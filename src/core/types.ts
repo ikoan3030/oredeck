@@ -139,9 +139,10 @@ export interface DeckEvaluation {
 }
 
 export interface OpponentDefinition {
-  id: "wall" | "rush";
+  id: string;
   name: string;
   title: string;
+  trait: string;
   deck: string[];
   faceBias: number;
   color: string;

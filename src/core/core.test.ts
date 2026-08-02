@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
-import { OPPONENTS, aestheticScore, advanceBattle, createBattle, createDraft, decideOffer, evaluateDeck, generateOffer, isAdviceDue, resolveOffer, runBattle, updateTrust, type Card, type ChildProfile, type DraftCard } from "./index";
+import { aestheticScore, advanceBattle, createBattle, createDraft, decideOffer, evaluateDeck, generateOffer, getOpponentById, isAdviceDue, resolveOffer, runBattle, updateTrust, type Card, type ChildProfile, type DraftCard, type OpponentDefinition } from "./index";
 
 const cards = JSON.parse(readFileSync(resolve("data/cards.json"), "utf8")) as Card[];
 const child = JSON.parse(readFileSync(resolve("data/children/tanjun.json"), "utf8")) as ChildProfile;
+const opponents = JSON.parse(readFileSync(resolve("data/opponents.json"), "utf8")) as OpponentDefinition[];
 const get = (id: string) => cards.find((card) => card.id === id)!;
+const getOpponent = (id: string) => getOpponentById(opponents, id)!;
 
 test("aesthetic score follows the fixed C/H/B/K weights", () => {
   assert.equal(aestheticScore(get("gravewald"), child), 2.7);
@@ -42,12 +44,12 @@ test("deck evaluation returns materials, not a win recommendation", () => {
 test("battle resolves within the turn limit without mutating the input state", () => {
   const ids = ["balga","dolguard","grim","alvine","gaiorg","volganid","phoenixeed","valzeid","dolga","zahhak","shadowkite","judgment","followarrow","thunder","steel-blessing"];
   const deck: DraftCard[] = ids.map((cardId, index) => ({ instanceId: `d-${index}`, cardId, intervention: index >= 11, source: index >= 11 ? "advice" : "auto" }));
-  const initial = createBattle(deck, OPPONENTS[0], cards, 12345);
+  const initial = createBattle(deck, getOpponent("wall"), cards, 12345);
   const snapshot = JSON.stringify(initial);
-  const oneTurn = advanceBattle(initial, cards, child, OPPONENTS[0]);
+  const oneTurn = advanceBattle(initial, cards, child, getOpponent("wall"));
   assert.equal(JSON.stringify(initial), snapshot);
   assert.notEqual(oneTurn, initial);
-  const result = runBattle(initial, cards, child, OPPONENTS[0]);
+  const result = runBattle(initial, cards, child, getOpponent("wall"));
   assert.ok(result.winner);
   assert.ok(result.turn <= 30);
 });
@@ -55,7 +57,7 @@ test("battle resolves within the turn limit without mutating the input state", (
 test("attribution only appears on effective work and never on card play", () => {
   const ids = ["judgment","judgment","followarrow","followarrow","steel-blessing","steel-blessing","balga","dolguard","grim","alvine","gaiorg","volganid","phoenixeed","valzeid","dolga"];
   const deck: DraftCard[] = ids.map((cardId, index) => ({ instanceId: `i-${index}`, cardId, intervention: index < 6, source: index < 6 ? "advice" : "auto" }));
-  const result = runBattle(createBattle(deck, OPPONENTS[0], cards, 98765), cards, child, OPPONENTS[0]);
+  const result = runBattle(createBattle(deck, getOpponent("rush"), cards, 98765), cards, child, getOpponent("rush"));
   assert.ok(result.events.filter((item) => item.type === "attribution").every((item) => item.effective));
   assert.ok(result.events.filter((item) => item.type === "play").every((item) => !item.dialogue));
 });

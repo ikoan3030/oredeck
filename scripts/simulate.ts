@@ -7,12 +7,16 @@ import {
   isAdviceDue,
   markAdviceSkipped,
   resolveOffer,
+  getOpponentById,
   type Card,
   type ChildProfile,
+  type OpponentDefinition,
 } from "../src/core/index";
 
 const cards = JSON.parse(readFileSync(resolve("data/cards.json"), "utf8")) as Card[];
 const child = JSON.parse(readFileSync(resolve("data/children/tanjun.json"), "utf8")) as ChildProfile;
+const opponents = JSON.parse(readFileSync(resolve("data/opponents.json"), "utf8")) as OpponentDefinition[];
+if (!getOpponentById(opponents, "wall") || !getOpponentById(opponents, "rush")) throw new Error("Missing baseline opponent data");
 const runs = Number(process.argv[2] ?? 2000);
 
 const totals = {
