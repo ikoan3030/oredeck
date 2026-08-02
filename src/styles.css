@@ -43,7 +43,6 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .versus-label span { font-size: clamp(20px, 3vw, 35px); font-weight: 1000; letter-spacing: -.05em; background: var(--yellow); border: 4px solid var(--ink); padding: 4px 18px; box-shadow: 4px 4px 0 var(--ink); transform: rotate(-1deg); }
 .versus-label b { background: var(--blue); color: white; border: 3px solid var(--ink); padding: 5px 12px; transform: rotate(1deg); }
 .card-choice { position: relative; display: grid; grid-template-columns: repeat(2, minmax(220px, 340px)); justify-content: center; gap: clamp(34px, 8vw, 94px); padding: 4px 24px; }
-.card-choice.has-kid-pick { padding-top: 48px; }
 .card-choice-button { position: relative; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; transition: transform .16s ease, filter .16s ease; }
 .card-choice-button:not(:disabled):hover { transform: translateY(-9px) rotate(-1deg); filter: drop-shadow(0 10px 10px #17151a44); }
 .card-choice-button:nth-child(2):not(:disabled):hover { transform: translateY(-9px) rotate(1deg); }
@@ -51,9 +50,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .card-choice-button .card-face { min-height: 450px; }
 .card-choice-button .choose-label { display: inline-block; margin-top: 13px; padding: 10px 22px; color: white; background: var(--ink); border: 4px solid var(--ink); box-shadow: 4px 4px 0 var(--yellow); }
 .vs-burst { position: absolute; z-index: 5; left: 50%; top: 42%; transform: translate(-50%, -50%) rotate(-8deg); display: grid; place-items: center; width: 80px; height: 80px; color: white; background: var(--red); border: 5px solid var(--ink); clip-path: polygon(50% 0, 61% 27%, 85% 9%, 79% 39%, 100% 50%, 75% 61%, 90% 88%, 60% 76%, 50% 100%, 39% 76%, 10% 90%, 24% 60%, 0 50%, 24% 39%, 9% 10%, 39% 26%); font-size: 25px; text-shadow: 3px 3px 0 var(--ink); }
-.kid-pick, .love-ribbon { position: absolute; z-index: 6; padding: 7px 14px; color: white; background: var(--blue); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--yellow); }
-.kid-pick { top: -10px; left: 50%; white-space: nowrap; pointer-events: none; transform: translate(-50%, -100%) rotate(-3deg); }
-.love-ribbon { top: 17px; left: -16px; background: var(--red); font-size: 15px; transform: rotate(-5deg); }
+.love-ribbon { position: absolute; z-index: 6; padding: 7px 14px; color: white; border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--yellow); top: 17px; left: -16px; background: var(--red); font-size: 15px; transform: rotate(-5deg); }
 
 .card-face { position: relative; overflow: hidden; border: 6px solid var(--ink); border-radius: 12px; padding: 12px; background: #f5eee2; box-shadow: var(--shadow); text-align: left; }
 .card-face.cool { background: linear-gradient(145deg, #e4f2ff 0 32%, #a8caff 32% 36%, #f4f7ff 36%); }
@@ -525,10 +522,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .effect-line { min-height: 42px; font-size: 10px; }
   .stats b { min-width: 58px; font-size: 11px; }
   .vs-burst { width: 54px; height: 54px; font-size: 17px; }
-  .card-choice.has-kid-pick { padding-top: 38px; }
-  .love-ribbon, .kid-pick { font-size: 9px; padding: 5px; }
-  .love-ribbon { left: -5px; top: 9px; }
-  .kid-pick { top: -7px; left: 50%; transform: translate(-50%, -100%) rotate(-3deg); }
+  .love-ribbon { font-size: 9px; padding: 5px; left: -5px; top: 9px; }
   .speech { padding: 10px; }
   .speech p { font-size: 13px; }
   .advice-options, .rival-cards { grid-template-columns: 1fr; }

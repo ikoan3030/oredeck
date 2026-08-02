@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
-import { advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createRun, decideOffer, evaluateDeck, generateOffer, getCurrentOpponentId, getOpponentById, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, updateTrust, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition } from "./index";
+import { advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createRun, decideOffer, evaluateDeck, generateOffer, getCurrentOpponentId, getOpponentById, isAdviceDue, isRunComplete, passiveInterventionRate, recordBattleResult, resetRun, resolveOffer, runBattle, updateTrust, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition } from "./index";
 
 const cards = JSON.parse(readFileSync(resolve("data/cards.json"), "utf8")) as Card[];
 const child = JSON.parse(readFileSync(resolve("data/children/tanjun.json"), "utf8")) as ChildProfile;
@@ -31,6 +31,39 @@ test("trust uses the confirmed asymmetric formula and floor", () => {
   assert.equal(updateTrust(50, true, 2, child), 53);
   assert.equal(updateTrust(50, false, 2, child), 45);
   assert.equal(updateTrust(21, false, 0, child), 20);
+});
+
+test("passive intervention rate follows the five trust levels", () => {
+  assert.deepEqual(child.passiveInterventionRatesByTrustLevel, [0.25, 0.4, 0.5, 0.6, 0.7]);
+  assert.deepEqual([20, 30, 50, 70, 90].map((trust) => passiveInterventionRate(trust, child)), [0.25, 0.4, 0.5, 0.6, 0.7]);
+});
+
+test("offer generation asks more often at high trust than at low trust", () => {
+  const sample = (trust: number) => {
+    let asked = 0;
+    let normal = 0;
+    for (let seed = 1; seed <= 600; seed += 1) {
+      const generated = generateOffer({ ...createDraft(seed * 7919, child, trust) }, cards, child);
+      if (generated.offer.decision.love) continue;
+      normal += 1;
+      if (generated.offer.wantsIntervention) asked += 1;
+    }
+    return asked / normal;
+  };
+  const low = sample(child.trust.minimum);
+  const high = sample(child.trust.maximum);
+  assert.ok(Math.abs(low - 0.25) < 0.06, `low trust rate ${low}`);
+  assert.ok(Math.abs(high - 0.7) < 0.06, `high trust rate ${high}`);
+});
+
+test("love suppresses passive intervention and advice picks always ask, whatever the trust", () => {
+  for (let seed = 1; seed <= 600; seed += 1) {
+    const generated = generateOffer(createDraft(seed * 7919, child, child.trust.maximum), cards, child);
+    if (generated.offer.decision.love) assert.equal(generated.offer.wantsIntervention, false);
+  }
+  const lowTrustDraft = createDraft(13579, child, child.trust.minimum);
+  assert.equal(generateOffer(lowTrustDraft, cards, child, "removal").offer.wantsIntervention, true);
+  assert.equal(generateOffer(lowTrustDraft, cards, child, "guard").offer.wantsIntervention, true);
 });
 
 test("deck evaluation returns materials, not a win recommendation", () => {

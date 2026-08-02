@@ -45,7 +45,8 @@ export interface ChildProfile {
   aestheticWeights: Record<AestheticKey, number>;
   loveThreshold: number;
   decisionOrder: string[];
-  passiveInterventionRate: number;
+  /** Passive intervention chance per trust level, ordered from the lowest level to the highest. */
+  passiveInterventionRatesByTrustLevel: number[];
   offerWeightsByCardId?: Record<string, number>;
   trust: {
     initial: number;

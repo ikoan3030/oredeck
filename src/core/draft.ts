@@ -1,7 +1,7 @@
 import { decideOffer } from "./decision";
 import { hasKeyword, isRemoval } from "./evaluation";
 import { nextRandom } from "./random";
-import { updateTrust } from "./trust";
+import { passiveInterventionRate, updateTrust } from "./trust";
 import type { AdviceCategory, Card, ChildProfile, DraftOffer, DraftState, PickSource } from "./types";
 
 export function createDraft(seed: number, child: ChildProfile, initialTrust = child.trust.initial): DraftState {
@@ -70,7 +70,7 @@ export function generateOffer(
   if (!adviceCategory && !decision.love) {
     const chance = nextRandom(seed);
     seed = chance.seed;
-    wantsIntervention = chance.value < child.passiveInterventionRate;
+    wantsIntervention = chance.value < passiveInterventionRate(state.trust, child);
   }
   return {
     state: { ...state, seed },

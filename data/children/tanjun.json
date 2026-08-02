@@ -5,7 +5,7 @@
   "aestheticWeights": {"C": 1.0, "K": 0.0, "B": 0.3, "H": 0.7},
   "loveThreshold": 2.4,
   "decisionOrder": ["monster", "lower_cost", "higher_attack", "aesthetic", "first"],
-  "passiveInterventionRate": 0.5,
+  "passiveInterventionRatesByTrustLevel": [0.25, 0.4, 0.5, 0.6, 0.7],
   "offerWeightsByCardId": {
     "gorganos": 1.9,
     "inferdos": 1.9,
