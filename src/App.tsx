@@ -169,7 +169,7 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, onPick, onAuto, o
       <div className="draft-layout">
         <section className="choice-zone">
           <div className="versus-label"><span>どっちを入れる？</span>{offer?.source === "advice" && <b>兄ちゃんの注文ピック</b>}</div>
-          {offer ? <div className="card-choice">
+          {offer ? <div className={`card-choice ${offer.wantsIntervention && !offer.decision.love ? "has-kid-pick" : ""}`}>
             {offer.cards.map((card, index) => (
               <button
                 className={`card-choice-button ${offer.decision.love && index === offer.decision.preferredIndex ? "love-lock" : ""}`}
