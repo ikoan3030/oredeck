@@ -84,6 +84,19 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .primary-action:hover { transform: translate(3px, 3px) skew(-4deg); box-shadow: 3px 3px 0 var(--ink); }
 .primary-action span { margin-left: 20px; color: var(--yellow); }
 .primary-action.slam { display: block; margin: 18px auto; }
+.kid-reaction { position: fixed; z-index: 20; top: 100px; left: 50%; transform: translateX(-50%) rotate(-1deg); display: flex; gap: 12px; align-items: center; width: max-content; max-width: min(620px, calc(100vw - 32px)); padding: 10px 20px 10px 12px; color: var(--ink); background: white; border: 4px solid var(--ink); border-radius: 10px; box-shadow: 5px 5px 0 var(--yellow); font-family: "Yu Gothic", sans-serif; animation: reaction-pop .18s ease-out; }
+.kid-reaction b { flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; color: white; border: 3px solid var(--ink); border-radius: 50%; font-size: 22px; }
+.kid-reaction span { flex: 0 0 auto; color: white; background: var(--ink); border: 3px solid var(--ink); padding: 5px 8px; font-weight: 900; font-size: 13px; }
+.kid-reaction p { margin: 0; font-weight: 900; font-size: 17px; }
+.kid-reaction.support { border-color: var(--blue); box-shadow: 5px 5px 0 var(--cyan); }
+.kid-reaction.support b { background: var(--blue); }
+.kid-reaction.support span { background: var(--blue); border-color: var(--blue); }
+.kid-reaction.reject { border-color: var(--red); box-shadow: 5px 5px 0 var(--orange); transform: translateX(-50%) rotate(1deg); }
+.kid-reaction.reject b { background: var(--red); }
+.kid-reaction.reject span { background: var(--red); border-color: var(--red); }
+
+@keyframes reaction-pop { from { opacity: 0; transform: translate(-50%, -12px) scale(.94); } }
+
 .speech { position: relative; display: flex; gap: 13px; align-items: center; max-width: 760px; margin: 17px auto 0; padding: 12px 20px; color: var(--ink); background: white; border: 4px solid var(--ink); border-radius: 10px; box-shadow: 4px 4px 0 var(--yellow); font-family: "Yu Gothic", sans-serif; }
 .speech::after { content: ""; position: absolute; top: -14px; left: 35px; width: 20px; height: 20px; background: white; border-left: 4px solid var(--ink); border-top: 4px solid var(--ink); transform: rotate(45deg); }
 .speech span { flex: 0 0 auto; color: white; background: var(--blue); border: 3px solid var(--ink); padding: 6px 9px; font-weight: 900; transform: rotate(-3deg); }
@@ -553,6 +566,10 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .battle-speech { display: none; }
   .battle-controls { right: 10px; bottom: 8px; }
   .battle-controls button { font-size: 11px; }
+  .kid-reaction { top: 84px; gap: 8px; padding: 7px 12px 7px 8px; }
+  .kid-reaction b { width: 28px; height: 28px; font-size: 15px; }
+  .kid-reaction span { font-size: 10px; padding: 4px 6px; }
+  .kid-reaction p { font-size: 13px; }
 }
 
 @media (max-width: 390px) {
@@ -574,4 +591,5 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 @media (prefers-reduced-motion: reduce) {
   .mode-card,
   button.character-slot.active { transition: none; }
+  .kid-reaction { animation: none; }
 }

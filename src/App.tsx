@@ -36,6 +36,12 @@ interface SavedGame {
   run: RunState;
 }
 
+/** Transient answer-check line shown after the player rules on a passive intervention. Not persisted. */
+interface KidReaction {
+  tone: "support" | "reject";
+  text: string;
+}
+
 const SAVE_KEY = "oredeck-prototype-v2";
 const LADDER_OPPONENT_IDS = ["rush", "wall", "boss"];
 
@@ -137,6 +143,14 @@ function Speech({ speaker, text, tone = "kid" }: { speaker: string; text: string
   return <div className={`speech ${tone}`}><span>{speaker}</span><p>{text}</p></div>;
 }
 
+function ReactionBanner({ reaction, speaker }: { reaction: KidReaction; speaker: string }) {
+  return <div className={`kid-reaction ${reaction.tone}`} role="status">
+    <b aria-hidden="true">{reaction.tone === "support" ? "！" : "…"}</b>
+    <span>{speaker}</span>
+    <p>{reaction.text}</p>
+  </div>;
+}
+
 function ModeSelectScreen({ onSelect }: { onSelect: () => void }) {
   return <main className="mode-select-screen"><section className="mode-select-panel"><span className="section-kicker">SELECT MODE</span><h1>遊び方を選べ！</h1><button className="mode-card active" onClick={onSelect}><strong>アーケードモード</strong><span>3人の相手と連続バトル</span><b>START ▶</b></button></section></main>;
 }
@@ -152,12 +166,13 @@ function OpponentPreviewScreen({ opponent, battleNumber, onStart }: { opponent: 
   return <main className="opponent-preview-screen"><section className="opponent-preview-panel"><span className="section-kicker">BATTLE {battleNumber} / 3</span><h1>つぎの相手</h1><div className="opponent-preview-card" style={{ "--rival-color": opponent.color } as CSSProperties}><span className="opponent-mark">{opponent.title.slice(0, 1)}</span><small>{opponent.title}</small><strong>{opponent.name}</strong><p>{opponent.trait}</p></div><button className="primary-action" onClick={onStart}>デッキを組む！<span>▶</span></button></section></main>;
 }
 
-function DraftScreen({ draft, offer, cards, child, adviceOpen, onPick, onAuto, onAdvice }: {
+function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, onPick, onAuto, onAdvice }: {
   draft: DraftState;
   offer: DraftOffer | null;
   cards: Card[];
   child: ChildProfile;
   adviceOpen: boolean;
+  reaction: KidReaction | null;
   onPick: (index: 0 | 1) => void;
   onAuto: () => void;
   onAdvice: (category: AdviceCategory) => void;
@@ -166,6 +181,7 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, onPick, onAuto, o
   return (
     <main className="game-shell draft-screen">
       <header className="game-header"><div className="mini-logo">兄ちゃん！<b>俺のデッキ作って！</b></div><div className="pick-counter"><span>PICK</span><b>{String(draft.pick + 1).padStart(2, "0")}</b><em>/15</em></div><Meter trust={draft.trust} child={child} /></header>
+      {reaction && <ReactionBanner reaction={reaction} speaker={child.displayName} />}
       <div className="draft-layout">
         <section className="choice-zone">
           <div className="versus-label"><span>どっちを入れる？</span>{offer?.source === "advice" && <b>兄ちゃんの注文ピック</b>}</div>
@@ -202,10 +218,11 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, onPick, onAuto, o
   );
 }
 
-function DeckScreen({ draft, cards, onBattle }: { draft: DraftState; cards: Card[]; onBattle: () => void }) {
+function DeckScreen({ draft, cards, child, reaction, onBattle }: { draft: DraftState; cards: Card[]; child: ChildProfile; reaction: KidReaction | null; onBattle: () => void }) {
   const byId = new Map(cards.map((card) => [card.id, card]));
   return <main className="game-shell deck-screen">
     <header className="game-header"><div className="mini-logo">デッキ完成！<b>答え合わせへ</b></div><div className="completion-stamp">15 CARDS</div></header>
+    {reaction && <ReactionBanner reaction={reaction} speaker={child.displayName} />}
     <div className="deck-review-grid">
       <section className="deck-list-panel"><div className="section-kicker">YOUR DECK</div><h1>ユウタのデッキ</h1><div className="deck-list">{draft.deck.map((item, index) => { const card = byId.get(item.cardId)!; return <div key={item.instanceId} className="deck-row"><span className="deck-number">{String(index + 1).padStart(2, "0")}</span><span className="mini-cost">{card.cost}</span><strong>{card.name}</strong><small>{effectText(card)}</small>{item.intervention && <b className="brother-tag">兄ちゃん</b>}</div>; })}</div></section>
       <aside><DeckMaterials draft={draft} cards={cards} /><div className="no-verdict"><b>勝てそう？</b><span>数字は材料。答えは対戦で確かめよう。</span></div></aside>
@@ -251,6 +268,7 @@ export default function Home() {
   const [game, setGame] = useState<SavedGame>(defaultSave);
   const [hydrated, setHydrated] = useState(false);
   const [autoBattle, setAutoBattle] = useState(false);
+  const [reaction, setReaction] = useState<KidReaction | null>(null);
 
   useEffect(() => {
     Promise.all([fetch("./data/cards.json").then((response) => response.json()), fetch("./data/children/tanjun.json").then((response) => response.json()), fetch("./data/opponents.json").then((response) => response.json())])
@@ -283,6 +301,7 @@ export default function Home() {
   function beginArcade() {
     if (!child) return;
     setAutoBattle(false);
+    setReaction(null);
     setGame({ ...createDefaultSave(child.trust.initial), phase: "mode" });
   }
 
@@ -296,6 +315,7 @@ export default function Home() {
 
   function startDraft() {
     if (!child || !getCurrentOpponentId(game.run)) return;
+    setReaction(null);
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
     const draft = createDraft(seed, child, game.run.carryTrust);
     const generated = generateOffer(draft, cards, child);
@@ -304,12 +324,22 @@ export default function Home() {
 
   function takePick(index?: 0 | 1) {
     if (!game.draft || !game.offer || !child) return;
+    const offer = game.offer;
+    const ruled = offer.source === "normal" && offer.wantsIntervention && !offer.decision.love && index !== undefined;
+    if (ruled) {
+      const supported = index === offer.decision.preferredIndex;
+      const lines = supported ? child.dialogue.support : child.dialogue.reject;
+      setReaction({ tone: supported ? "support" : "reject", text: lines[game.draft.pick % lines.length] });
+    } else {
+      setReaction(null);
+    }
     const next = resolveOffer(game.draft, game.offer, child, index);
     setGame(nextNormalOffer(next));
   }
 
   function chooseAdvice(category: AdviceCategory) {
     if (!game.draft || !child) return;
+    setReaction(null);
     if (category === "skip") { const next = markAdviceSkipped(game.draft); const generated = generateOffer(next, cards, child); setGame({ ...game, draft: generated.state, offer: generated.offer, adviceOpen: false }); return; }
     const generated = generateOffer(game.draft, cards, child, category);
     setGame({ ...game, draft: generated.state, offer: generated.offer, adviceOpen: false });
@@ -317,6 +347,7 @@ export default function Home() {
 
   function startBattle() {
     if (!game.draft || !child) return;
+    setReaction(null);
     const opponentId = getCurrentOpponentId(game.run);
     const opponent = opponentId ? getOpponentById(opponents, opponentId) : undefined;
     if (!opponent) return;
@@ -334,6 +365,7 @@ export default function Home() {
   function returnToTitle() {
     if (!child) return;
     setAutoBattle(false);
+    setReaction(null);
     setGame(createDefaultSave(child.trust.initial));
   }
 
@@ -344,8 +376,8 @@ export default function Home() {
   const currentOpponentId = getCurrentOpponentId(game.run);
   const currentOpponent = currentOpponentId ? getOpponentById(opponents, currentOpponentId) : undefined;
   if (game.phase === "opponent" && currentOpponent) return <OpponentPreviewScreen opponent={currentOpponent} battleNumber={game.run.currentBattle + 1} onStart={startDraft} />;
-  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} onPick={takePick} onAuto={() => takePick()} onAdvice={chooseAdvice} />;
-  if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} onBattle={startBattle} />;
+  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} onPick={takePick} onAuto={() => takePick()} onAdvice={chooseAdvice} />;
+  if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} onBattle={startBattle} />;
   if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} opponent={currentOpponent} onNext={() => setGame({ ...game, battle: advanceBattle(game.battle!, cards, child, currentOpponent) })} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} />;
   if (game.phase === "clear") return <ClearScreen run={game.run} cards={cards} child={child} opponents={opponents} onTitle={returnToTitle} />;
   return <main className="boot-screen"><button className="primary-action" onClick={returnToTitle}>タイトルへ</button></main>;
