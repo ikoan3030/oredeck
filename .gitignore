@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+public/data/
+*.tsbuildinfo
+.DS_Store
+.env*
+.verify/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

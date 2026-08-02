@@ -1,0 +1,265 @@
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import {
+  OPPONENTS,
+  advanceBattle,
+  createBattle,
+  createDraft,
+  evaluateDeck,
+  generateOffer,
+  isAdviceDue,
+  markAdviceSkipped,
+  resolveOffer,
+  trustLabel,
+  type AdviceCategory,
+  type BattleState,
+  type Card,
+  type ChildProfile,
+  type DraftOffer,
+  type DraftState,
+  type OpponentDefinition,
+} from "@/src/core";
+
+type Phase = "title" | "draft" | "deck" | "battle";
+
+interface SavedGame {
+  phase: Phase;
+  draft: DraftState | null;
+  offer: DraftOffer | null;
+  adviceOpen: boolean;
+  opponentId: OpponentDefinition["id"];
+  battle: BattleState | null;
+}
+
+const SAVE_KEY = "oredeck-prototype-v1";
+const defaultSave: SavedGame = { phase: "title", draft: null, offer: null, adviceOpen: false, opponentId: "wall", battle: null };
+
+const categoryCopy: Record<AdviceCategory, { label: string; detail: string; icon: string }> = {
+  removal: { label: "除去がほしい", detail: "相手の切り札をどかすカード", icon: "破" },
+  guard: { label: "守護がほしい", detail: "攻撃を受け止めるモンスター", icon: "守" },
+  low_cost: { label: "軽いカードがほしい", detail: "2コスト以下で早く動けるカード", icon: "軽" },
+  skip: { label: "今は見送る", detail: "弟の選び方をそのまま続ける", icon: "続" },
+};
+
+const reasonCopy: Record<DraftOffer["decision"]["reason"], string> = {
+  love: "見た瞬間に心を奪われた",
+  monster: "モンスターだから",
+  lower_cost: "先に出せるから",
+  higher_attack: "攻撃力が高いから",
+  aesthetic: "よりカッコいいから",
+  first: "最初に見た方だから",
+};
+
+function effectText(card: Card): string {
+  if (!card.effects.length) return "効果なし";
+  return card.effects.map((effect) => {
+    const words: Record<string, string> = { rush: "速攻", guard: "守護", damage: `ダメージ${effect.value}`, destroy: "破壊", buff: `強化+${effect.value}`, draw: `ドロー${effect.value}`, revive: "復活" };
+    const triggers: Record<string, string> = { on_play: "登場時", on_destroyed: "破壊時", passive: "", aura: "常時" };
+    return [triggers[effect.trigger], words[effect.keyword]].filter(Boolean).join("：");
+  }).join(" / ");
+}
+
+function CardFace({ card, selected, intervention, compact = false }: { card: Card; selected?: boolean; intervention?: boolean; compact?: boolean }) {
+  const aesthetic = card.aesthetic.C >= 3 ? "love" : card.aesthetic.C >= 2 ? "cool" : card.aesthetic.K >= 2 ? "cute" : "plain";
+  return (
+    <article className={`card-face ${aesthetic} ${selected ? "selected" : ""} ${compact ? "compact" : ""}`}>
+      {intervention && <span className="intervention-mark" title="兄ちゃんが選んだカード">兄</span>}
+      <div className="card-topline"><span className="cost-gem">{card.cost}</span><span className="card-kind">{card.type === "monster" ? "MONSTER" : "SPELL"}</span></div>
+      <div className="card-art" aria-hidden="true"><span>{card.name.slice(0, 1)}</span><i /></div>
+      <h3>{card.name}</h3>
+      <p className="effect-line">{effectText(card)}</p>
+      {card.type === "monster" ? <div className="stats"><b>ATK {card.atk}</b><b>HP {card.hp}</b></div> : <div className="spell-stamp">ACTION</div>}
+    </article>
+  );
+}
+
+function Meter({ trust, child }: { trust: number; child: ChildProfile }) {
+  const level = Math.max(1, Math.min(5, Math.ceil(trust / 20)));
+  return (
+    <div className="trust-box" aria-label={`信頼度状態：${trustLabel(trust, child)}`}>
+      <span>兄ちゃんへの信頼</span>
+      <div className="trust-meter" aria-hidden="true">{[1, 2, 3, 4, 5].map((item) => <i key={item} className={item <= level ? "on" : ""} />)}</div>
+      <strong>{trustLabel(trust, child)}</strong>
+    </div>
+  );
+}
+
+function DeckMaterials({ draft, cards, small = false }: { draft: DraftState; cards: Card[]; small?: boolean }) {
+  const data = evaluateDeck(draft.deck, cards);
+  const maxCurve = Math.max(1, ...data.curve);
+  return (
+    <section className={`materials-panel ${small ? "small" : ""}`}>
+      <div className="panel-heading"><span>DECK DATA</span><b>{data.size}/15</b></div>
+      <div className="material-grid">
+        <div><span>除去</span><strong>{data.removal}</strong><small>目安 2</small></div>
+        <div><span>守護</span><strong>{data.guards}</strong><small>目安 2</small></div>
+        <div><span>6コスト〜</span><strong>{data.heavy}</strong><small>目安 2以下</small></div>
+        <div><span>〜2コスト</span><strong>{data.lowCost}</strong><small>目安 4</small></div>
+      </div>
+      {!small && <>
+        <div className="substats"><span>平均コスト <b>{data.averageCost.toFixed(1)}</b></span><span>モンスター <b>{data.monsters}</b></span><span>スペル <b>{data.spells}</b></span></div>
+        <div className="curve" aria-label="コスト分布">
+          {data.curve.slice(1).map((value, index) => <div key={index}><i style={{ height: `${Math.max(4, value / maxCurve * 54)}px` }} /><span>{index === 7 ? "8+" : index + 1}</span></div>)}
+        </div>
+      </>}
+    </section>
+  );
+}
+
+function Speech({ speaker, text, tone = "kid" }: { speaker: string; text: string; tone?: "kid" | "rival" | "system" }) {
+  return <div className={`speech ${tone}`}><span>{speaker}</span><p>{text}</p></div>;
+}
+
+function DraftScreen({ draft, offer, cards, child, adviceOpen, onPick, onAuto, onAdvice }: {
+  draft: DraftState;
+  offer: DraftOffer | null;
+  cards: Card[];
+  child: ChildProfile;
+  adviceOpen: boolean;
+  onPick: (index: 0 | 1) => void;
+  onAuto: () => void;
+  onAdvice: (category: AdviceCategory) => void;
+}) {
+  const dialogue = !offer ? "次のカード、どんなのかな！" : offer.decision.love ? child.dialogue.love[draft.pick % child.dialogue.love.length] : offer.wantsIntervention ? child.dialogue.ask[draft.pick % child.dialogue.ask.length] : `${offer.cards[offer.decision.preferredIndex].name}にする！ ${reasonCopy[offer.decision.reason]}！`;
+  return (
+    <main className="game-shell draft-screen">
+      <header className="game-header"><div className="mini-logo">兄ちゃん！<b>俺のデッキ作って！</b></div><div className="pick-counter"><span>PICK</span><b>{String(draft.pick + 1).padStart(2, "0")}</b><em>/15</em></div><Meter trust={draft.trust} child={child} /></header>
+      <div className="draft-layout">
+        <section className="choice-zone">
+          <div className="versus-label"><span>どっちを入れる？</span>{offer?.source === "advice" && <b>兄ちゃんの注文ピック</b>}</div>
+          {offer ? <div className="card-choice">
+            {offer.cards.map((card, index) => (
+              <button
+                className={`card-choice-button ${offer.decision.love && index === offer.decision.preferredIndex ? "love-lock" : ""}`}
+                key={`${card.id}-${index}`}
+                disabled={!offer.wantsIntervention || offer.decision.love}
+                onClick={() => onPick(index as 0 | 1)}
+                aria-label={`${card.name}を選ぶ`}
+              >
+                {offer.decision.love && index === offer.decision.preferredIndex && <span className="love-ribbon">一目惚れ！変更不可</span>}
+                {offer.wantsIntervention && !offer.decision.love && index === offer.decision.preferredIndex && <span className="kid-pick">弟の第一希望</span>}
+                <CardFace card={card} />
+                {offer.wantsIntervention && !offer.decision.love && <span className="choose-label">こっちにする</span>}
+              </button>
+            ))}
+            <div className="vs-burst">VS</div>
+          </div> : <div className="loading-card">カードをシャッフル中…</div>}
+          {offer && (!offer.wantsIntervention || offer.decision.love) && <button className="primary-action slam" onClick={onAuto}>{offer.decision.love ? "このカードで決定！" : "弟のピックを見届ける"}<span>▶</span></button>}
+          <Speech speaker={child.displayName} text={dialogue} />
+        </section>
+        <aside><DeckMaterials draft={draft} cards={cards} /></aside>
+      </div>
+      {adviceOpen && <div className="modal-backdrop"><section className="advice-modal">
+        <div className="advice-title"><span>兄ちゃん会議！</span><h2>デッキを見て、ひとこと注文しよう</h2><p>注文したカードも、このまま通常の1枠として入る。</p></div>
+        <DeckMaterials draft={draft} cards={cards} small />
+        <div className="advice-options">{child.advice.categories.map((category) => {
+          const copy = categoryCopy[category];
+          return <button key={category} onClick={() => onAdvice(category)} className={category === "skip" ? "skip" : ""}><b>{copy.icon}</b><span><strong>{copy.label}</strong><small>{copy.detail}</small></span></button>;
+        })}</div>
+      </section></div>}
+    </main>
+  );
+}
+
+function DeckScreen({ draft, cards, opponentId, onOpponent, onBattle }: { draft: DraftState; cards: Card[]; opponentId: OpponentDefinition["id"]; onOpponent: (id: OpponentDefinition["id"]) => void; onBattle: () => void }) {
+  const byId = new Map(cards.map((card) => [card.id, card]));
+  return <main className="game-shell deck-screen">
+    <header className="game-header"><div className="mini-logo">デッキ完成！<b>答え合わせへ</b></div><div className="completion-stamp">15 CARDS</div></header>
+    <div className="deck-review-grid">
+      <section className="deck-list-panel"><div className="section-kicker">YOUR DECK</div><h1>ユウタのデッキ</h1><div className="deck-list">{draft.deck.map((item, index) => { const card = byId.get(item.cardId)!; return <div key={item.instanceId} className="deck-row"><span className="deck-number">{String(index + 1).padStart(2, "0")}</span><span className="mini-cost">{card.cost}</span><strong>{card.name}</strong><small>{effectText(card)}</small>{item.intervention && <b className="brother-tag">兄ちゃん</b>}</div>; })}</div></section>
+      <aside><DeckMaterials draft={draft} cards={cards} /><div className="no-verdict"><b>勝てそう？</b><span>数字は材料。答えは対戦で確かめよう。</span></div></aside>
+    </div>
+    <section className="rival-select"><div><span className="section-kicker">NEXT RIVAL</span><h2>対戦相手を選べ！</h2></div><div className="rival-cards">{OPPONENTS.map((opponent) => <button key={opponent.id} className={opponentId === opponent.id ? "active" : ""} onClick={() => onOpponent(opponent.id)} style={{ "--rival-color": opponent.color } as CSSProperties}><i>{opponent.title.slice(0, 1)}</i><span><small>{opponent.title}</small><strong>{opponent.name}</strong><em>{opponent.id === "wall" ? "守護で受けて切り返す" : "軽いカードで一気に攻める"}</em></span><b>{opponentId === opponent.id ? "選択中" : "挑戦"}</b></button>)}</div><button className="primary-action battle-start" onClick={onBattle}>この相手とバトル！<span>▶</span></button></section>
+  </main>;
+}
+
+function BoardCard({ instance, cards }: { instance: BattleState["brother"]["board"][number]; cards: Card[] }) {
+  const card = cards.find((item) => item.id === instance.cardId)!;
+  return <div className={`board-card ${instance.intervention ? "intervened" : ""}`} title={card.name}>{instance.intervention && <span className="intervention-mark">兄</span>}<b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
+}
+
+function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onRestart }: { battle: BattleState; cards: Card[]; opponent: OpponentDefinition; onNext: () => void; onAuto: () => void; auto: boolean; onRestart: () => void }) {
+  const recent = battle.events.slice(-9).reverse();
+  const dialogueEvent = [...battle.events].reverse().find((item) => item.dialogue);
+  return <main className="battle-screen">
+    <header className="battle-header"><div><span>{opponent.title}</span><strong>{opponent.name}</strong></div><div className="battle-turn">TURN <b>{battle.turn}</b></div><div className="brother-name"><span>単純弟</span><strong>ユウタ</strong></div></header>
+    <section className="arena">
+      <div className="fighter opponent-fighter"><div className="avatar" style={{ "--rival-color": opponent.color } as CSSProperties}>{opponent.name.slice(0, 1)}</div><div className="life"><span>LIFE</span><b>{battle.opponent.life}</b></div><div className="pp">PP {battle.opponent.pp}/{battle.opponent.maxPp}</div></div>
+      <div className="board-zone opponent-board">{battle.opponent.board.map((item) => <BoardCard key={item.instanceId} instance={item} cards={cards} />)}{!battle.opponent.board.length && <span className="empty-board">相手の場は空</span>}</div>
+      <div className="board-line"><b>AUTO CARD BATTLE</b></div>
+      <div className="board-zone brother-board">{battle.brother.board.map((item) => <BoardCard key={item.instanceId} instance={item} cards={cards} />)}{!battle.brother.board.length && <span className="empty-board">ユウタの場は空</span>}</div>
+      <div className="fighter brother-fighter"><div className="avatar kid">ユ</div><div className="life"><span>LIFE</span><b>{battle.brother.life}</b></div><div className="pp">PP {battle.brother.pp}/{battle.brother.maxPp}</div></div>
+      <div className="hand-zone">{battle.brother.hand.map((item) => <div key={item.instanceId} className="hand-card"><CardFace compact card={cards.find((card) => card.id === item.cardId)!} intervention={item.intervention} /></div>)}</div>
+    </section>
+    <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
+    {dialogueEvent && !battle.winner && <div className="battle-speech"><Speech speaker={dialogueEvent.side === "brother" ? "ユウタ" : opponent.name} text={dialogueEvent.dialogue!} tone={dialogueEvent.side === "brother" ? "kid" : "rival"} /></div>}
+    {!battle.winner && <div className="battle-controls"><button onClick={onNext} disabled={auto}>1ターン進める</button><button className="primary-action" onClick={onAuto}>{auto ? "自動再生中…" : "最後まで見る"}<span>▶</span></button></div>}
+    {battle.winner && <div className="result-overlay"><div className={`result-burst ${battle.winner === "brother" ? "win" : "lose"}`}><span>{battle.winner === "brother" ? "VICTORY!" : battle.winner === "draw" ? "DRAW" : "DEFEAT"}</span><h1>{battle.winner === "brother" ? "ユウタの勝利！" : battle.winner === "draw" ? "引き分け！" : `${opponent.name}の勝利！`}</h1><p>{battle.winner === "brother" ? "デッキは狙い通りに仕事をしただろうか？" : "どの穴が勝負を分けたか、デッキを思い返そう。"}</p><button className="primary-action" onClick={onRestart}>もう一度デッキを作る<span>↻</span></button></div></div>}
+  </main>;
+}
+
+export default function Home() {
+  const [cards, setCards] = useState<Card[]>([]);
+  const [child, setChild] = useState<ChildProfile | null>(null);
+  const [game, setGame] = useState<SavedGame>(defaultSave);
+  const [hydrated, setHydrated] = useState(false);
+  const [autoBattle, setAutoBattle] = useState(false);
+
+  useEffect(() => {
+    Promise.all([fetch("./data/cards.json").then((response) => response.json()), fetch("./data/children/tanjun.json").then((response) => response.json())])
+      .then(([cardData, childData]) => { setCards(cardData); setChild(childData); const saved = localStorage.getItem(SAVE_KEY); if (saved) setGame(JSON.parse(saved)); setHydrated(true); });
+  }, []);
+
+  useEffect(() => { if (hydrated) localStorage.setItem(SAVE_KEY, JSON.stringify(game)); }, [game, hydrated]);
+
+  useEffect(() => {
+    if (!autoBattle || !game.battle || game.battle.winner || !child) { if (game.battle?.winner) setAutoBattle(false); return; }
+    const timer = window.setTimeout(() => setGame((current) => current.battle ? { ...current, battle: advanceBattle(current.battle, cards, child, OPPONENTS.find((item) => item.id === current.opponentId)!) } : current), 520);
+    return () => window.clearTimeout(timer);
+  }, [autoBattle, game.battle, game.opponentId, cards, child]);
+
+  const byId = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
+
+  function nextNormalOffer(draft: DraftState): SavedGame {
+    if (!child) return game;
+    if (draft.pick >= 15) return { ...game, phase: "deck", draft, offer: null, adviceOpen: false };
+    if (isAdviceDue(draft, child)) return { ...game, phase: "draft", draft, offer: null, adviceOpen: true };
+    const generated = generateOffer(draft, cards, child);
+    return { ...game, phase: "draft", draft: generated.state, offer: generated.offer, adviceOpen: false, battle: null };
+  }
+
+  function startGame() {
+    if (!child) return;
+    const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
+    const draft = createDraft(seed, child);
+    const generated = generateOffer(draft, cards, child);
+    setGame({ ...defaultSave, phase: "draft", draft: generated.state, offer: generated.offer });
+  }
+
+  function takePick(index?: 0 | 1) {
+    if (!game.draft || !game.offer || !child) return;
+    const next = resolveOffer(game.draft, game.offer, child, index);
+    setGame(nextNormalOffer(next));
+  }
+
+  function chooseAdvice(category: AdviceCategory) {
+    if (!game.draft || !child) return;
+    if (category === "skip") { const next = markAdviceSkipped(game.draft); const generated = generateOffer(next, cards, child); setGame({ ...game, draft: generated.state, offer: generated.offer, adviceOpen: false }); return; }
+    const generated = generateOffer(game.draft, cards, child, category);
+    setGame({ ...game, draft: generated.state, offer: generated.offer, adviceOpen: false });
+  }
+
+  function startBattle() {
+    if (!game.draft || !child) return;
+    const opponent = OPPONENTS.find((item) => item.id === game.opponentId)!;
+    const battle = createBattle(game.draft.deck, opponent, cards, game.draft.seed ^ 0xa5a5a5a5);
+    setGame({ ...game, phase: "battle", battle });
+  }
+
+  if (!hydrated || !child || cards.length !== 40) return <main className="boot-screen"><div className="logo-burst"><span>NOW LOADING</span><b>カードをまぜてるぞ！</b></div></main>;
+  if (game.phase === "title") return <main className="title-screen"><div className="halftone" /><section className="title-copy"><span className="prototype-label">DECK BUILD SUPPORT GAME / PROTOTYPE</span><h1><small>兄ちゃん！</small>俺のデッキ<br />作って！</h1><p>好きなカードは、変えたくない。<br /><b>だから兄ちゃん、勝てる形にしてくれよ！</b></p><button className="primary-action title-start" onClick={startGame}>デッキを作る！<span>▶</span></button><div className="save-note">途中経過はこのブラウザに自動保存</div></section><section className="title-cards"><div className="tilted-card one"><CardFace card={byId.get("zexvain")!} /></div><div className="tilted-card two"><CardFace card={byId.get("dolguard")!} intervention /></div><div className="title-shout">「カッコいい」で<br />勝ちたいんだ！</div></section><footer>15 PICKS · 2 ADVICES · 1 AUTO BATTLE</footer></main>;
+  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} onPick={takePick} onAuto={() => takePick()} onAdvice={chooseAdvice} />;
+  if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} opponentId={game.opponentId} onOpponent={(opponentId) => setGame({ ...game, opponentId })} onBattle={startBattle} />;
+  if (game.phase === "battle" && game.battle) return <BattleScreen battle={game.battle} cards={cards} opponent={OPPONENTS.find((item) => item.id === game.opponentId)!} onNext={() => setGame({ ...game, battle: advanceBattle(game.battle!, cards, child, OPPONENTS.find((item) => item.id === game.opponentId)!) })} onAuto={() => setAutoBattle(true)} auto={autoBattle} onRestart={startGame} />;
+  return <main className="boot-screen"><button className="primary-action" onClick={startGame}>最初から始める</button></main>;
+}
+

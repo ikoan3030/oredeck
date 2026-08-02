@@ -1,0 +1,56 @@
+{
+  "id": "tanjun",
+  "name": "単純弟",
+  "displayName": "ユウタ",
+  "aestheticWeights": {"C": 1.0, "K": 0.0, "B": 0.3, "H": 0.7},
+  "loveThreshold": 2.4,
+  "decisionOrder": ["monster", "lower_cost", "higher_attack", "aesthetic", "first"],
+  "passiveInterventionRate": 0.5,
+  "offerWeightsByCardId": {
+    "gorganos": 1.9,
+    "inferdos": 1.9,
+    "drakevine": 1.9,
+    "holyblade": 1.08,
+    "judgment": 1.08,
+    "dragonseal": 1.08,
+    "vanishflash": 1.08,
+    "followarrow": 1.08,
+    "thunder": 1.08,
+    "gravewald": 1.1,
+    "nemesion": 1.1
+  },
+  "trust": {
+    "initial": 50,
+    "minimum": 20,
+    "maximum": 100,
+    "supportGain": 3,
+    "rejectBaseLoss": 5,
+    "aestheticDivisor": 2,
+    "aestheticMinimumMultiplier": 0.5,
+    "labels": [
+      {"minimum": 81, "label": "兄ちゃんをすっげー頼ってる！"},
+      {"minimum": 61, "label": "かなり乗り気"},
+      {"minimum": 41, "label": "いつもの調子"},
+      {"minimum": 21, "label": "ちょっと不満そう"},
+      {"minimum": 0, "label": "かなり意地になってる"}
+    ]
+  },
+  "advice": {
+    "checkpoints": [5, 10],
+    "categories": ["removal", "guard", "low_cost", "skip"],
+    "alwaysIntervene": true,
+    "consumesPick": true
+  },
+  "battle": {
+    "faceBias": 0.82,
+    "attributionKeywords": ["damage", "destroy", "buff"]
+  },
+  "dialogue": {
+    "ask": ["兄ちゃん、どっちがいいと思う？", "どっちもよさそうなんだよなー！", "兄ちゃんが決めてくれよ！"],
+    "support": ["だよな！ こっち、ぜったい強いって！", "兄ちゃんも分かってるじゃん！"],
+    "reject": ["えーっ、そっちなの！？", "マジかよ兄ちゃん……でも、分かった！"],
+    "love": ["うおおっ！ こいつ絶対入れる！", "見ろよ兄ちゃん、めちゃくちゃカッコいい！"],
+    "work": ["兄ちゃんと選んだカード、効いてる！", "うおっ、兄ちゃんの言った通りだ！", "このカード、マジで仕事したじゃん！"],
+    "finisher": ["決めたぁ！ 兄ちゃんとのカードだ！", "これでトドメだああっ！"]
+  }
+}
