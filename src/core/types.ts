@@ -118,6 +118,42 @@ export interface DraftState {
   history: DraftHistoryItem[];
 }
 
+export type RunWinner = BattleSide | "draw";
+export type RunOutcome = "win" | "loss" | "draw";
+
+export interface RunBattleResult {
+  opponentId: string;
+  winner: RunWinner;
+  outcome: RunOutcome;
+  trustBefore: number;
+  trustAfter: number;
+  passiveInterventions: number;
+  passiveSupports: number;
+  passiveRejects: number;
+  loveCardIds: string[];
+}
+
+export interface RunSummary {
+  wins: number;
+  losses: number;
+  draws: number;
+  passiveInterventions: number;
+  passiveSupports: number;
+  passiveRejects: number;
+  loveCardIds: string[];
+  finalTrust: number;
+}
+
+export interface RunState {
+  /** Zero-based index of the next battle to start. Equals opponentIds.length when complete. */
+  currentBattle: number;
+  opponentIds: string[];
+  initialTrust: number;
+  carryTrust: number;
+  battleResults: RunBattleResult[];
+  summary: RunSummary;
+}
+
 export interface DeckEvaluation {
   size: number;
   monsters: number;

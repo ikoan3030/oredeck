@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
-import { aestheticScore, advanceBattle, createBattle, createDraft, decideOffer, evaluateDeck, generateOffer, getOpponentById, isAdviceDue, resolveOffer, runBattle, updateTrust, type Card, type ChildProfile, type DraftCard, type OpponentDefinition } from "./index";
+import { advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createRun, decideOffer, evaluateDeck, generateOffer, getCurrentOpponentId, getOpponentById, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, updateTrust, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition } from "./index";
 
 const cards = JSON.parse(readFileSync(resolve("data/cards.json"), "utf8")) as Card[];
 const child = JSON.parse(readFileSync(resolve("data/children/tanjun.json"), "utf8")) as ChildProfile;
@@ -80,4 +80,73 @@ test("the full draft reaches advice checkpoints, forces advice intervention, and
   }
   const counts = state.deck.reduce((map, item) => map.set(item.cardId, (map.get(item.cardId) ?? 0) + 1), new Map<string, number>());
   assert.ok([...counts.values()].every((count) => count <= 2));
+});
+
+test("run trust carries from the first battle into the second draft", () => {
+  const initialDraft = createDraft(1, child, 50);
+  const decision = decideOffer([get("grim"), get("zahhak")], child);
+  const offer: DraftOffer = { cards: [get("grim"), get("zahhak")], decision, wantsIntervention: true, source: "normal" };
+  const rejectedIndex = decision.preferredIndex === 0 ? 1 : 0;
+  const firstDraft = resolveOffer(initialDraft, offer, child, rejectedIndex);
+  const afterFirstBattle = recordBattleResult(createRun(["rush", "wall", "boss"], 50), firstDraft, "opponent");
+  const secondDraft = createDraft(2, child, afterFirstBattle.carryTrust);
+
+  assert.equal(afterFirstBattle.battleResults[0].trustBefore, 50);
+  assert.equal(afterFirstBattle.carryTrust, firstDraft.trust);
+  assert.equal(secondDraft.trust, firstDraft.trust);
+});
+
+test("resetting a run clears battle progress and restores the initial trust", () => {
+  const run = recordBattleResult(createRun(["rush", "wall", "boss"], 50), { ...createDraft(3, child, 50), trust: 37 }, "brother");
+  const reset = resetRun(run);
+
+  assert.equal(reset.currentBattle, 0);
+  assert.deepEqual(reset.battleResults, []);
+  assert.equal(reset.carryTrust, 50);
+  assert.equal(reset.summary.finalTrust, 50);
+});
+
+test("run advances through rush, wall, and boss and completes after three battles", () => {
+  let run = createRun(["rush", "wall", "boss"], 50);
+  const winners = ["brother", "opponent", "draw"] as const;
+
+  winners.forEach((winner, index) => {
+    run = advanceRun(run, createDraft(index + 10, child, run.carryTrust), winner);
+    assert.equal(run.currentBattle, index + 1);
+  });
+
+  assert.equal(isRunComplete(run), true);
+  assert.equal(getCurrentOpponentId(run), undefined);
+  assert.deepEqual(run.battleResults.map((result) => result.opponentId), ["rush", "wall", "boss"]);
+  assert.deepEqual(run.battleResults.map((result) => result.outcome), ["win", "loss", "draw"]);
+  assert.deepEqual({ wins: run.summary.wins, losses: run.summary.losses, draws: run.summary.draws }, { wins: 1, losses: 1, draws: 1 });
+});
+
+test("run summary aggregates passive support, rejection, love cards, outcomes, and final trust", () => {
+  let draft = createDraft(20, child, 50);
+  const loveOffer: DraftOffer = { cards: [get("zexvain"), get("noelka")], decision: decideOffer([get("zexvain"), get("noelka")], child), wantsIntervention: false, source: "normal" };
+  draft = resolveOffer(draft, loveOffer, child);
+
+  const supportDecision = decideOffer([get("grim"), get("zahhak")], child);
+  const supportOffer: DraftOffer = { cards: [get("grim"), get("zahhak")], decision: supportDecision, wantsIntervention: true, source: "normal" };
+  draft = resolveOffer(draft, supportOffer, child, supportDecision.preferredIndex);
+
+  const rejectDecision = decideOffer([get("dolguard"), get("gaiorg")], child);
+  const rejectOffer: DraftOffer = { cards: [get("dolguard"), get("gaiorg")], decision: rejectDecision, wantsIntervention: true, source: "normal" };
+  const rejectedIndex = rejectDecision.preferredIndex === 0 ? 1 : 0;
+  draft = resolveOffer(draft, rejectOffer, child, rejectedIndex);
+
+  const run = recordBattleResult(createRun(["rush", "wall", "boss"], 50), draft, "brother");
+  const result = run.battleResults[0];
+
+  assert.equal(result.passiveInterventions, 2);
+  assert.equal(result.passiveSupports, 1);
+  assert.equal(result.passiveRejects, 1);
+  assert.deepEqual(result.loveCardIds, ["zexvain"]);
+  assert.equal(run.summary.wins, 1);
+  assert.equal(run.summary.passiveInterventions, 2);
+  assert.equal(run.summary.passiveSupports, 1);
+  assert.equal(run.summary.passiveRejects, 1);
+  assert.deepEqual(run.summary.loveCardIds, ["zexvain"]);
+  assert.equal(run.summary.finalTrust, draft.trust);
 });

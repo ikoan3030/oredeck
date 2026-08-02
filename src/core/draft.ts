@@ -4,13 +4,13 @@ import { nextRandom } from "./random";
 import { updateTrust } from "./trust";
 import type { AdviceCategory, Card, ChildProfile, DraftOffer, DraftState, PickSource } from "./types";
 
-export function createDraft(seed: number, child: ChildProfile): DraftState {
+export function createDraft(seed: number, child: ChildProfile, initialTrust = child.trust.initial): DraftState {
   return {
     seed: seed >>> 0,
     pick: 0,
     deck: [],
     rejectedCardIds: [],
-    trust: child.trust.initial,
+    trust: initialTrust,
     seenAdviceCheckpoints: [],
     passiveInterventions: 0,
     lovePicks: 0,
