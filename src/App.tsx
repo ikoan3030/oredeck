@@ -13,7 +13,7 @@ import {
   isRunComplete,
   markAdviceSkipped,
   resolveOffer,
-  trustLabel,
+  syncStage,
   type AdviceCategory,
   type BattleState,
   type Card,
@@ -27,7 +27,7 @@ import {
 type Phase = "title" | "mode" | "character" | "opponent" | "draft" | "deck" | "battle" | "clear";
 
 interface SavedGame {
-  version: 2;
+  version: 3;
   phase: Phase;
   draft: DraftState | null;
   offer: DraftOffer | null;
@@ -45,8 +45,8 @@ interface KidReaction {
 const SAVE_KEY = "oredeck-prototype-v2";
 const LADDER_OPPONENT_IDS = ["rush", "wall", "boss"];
 
-function createDefaultSave(initialTrust = 50): SavedGame {
-  return { version: 2, phase: "title", draft: null, offer: null, adviceOpen: false, battle: null, run: createRun(LADDER_OPPONENT_IDS, initialTrust) };
+function createDefaultSave(initialSync = 0): SavedGame {
+  return { version: 3, phase: "title", draft: null, offer: null, adviceOpen: false, battle: null, run: createRun(LADDER_OPPONENT_IDS, initialSync) };
 }
 
 const defaultSave = createDefaultSave();
@@ -54,7 +54,7 @@ const defaultSave = createDefaultSave();
 function isSavedGame(value: unknown): value is SavedGame {
   if (!value || typeof value !== "object") return false;
   const saved = value as Partial<SavedGame>;
-  return saved.version === 2 && typeof saved.phase === "string" && Boolean(saved.run && Array.isArray(saved.run.opponentIds));
+  return saved.version === 3 && typeof saved.phase === "string" && Boolean(saved.run && Array.isArray(saved.run.opponentIds));
 }
 
 function loadSavedGame(raw: string | null): SavedGame | null {
@@ -106,13 +106,14 @@ function CardFace({ card, selected, intervention, compact = false }: { card: Car
   );
 }
 
-function Meter({ trust, child }: { trust: number; child: ChildProfile }) {
-  const level = Math.max(1, Math.min(5, Math.ceil(trust / 20)));
+function Meter({ sync, child }: { sync: number; child: ChildProfile }) {
+  const stage = syncStage(sync, child);
+  const stages = child.sync.stageMinimums.length;
   return (
-    <div className="trust-box" aria-label={`信頼度状態：${trustLabel(trust, child)}`}>
-      <span>兄ちゃんへの信頼</span>
-      <div className="trust-meter" aria-hidden="true">{[1, 2, 3, 4, 5].map((item) => <i key={item} className={item <= level ? "on" : ""} />)}</div>
-      <strong>{trustLabel(trust, child)}</strong>
+    <div className="trust-box" aria-label={`シンクロ率：段階${stage} / ${stages}`}>
+      <span>ユウタとのシンクロ率</span>
+      <div className="trust-meter" aria-hidden="true">{Array.from({ length: stages }, (_, index) => index + 1).map((item) => <i key={item} className={item <= stage ? "on" : ""} />)}</div>
+      <strong>段階{stage} / {stages}</strong>
     </div>
   );
 }
@@ -180,7 +181,7 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, onPick,
   const dialogue = !offer ? "次のカード、どんなのかな！" : offer.decision.love ? child.dialogue.love[draft.pick % child.dialogue.love.length] : offer.wantsIntervention ? child.dialogue.ask[draft.pick % child.dialogue.ask.length] : `${offer.cards[offer.decision.preferredIndex].name}にする！ ${reasonCopy[offer.decision.reason]}！`;
   return (
     <main className="game-shell draft-screen">
-      <header className="game-header"><div className="mini-logo">兄ちゃん！<b>俺のデッキ作って！</b></div><div className="pick-counter"><span>PICK</span><b>{String(draft.pick + 1).padStart(2, "0")}</b><em>/15</em></div><Meter trust={draft.trust} child={child} /></header>
+      <header className="game-header"><div className="mini-logo">兄ちゃん！<b>俺のデッキ作って！</b></div><div className="pick-counter"><span>PICK</span><b>{String(draft.pick + 1).padStart(2, "0")}</b><em>/15</em></div><Meter sync={draft.syncRate} child={child} /></header>
       {reaction && <ReactionBanner reaction={reaction} speaker={child.displayName} />}
       <div className="draft-layout">
         <section className="choice-zone">
@@ -258,7 +259,7 @@ function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish,
 
 function ClearScreen({ run, cards, child, opponents, onTitle }: { run: RunState; cards: Card[]; child: ChildProfile; opponents: OpponentDefinition[]; onTitle: () => void }) {
   const opponentById = new Map(opponents.map((opponent) => [opponent.id, opponent]));
-  return <main className="clear-screen"><section className="clear-panel"><span className="section-kicker">ARCADE CLEAR</span><h1>3戦完走！</h1><section className="run-results"><h2>バトルの記録</h2>{run.battleResults.map((result, index) => <div className="run-result-row" key={`${result.opponentId}-${index}`}><span>{index + 1}戦目</span><strong className={result.outcome}>{result.outcome === "win" ? "○" : result.outcome === "loss" ? "×" : "△"}</strong><b>{opponentById.get(result.opponentId)?.name ?? result.opponentId}</b></div>)}</section><section className="run-facts"><div className="run-fact"><span>受動介入</span><strong>{run.summary.passiveInterventions}回</strong><small>支持 {run.summary.passiveSupports} / 却下 {run.summary.passiveRejects}</small></div><div className="run-fact"><span>一目惚れで入った札</span>{run.summary.loveCardIds.length ? <ul>{run.summary.loveCardIds.map((cardId, index) => <li key={`${cardId}-${index}`}>{cards.find((card) => card.id === cardId)?.name ?? cardId}</li>)}</ul> : <strong>なし</strong>}</div><div className="run-fact"><span>最後の信頼度</span><strong>{trustLabel(run.summary.finalTrust, child)}</strong></div></section><button className="primary-action" onClick={onTitle}>タイトルへ<span>↻</span></button></section></main>;
+  return <main className="clear-screen"><section className="clear-panel"><span className="section-kicker">ARCADE CLEAR</span><h1>3戦完走！</h1><section className="run-results"><h2>バトルの記録</h2>{run.battleResults.map((result, index) => <div className="run-result-row" key={`${result.opponentId}-${index}`}><span>{index + 1}戦目</span><strong className={result.outcome}>{result.outcome === "win" ? "○" : result.outcome === "loss" ? "×" : "△"}</strong><b>{opponentById.get(result.opponentId)?.name ?? result.opponentId}</b></div>)}</section><section className="run-facts"><div className="run-fact"><span>受動介入</span><strong>{run.summary.passiveInterventions}回</strong><small>支持 {run.summary.passiveSupports} / 却下 {run.summary.passiveRejects}</small></div><div className="run-fact"><span>一目惚れで入った札</span>{run.summary.loveCardIds.length ? <ul>{run.summary.loveCardIds.map((cardId, index) => <li key={`${cardId}-${index}`}>{cards.find((card) => card.id === cardId)?.name ?? cardId}</li>)}</ul> : <strong>なし</strong>}</div><div className="run-fact"><span>最後のシンクロ率</span><strong>段階{syncStage(run.summary.finalSync, child)} / {child.sync.stageMinimums.length}</strong></div></section><button className="primary-action" onClick={onTitle}>タイトルへ<span>↻</span></button></section></main>;
 }
 
 export default function Home() {
@@ -272,7 +273,7 @@ export default function Home() {
 
   useEffect(() => {
     Promise.all([fetch("./data/cards.json").then((response) => response.json()), fetch("./data/children/tanjun.json").then((response) => response.json()), fetch("./data/opponents.json").then((response) => response.json())])
-      .then(([cardData, childData, opponentData]) => { setCards(cardData); setChild(childData); setOpponents(opponentData); setGame(loadSavedGame(localStorage.getItem(SAVE_KEY)) ?? createDefaultSave(childData.trust.initial)); setHydrated(true); });
+      .then(([cardData, childData, opponentData]) => { setCards(cardData); setChild(childData); setOpponents(opponentData); setGame(loadSavedGame(localStorage.getItem(SAVE_KEY)) ?? createDefaultSave(childData.sync.initial)); setHydrated(true); });
   }, []);
 
   useEffect(() => { if (hydrated) localStorage.setItem(SAVE_KEY, JSON.stringify(game)); }, [game, hydrated]);
@@ -302,7 +303,7 @@ export default function Home() {
     if (!child) return;
     setAutoBattle(false);
     setReaction(null);
-    setGame({ ...createDefaultSave(child.trust.initial), phase: "mode" });
+    setGame({ ...createDefaultSave(child.sync.initial), phase: "mode" });
   }
 
   function selectMode() {
@@ -317,7 +318,7 @@ export default function Home() {
     if (!child || !getCurrentOpponentId(game.run)) return;
     setReaction(null);
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
-    const draft = createDraft(seed, child, game.run.carryTrust);
+    const draft = createDraft(seed, child, game.run.carrySync);
     const generated = generateOffer(draft, cards, child);
     setGame({ ...game, phase: "draft", draft: generated.state, offer: generated.offer, adviceOpen: false, battle: null });
   }
@@ -356,8 +357,8 @@ export default function Home() {
   }
 
   function finishBattle() {
-    if (!game.draft || !game.battle?.winner) return;
-    const nextRun = advanceRun(game.run, game.draft, game.battle.winner);
+    if (!game.draft || !game.battle?.winner || !child) return;
+    const nextRun = advanceRun(game.run, game.draft, game.battle.winner, child);
     setAutoBattle(false);
     setGame({ ...game, phase: isRunComplete(nextRun) ? "clear" : "opponent", draft: null, offer: null, adviceOpen: false, battle: null, run: nextRun });
   }
@@ -366,7 +367,7 @@ export default function Home() {
     if (!child) return;
     setAutoBattle(false);
     setReaction(null);
-    setGame(createDefaultSave(child.trust.initial));
+    setGame(createDefaultSave(child.sync.initial));
   }
 
   if (!hydrated || !child || cards.length !== 40 || opponents.length === 0) return <main className="boot-screen"><div className="logo-burst"><span>NOW LOADING</span><b>カードをまぜてるぞ！</b></div></main>;

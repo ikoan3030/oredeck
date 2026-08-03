@@ -1,16 +1,16 @@
 import { decideOffer } from "./decision";
 import { hasKeyword, isRemoval } from "./evaluation";
 import { nextRandom } from "./random";
-import { passiveInterventionRate, updateTrust } from "./trust";
+import { gainSync } from "./sync";
 import type { AdviceCategory, Card, ChildProfile, DraftOffer, DraftState, PickSource } from "./types";
 
-export function createDraft(seed: number, child: ChildProfile, initialTrust = child.trust.initial): DraftState {
+export function createDraft(seed: number, child: ChildProfile, initialSync = child.sync.initial): DraftState {
   return {
     seed: seed >>> 0,
     pick: 0,
     deck: [],
     rejectedCardIds: [],
-    trust: initialTrust,
+    syncRate: initialSync,
     seenAdviceCheckpoints: [],
     passiveInterventions: 0,
     lovePicks: 0,
@@ -70,7 +70,7 @@ export function generateOffer(
   if (!adviceCategory && !decision.love) {
     const chance = nextRandom(seed);
     seed = chance.seed;
-    wantsIntervention = chance.value < passiveInterventionRate(state.trust, child);
+    wantsIntervention = chance.value < child.passiveInterventionRate;
   }
   return {
     state: { ...state, seed },
@@ -97,15 +97,13 @@ export function resolveOffer(
   const rejected = offer.cards[rejectedIndex];
   const source: PickSource = offer.decision.love ? "love" : offer.source === "advice" ? "advice" : isPlayerDecision ? "passive" : "auto";
   const supported = chosenIndex === offer.decision.preferredIndex;
-  const trustAfter = source === "passive"
-    ? updateTrust(state.trust, supported, offer.decision.scores[offer.decision.preferredIndex], child)
-    : state.trust;
+  const syncAfter = source === "passive" ? gainSync(state.syncRate, supported, child) : state.syncRate;
   return {
     ...state,
     pick: state.pick + 1,
     deck: [...state.deck, { instanceId: `${chosen.id}-${state.pick}-${state.seed}`, cardId: chosen.id, intervention: source === "passive" || source === "advice", source }],
     rejectedCardIds: [...state.rejectedCardIds, rejected.id],
-    trust: trustAfter,
+    syncRate: syncAfter,
     seenAdviceCheckpoints: offer.source === "advice" && !state.seenAdviceCheckpoints.includes(state.pick) ? [...state.seenAdviceCheckpoints, state.pick] : state.seenAdviceCheckpoints,
     passiveInterventions: state.passiveInterventions + (offer.source === "normal" && offer.wantsIntervention ? 1 : 0),
     lovePicks: state.lovePicks + (offer.decision.love ? 1 : 0),
@@ -116,8 +114,8 @@ export function resolveOffer(
       rejected: rejected.id,
       source,
       preferred: offer.cards[offer.decision.preferredIndex].id,
-      trustBefore: state.trust,
-      trustAfter,
+      syncBefore: state.syncRate,
+      syncAfter,
       reason: offer.decision.reason,
     }],
   };

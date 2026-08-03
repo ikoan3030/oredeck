@@ -1,6 +1,7 @@
-import type { DraftState, RunBattleResult, RunOutcome, RunState, RunSummary, RunWinner } from "./types";
+import { decaySync } from "./sync";
+import type { ChildProfile, DraftState, RunBattleResult, RunOutcome, RunState, RunSummary, RunWinner } from "./types";
 
-function emptySummary(initialTrust: number): RunSummary {
+function emptySummary(initialSync: number): RunSummary {
   return {
     wins: 0,
     losses: 0,
@@ -9,18 +10,18 @@ function emptySummary(initialTrust: number): RunSummary {
     passiveSupports: 0,
     passiveRejects: 0,
     loveCardIds: [],
-    finalTrust: initialTrust,
+    finalSync: initialSync,
   };
 }
 
-export function createRun(opponentIds: readonly string[], initialTrust: number): RunState {
+export function createRun(opponentIds: readonly string[], initialSync: number): RunState {
   return {
     currentBattle: 0,
     opponentIds: [...opponentIds],
-    initialTrust,
-    carryTrust: initialTrust,
+    initialSync,
+    carrySync: initialSync,
     battleResults: [],
-    summary: emptySummary(initialTrust),
+    summary: emptySummary(initialSync),
   };
 }
 
@@ -57,25 +58,27 @@ function addOutcome(summary: RunSummary, outcome: RunOutcome): RunSummary {
   };
 }
 
-export function recordBattleResult(run: RunState, draft: DraftState, winner: RunWinner): RunState {
+export function recordBattleResult(run: RunState, draft: DraftState, winner: RunWinner, child: ChildProfile): RunState {
   const opponentId = getCurrentOpponentId(run);
   if (!opponentId) return run;
 
   const outcome = outcomeFor(winner);
   const draftSummary = summarizeDraft(draft);
+  const syncAfterDecay = decaySync(draft.syncRate, child);
   const battleResult: RunBattleResult = {
     opponentId,
     winner,
     outcome,
-    trustBefore: run.carryTrust,
-    trustAfter: draft.trust,
+    syncBefore: run.carrySync,
+    syncAfterBuild: draft.syncRate,
+    syncAfterDecay,
     ...draftSummary,
   };
   const summary = addOutcome(run.summary, outcome);
   return {
     ...run,
     currentBattle: run.currentBattle + 1,
-    carryTrust: draft.trust,
+    carrySync: syncAfterDecay,
     battleResults: [...run.battleResults, battleResult],
     summary: {
       ...summary,
@@ -83,15 +86,15 @@ export function recordBattleResult(run: RunState, draft: DraftState, winner: Run
       passiveSupports: summary.passiveSupports + draftSummary.passiveSupports,
       passiveRejects: summary.passiveRejects + draftSummary.passiveRejects,
       loveCardIds: [...summary.loveCardIds, ...draftSummary.loveCardIds],
-      finalTrust: draft.trust,
+      finalSync: syncAfterDecay,
     },
   };
 }
 
-export function advanceRun(run: RunState, draft: DraftState, winner: RunWinner): RunState {
-  return recordBattleResult(run, draft, winner);
+export function advanceRun(run: RunState, draft: DraftState, winner: RunWinner, child: ChildProfile): RunState {
+  return recordBattleResult(run, draft, winner, child);
 }
 
-export function resetRun(run: RunState, initialTrust = run.initialTrust): RunState {
-  return createRun(run.opponentIds, initialTrust);
+export function resetRun(run: RunState, initialSync = run.initialSync): RunState {
+  return createRun(run.opponentIds, initialSync);
 }

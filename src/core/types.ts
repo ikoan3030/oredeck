@@ -31,11 +31,6 @@ export interface Card {
   rarity: "common" | "rare" | "legend";
 }
 
-export interface TrustLabel {
-  minimum: number;
-  label: string;
-}
-
 export type AdviceCategory = "removal" | "guard" | "low_cost" | "skip";
 
 export interface ChildProfile {
@@ -45,18 +40,20 @@ export interface ChildProfile {
   aestheticWeights: Record<AestheticKey, number>;
   loveThreshold: number;
   decisionOrder: string[];
-  /** Passive intervention chance per trust level, ordered from the lowest level to the highest. */
-  passiveInterventionRatesByTrustLevel: number[];
+  /** Fixed per character. Deliberately not tied to the sync rate. */
+  passiveInterventionRate: number;
   offerWeightsByCardId?: Record<string, number>;
-  trust: {
+  sync: {
     initial: number;
-    minimum: number;
     maximum: number;
+    /** Added when the player rules in favour of the kid's first choice. */
     supportGain: number;
-    rejectBaseLoss: number;
-    aestheticDivisor: number;
-    aestheticMinimumMultiplier: number;
-    labels: TrustLabel[];
+    /** Applied after every battle. */
+    decayMultiplier: number;
+    /** Values below this are carried over undecayed; the floor never raises a value. */
+    decayFloor: number;
+    /** Lower bound of each stage, lowest first. */
+    stageMinimums: number[];
   };
   advice: {
     checkpoints: number[];
@@ -102,8 +99,8 @@ export interface DraftHistoryItem {
   rejected: string;
   source: PickSource;
   preferred: string;
-  trustBefore: number;
-  trustAfter: number;
+  syncBefore: number;
+  syncAfter: number;
   reason: PickDecision["reason"];
 }
 
@@ -112,7 +109,7 @@ export interface DraftState {
   pick: number;
   deck: DraftCard[];
   rejectedCardIds: string[];
-  trust: number;
+  syncRate: number;
   seenAdviceCheckpoints: number[];
   passiveInterventions: number;
   lovePicks: number;
@@ -126,8 +123,11 @@ export interface RunBattleResult {
   opponentId: string;
   winner: RunWinner;
   outcome: RunOutcome;
-  trustBefore: number;
-  trustAfter: number;
+  syncBefore: number;
+  /** Sync rate at the end of the deck build, before the post-battle cooldown. */
+  syncAfterBuild: number;
+  /** Sync rate carried into the next battle, after the cooldown. */
+  syncAfterDecay: number;
   passiveInterventions: number;
   passiveSupports: number;
   passiveRejects: number;
@@ -142,15 +142,15 @@ export interface RunSummary {
   passiveSupports: number;
   passiveRejects: number;
   loveCardIds: string[];
-  finalTrust: number;
+  finalSync: number;
 }
 
 export interface RunState {
   /** Zero-based index of the next battle to start. Equals opponentIds.length when complete. */
   currentBattle: number;
   opponentIds: string[];
-  initialTrust: number;
-  carryTrust: number;
+  initialSync: number;
+  carrySync: number;
   battleResults: RunBattleResult[];
   summary: RunSummary;
 }
