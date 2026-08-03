@@ -3,10 +3,10 @@
     "id": "wall",
     "name": "ゴウダ",
     "title": "鉄壁番長",
-    "trait": "守護で受けて切り返す",
+    "trait": "組織の壁役。守護で受けて切り返す",
     "color": "#3867d6",
     "faceBias": 0.22,
-    "intro": "オレの鉄壁陣を、お前のデッキで抜けるかな！",
+    "intro": "組織の壁役をなめるなよ。オレの鉄壁陣を抜けるかな！",
     "taunts": [
       "そんな貧弱な攻撃でオレの壁を抜けるつもりか！",
       "守りを崩す札がなけりゃ、ここで終わりだ！",
@@ -59,6 +59,130 @@
       "followarrow",
       "thunder",
       "alvine"
+    ]
+  },
+  {
+    "id": "sister",
+    "name": "気弱妹",
+    "title": "おどおど守護兵",
+    "trait": "守護と復活でじっくり受ける",
+    "color": "#5dade2",
+    "faceBias": 0.28,
+    "intro": "こ、こわいけど……守っていれば、きっと大丈夫！",
+    "taunts": [
+      "まだ、あきらめないで……復活できるから……！",
+      "その攻撃、守護で受け止めます……！",
+      "こわいけど、みんなが残ってくれれば勝てるよ……！"
+    ],
+    "deck": [
+      "dolguard",
+      "dolguard",
+      "gaiorg",
+      "gaiorg",
+      "lilibel",
+      "lilibel",
+      "fiorina",
+      "fiorina",
+      "mewrin",
+      "mewrin",
+      "phoenixeed",
+      "phoenixeed",
+      "steel-blessing",
+      "wisdom",
+      "valzeid"
+    ]
+  },
+  {
+    "id": "smart-brother",
+    "name": "聡明弟",
+    "title": "冷静参謀",
+    "trait": "除去スペルで盤面を整理する",
+    "color": "#45aaf2",
+    "faceBias": 0.42,
+    "intro": "盤面を読めば、勝ち筋は自然に見えてくるよ。",
+    "taunts": [
+      "その盤面なら、除去一枚で十分だね。",
+      "序盤は耐える時間だ。焦る必要はないよ。",
+      "計算どおり。次の一手で盤面を空にする。"
+    ],
+    "deck": [
+      "holyblade",
+      "judgment",
+      "judgment",
+      "dragonseal",
+      "dragonseal",
+      "vanishflash",
+      "flamebullet",
+      "flamebullet",
+      "followarrow",
+      "followarrow",
+      "thunder",
+      "blastwave",
+      "wisdom",
+      "valzeid",
+      "noelka"
+    ]
+  },
+  {
+    "id": "cousin",
+    "name": "いとこ",
+    "title": "重量級エース",
+    "trait": "重い一撃で押しつぶす",
+    "color": "#a55eea",
+    "faceBias": 0.62,
+    "intro": "軽い小細工より、でかい一発のほうが気持ちいいだろ！",
+    "taunts": [
+      "その小さな札で、この重量級を止めるのか？",
+      "次のターン、もっと大きいのが来るぞ！",
+      "重さが違うんだよ。受け切れるかな？"
+    ],
+    "deck": [
+      "inferdos",
+      "inferdos",
+      "gorganos",
+      "gorganos",
+      "baldrogia",
+      "baldrogia",
+      "drakevine",
+      "drakevine",
+      "zamud",
+      "zamud",
+      "volganid",
+      "volganid",
+      "phoenixeed",
+      "zexvain",
+      "dragbalt"
+    ]
+  },
+  {
+    "id": "executive",
+    "name": "幹部",
+    "title": "組織幹部",
+    "trait": "守りから攻めへ均衡を崩す",
+    "color": "#8854d0",
+    "faceBias": 0.38,
+    "intro": "組織の中枢まで来たか。ここからは均衡を崩していく。",
+    "taunts": [
+      "守りだけでは、幹部の座は奪えない。",
+      "その一手、攻守のどちらにも足りないな。",
+      "ここから先は、組織の本気を見せよう。"
+    ],
+    "deck": [
+      "dolguard",
+      "dolguard",
+      "gaiorg",
+      "gaiorg",
+      "lilibel",
+      "grim",
+      "grim",
+      "alvine",
+      "alvine",
+      "valzeid",
+      "phoenixeed",
+      "judgment",
+      "judgment",
+      "dragonseal",
+      "steel-blessing"
     ]
   },
   {

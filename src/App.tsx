@@ -4,7 +4,7 @@ import {
   advanceRun,
   createBattle,
   createDraft,
-  createRun,
+  createLadderRun,
   evaluateDeck,
   getOpponentById,
   getCurrentOpponentId,
@@ -28,7 +28,7 @@ import {
 type Phase = "title" | "mode" | "character" | "opponent" | "draft" | "deck" | "ace" | "battle" | "clear";
 
 interface SavedGame {
-  version: 3;
+  version: 4;
   phase: Phase;
   draft: DraftState | null;
   offer: DraftOffer | null;
@@ -55,10 +55,9 @@ interface SyncNotice {
 }
 
 const SAVE_KEY = "oredeck-prototype-v2";
-const LADDER_OPPONENT_IDS = ["rush", "wall", "boss"];
 
-function createDefaultSave(initialSync = 0): SavedGame {
-  return { version: 3, phase: "title", draft: null, offer: null, adviceOpen: false, battle: null, run: createRun(LADDER_OPPONENT_IDS, initialSync), aceCardId: null };
+function createDefaultSave(initialSync = 0, seed = 0): SavedGame {
+  return { version: 4, phase: "title", draft: null, offer: null, adviceOpen: false, battle: null, run: createLadderRun(seed, initialSync), aceCardId: null };
 }
 
 const defaultSave = createDefaultSave();
@@ -66,7 +65,7 @@ const defaultSave = createDefaultSave();
 function isSavedGame(value: unknown): value is SavedGame {
   if (!value || typeof value !== "object") return false;
   const saved = value as Partial<SavedGame>;
-  return saved.version === 3 && typeof saved.phase === "string" && Boolean(saved.run && Array.isArray(saved.run.opponentIds));
+  return saved.version === 4 && typeof saved.phase === "string" && Boolean(saved.run && Array.isArray(saved.run.opponentIds) && saved.run.opponentIds.length === 6);
 }
 
 function loadSavedGame(raw: string | null): SavedGame | null {
@@ -322,7 +321,7 @@ function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish,
 
 function ClearScreen({ run, cards, child, opponents, onTitle }: { run: RunState; cards: Card[]; child: ChildProfile; opponents: OpponentDefinition[]; onTitle: () => void }) {
   const opponentById = new Map(opponents.map((opponent) => [opponent.id, opponent]));
-  return <main className="clear-screen"><section className="clear-panel"><span className="section-kicker">ARCADE CLEAR</span><h1>3戦完走！</h1><section className="run-results"><h2>バトルの記録</h2>{run.battleResults.map((result, index) => <div className="run-result-row" key={`${result.opponentId}-${index}`}><span>{index + 1}戦目</span><strong className={result.outcome}>{result.outcome === "win" ? "○" : result.outcome === "loss" ? "×" : "△"}</strong><b>{opponentById.get(result.opponentId)?.name ?? result.opponentId}</b></div>)}</section><section className="run-facts"><div className="run-fact"><span>受動介入</span><strong>{run.summary.passiveInterventions}回</strong><small>支持 {run.summary.passiveSupports} / 却下 {run.summary.passiveRejects}</small></div><div className="run-fact"><span>一目惚れで入った札</span>{run.summary.loveCardIds.length ? <ul>{run.summary.loveCardIds.map((cardId, index) => <li key={`${cardId}-${index}`}>{cards.find((card) => card.id === cardId)?.name ?? cardId}</li>)}</ul> : <strong>なし</strong>}</div><div className="run-fact"><span>最後のシンクロ状態</span><strong>{syncStageLabel(run.summary.finalSync, child)}</strong></div></section><button className="primary-action" onClick={onTitle}>タイトルへ<span>↻</span></button></section></main>;
+  return <main className="clear-screen"><section className="clear-panel"><span className="section-kicker">ARCADE CLEAR</span><h1>6戦完走！</h1><section className="run-results"><h2>バトルの記録</h2>{run.battleResults.map((result, index) => <div className="run-result-row" key={`${result.opponentId}-${index}`}><span>{index + 1}戦目</span><strong className={result.outcome}>{result.outcome === "win" ? "○" : result.outcome === "loss" ? "×" : "△"}</strong><b>{opponentById.get(result.opponentId)?.name ?? result.opponentId}</b></div>)}</section><section className="run-facts"><div className="run-fact"><span>受動介入</span><strong>{run.summary.passiveInterventions}回</strong><small>支持 {run.summary.passiveSupports} / 却下 {run.summary.passiveRejects}</small></div><div className="run-fact"><span>一目惚れで入った札</span>{run.summary.loveCardIds.length ? <ul>{run.summary.loveCardIds.map((cardId, index) => <li key={`${cardId}-${index}`}>{cards.find((card) => card.id === cardId)?.name ?? cardId}</li>)}</ul> : <strong>なし</strong>}</div><div className="run-fact"><span>最後のシンクロ状態</span><strong>{syncStageLabel(run.summary.finalSync, child)}</strong></div></section><button className="primary-action" onClick={onTitle}>タイトルへ<span>↻</span></button></section></main>;
 }
 
 export default function Home() {
@@ -368,7 +367,8 @@ export default function Home() {
     setAutoBattle(false);
     setReaction(null);
     setSyncNotice(null);
-    setGame({ ...createDefaultSave(child.sync.initial), phase: "mode" });
+    const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
+    setGame({ ...createDefaultSave(child.sync.initial, seed), phase: "mode" });
   }
 
   function selectMode() {

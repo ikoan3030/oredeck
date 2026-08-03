@@ -1,5 +1,27 @@
 import { decaySync } from "./sync";
+import { randomIndex } from "./random";
 import type { ChildProfile, DraftState, RunBattleResult, RunOutcome, RunState, RunSummary, RunWinner } from "./types";
+
+export const LADDER_VARIABLE_OPPONENT_IDS = ["sister", "smart-brother", "cousin"] as const;
+
+/** Builds the six-battle ladder from a run seed without touching browser state. */
+export function createLadderOpponentIds(seed: number): string[] {
+  const first = randomIndex(seed >>> 0, LADDER_VARIABLE_OPPONENT_IDS.length);
+  const remaining = LADDER_VARIABLE_OPPONENT_IDS.filter((_, index) => index !== first.index);
+  const second = randomIndex(first.seed, remaining.length);
+  return [
+    "rush",
+    LADDER_VARIABLE_OPPONENT_IDS[first.index],
+    remaining[second.index],
+    "wall",
+    "executive",
+    "boss",
+  ];
+}
+
+export function createLadderRun(seed: number, initialSync: number): RunState {
+  return createRun(createLadderOpponentIds(seed), initialSync);
+}
 
 function emptySummary(initialSync: number): RunSummary {
   return {

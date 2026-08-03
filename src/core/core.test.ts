@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
-import { advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createRun, decaySync, decideOffer, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, instanceHasKeyword, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition } from "./index";
+import { advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createLadderRun, createRun, decaySync, decideOffer, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, instanceHasKeyword, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition } from "./index";
 
 const cards = JSON.parse(readFileSync(resolve("data/cards.json"), "utf8")) as Card[];
 const child = JSON.parse(readFileSync(resolve("data/children/tanjun.json"), "utf8")) as ChildProfile;
@@ -279,6 +279,17 @@ test("run advances through rush, wall, and boss and completes after three battle
   assert.deepEqual(run.battleResults.map((result) => result.opponentId), ["rush", "wall", "boss"]);
   assert.deepEqual(run.battleResults.map((result) => result.outcome), ["win", "loss", "draw"]);
   assert.deepEqual({ wins: run.summary.wins, losses: run.summary.losses, draws: run.summary.draws }, { wins: 1, losses: 1, draws: 1 });
+});
+
+test("the ladder builds six deterministic battles with two distinct variable opponents", () => {
+  const first = createLadderRun(123456, 0);
+  const second = createLadderRun(123456, 0);
+  assert.deepEqual(first, second);
+  assert.deepEqual(first.opponentIds.slice(0, 1), ["rush"]);
+  assert.deepEqual(first.opponentIds.slice(3), ["wall", "executive", "boss"]);
+  assert.equal(first.opponentIds.length, 6);
+  assert.equal(new Set(first.opponentIds.slice(1, 3)).size, 2);
+  assert.ok(first.opponentIds.slice(1, 3).every((id) => ["sister", "smart-brother", "cousin"].includes(id)));
 });
 
 test("run summary aggregates passive support, rejection, love cards, outcomes, and final sync", () => {
