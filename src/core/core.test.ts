@@ -149,6 +149,7 @@ test("the ace card uses the 14-card deck, life threshold, and one-use turn-start
   assert.equal(drawnAce.grantedAtk, 2);
   assert.deepEqual(drawnAce.grantedKeywords, ["rush"]);
   assert.equal(first.brother.aceCard, null);
+  assert.equal(first.brother.aceUsed, true);
   assert.equal(first.brother.deck.length, battle.brother.deck.length);
   assert.equal(first.events.filter((item) => item.type === "ace").length, 1);
   assert.equal(first.events.filter((item) => item.type === "draw").length, 0);
@@ -169,6 +170,7 @@ test("the ace card uses the 14-card deck, life threshold, and one-use turn-start
 
   const noAce = createBattle(battleDeck("grim"), opponent, cards, 123, 80, null);
   assert.equal(noAce.brother.aceCard, null);
+  assert.equal(noAce.brother.aceUsed, false);
   assert.equal(noAce.brother.deck.length, 12);
 });
 

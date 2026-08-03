@@ -241,6 +241,7 @@ export interface BattlePlayer {
   board: BattleCardInstance[];
   graveyard: BattleCardInstance[];
   aceCard: BattleCardInstance | null;
+  aceUsed: boolean;
 }
 
 export type BattleEventType = "turn" | "draw" | "play" | "effect" | "attack" | "destroyed" | "attribution" | "taunt" | "result" | "sync_bonus" | "ace";

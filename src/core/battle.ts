@@ -88,7 +88,7 @@ function drawAtTurnStart(
   }
   const drawn = grantToInstance(player.aceCard, ace.grant.keywords, ace.grant.statModifiers.attack);
   return {
-    player: { ...player, aceCard: null, hand: [...player.hand, drawn] },
+    player: { ...player, aceCard: null, aceUsed: true, hand: [...player.hand, drawn] },
     ace: true,
     aceCard: drawn,
   };
@@ -410,8 +410,8 @@ export function createBattle(
   };
   return {
     ...result,
-    brother: { ...result.brother, aceCard } as BattlePlayer,
-    opponent: { ...result.opponent, aceCard: null } as BattlePlayer,
+    brother: { ...result.brother, aceCard, aceUsed: false } as BattlePlayer,
+    opponent: { ...result.opponent, aceCard: null, aceUsed: false } as BattlePlayer,
   };
 }
 

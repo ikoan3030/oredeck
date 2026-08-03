@@ -10,6 +10,7 @@ import {
   getCurrentOpponentId,
   generateOffer,
   isAdviceDue,
+  isAceUnlocked,
   isRunComplete,
   markAdviceSkipped,
   resolveOffer,
@@ -24,7 +25,7 @@ import {
   type RunState,
 } from "@/src/core";
 
-type Phase = "title" | "mode" | "character" | "opponent" | "draft" | "deck" | "battle" | "clear";
+type Phase = "title" | "mode" | "character" | "opponent" | "draft" | "deck" | "ace" | "battle" | "clear";
 
 interface SavedGame {
   version: 3;
@@ -34,6 +35,7 @@ interface SavedGame {
   adviceOpen: boolean;
   battle: BattleState | null;
   run: RunState;
+  aceCardId?: string | null;
 }
 
 /** Transient answer-check line shown after the player rules on a passive intervention. Not persisted. */
@@ -42,11 +44,21 @@ interface KidReaction {
   text: string;
 }
 
+interface SyncStageLabel {
+  minimum: number;
+  label: string;
+}
+
+interface SyncNotice {
+  stage: number;
+  label: string;
+}
+
 const SAVE_KEY = "oredeck-prototype-v2";
 const LADDER_OPPONENT_IDS = ["rush", "wall", "boss"];
 
 function createDefaultSave(initialSync = 0): SavedGame {
-  return { version: 3, phase: "title", draft: null, offer: null, adviceOpen: false, battle: null, run: createRun(LADDER_OPPONENT_IDS, initialSync) };
+  return { version: 3, phase: "title", draft: null, offer: null, adviceOpen: false, battle: null, run: createRun(LADDER_OPPONENT_IDS, initialSync), aceCardId: null };
 }
 
 const defaultSave = createDefaultSave();
@@ -61,7 +73,7 @@ function loadSavedGame(raw: string | null): SavedGame | null {
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
-    return isSavedGame(parsed) ? parsed : null;
+    return isSavedGame(parsed) ? { ...parsed, aceCardId: parsed.aceCardId ?? null } : null;
   } catch {
     return null;
   }
@@ -106,16 +118,27 @@ function CardFace({ card, selected, intervention, compact = false }: { card: Car
   );
 }
 
-function Meter({ sync, child }: { sync: number; child: ChildProfile }) {
+function syncStageLabel(sync: number, child: ChildProfile): string {
+  const labels = (child.sync as ChildProfile["sync"] & { stageLabels?: SyncStageLabel[] }).stageLabels ?? [];
+  return [...labels].filter((item) => sync >= item.minimum).sort((a, b) => a.minimum - b.minimum).at(-1)?.label ?? "シンクロ";
+}
+
+function SyncMeter({ sync, child }: { sync: number; child: ChildProfile }) {
   const stage = syncStage(sync, child);
   const stages = child.sync.stageMinimums.length;
+  const label = syncStageLabel(sync, child);
   return (
-    <div className="trust-box" aria-label={`シンクロ率：段階${stage} / ${stages}`}>
-      <span>ユウタとのシンクロ率</span>
-      <div className="trust-meter" aria-hidden="true">{Array.from({ length: stages }, (_, index) => index + 1).map((item) => <i key={item} className={item <= stage ? "on" : ""} />)}</div>
-      <strong>段階{stage} / {stages}</strong>
+    <div className={`sync-box stage-${stage}`} aria-label={`シンクロ状態：${label}`}>
+      <span>ユウタとカードのシンクロ</span>
+      <div className="sync-meter" aria-hidden="true">{Array.from({ length: stages }, (_, index) => index + 1).map((item) => <i key={item} className={item <= stage ? "on" : ""} />)}</div>
+      <strong>{label}</strong>
     </div>
   );
+}
+
+function SyncStageBanner({ notice }: { notice: SyncNotice | null }) {
+  if (!notice) return null;
+  return <div className={`sync-stage-banner ${notice.stage === 5 ? "unlock" : ""}`} role="status"><span>SYNC UP!</span><strong>{notice.label}</strong>{notice.stage === 5 && <b>切り札解禁！！</b>}</div>;
 }
 
 function DeckMaterials({ draft, cards, small = false }: { draft: DraftState; cards: Card[]; small?: boolean }) {
@@ -167,13 +190,14 @@ function OpponentPreviewScreen({ opponent, battleNumber, onStart }: { opponent: 
   return <main className="opponent-preview-screen"><section className="opponent-preview-panel"><span className="section-kicker">BATTLE {battleNumber} / 3</span><h1>つぎの相手</h1><div className="opponent-preview-card" style={{ "--rival-color": opponent.color } as CSSProperties}><span className="opponent-mark">{opponent.title.slice(0, 1)}</span><small>{opponent.title}</small><strong>{opponent.name}</strong><p>{opponent.trait}</p></div><button className="primary-action" onClick={onStart}>デッキを組む！<span>▶</span></button></section></main>;
 }
 
-function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, onPick, onAuto, onAdvice }: {
+function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNotice, onPick, onAuto, onAdvice }: {
   draft: DraftState;
   offer: DraftOffer | null;
   cards: Card[];
   child: ChildProfile;
   adviceOpen: boolean;
   reaction: KidReaction | null;
+  syncNotice: SyncNotice | null;
   onPick: (index: 0 | 1) => void;
   onAuto: () => void;
   onAdvice: (category: AdviceCategory) => void;
@@ -181,8 +205,9 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, onPick,
   const dialogue = !offer ? "次のカード、どんなのかな！" : offer.decision.love ? child.dialogue.love[draft.pick % child.dialogue.love.length] : offer.wantsIntervention ? child.dialogue.ask[draft.pick % child.dialogue.ask.length] : `${offer.cards[offer.decision.preferredIndex].name}にする！ ${reasonCopy[offer.decision.reason]}！`;
   return (
     <main className="game-shell draft-screen">
-      <header className="game-header"><div className="mini-logo">兄ちゃん！<b>俺のデッキ作って！</b></div><div className="pick-counter"><span>PICK</span><b>{String(draft.pick + 1).padStart(2, "0")}</b><em>/15</em></div><Meter sync={draft.syncRate} child={child} /></header>
+      <header className="game-header"><div className="mini-logo">兄ちゃん！<b>俺のデッキ作って！</b></div><div className="pick-counter"><span>PICK</span><b>{String(draft.pick + 1).padStart(2, "0")}</b><em>/15</em></div><SyncMeter sync={draft.syncRate} child={child} /></header>
       {reaction && <ReactionBanner reaction={reaction} speaker={child.displayName} />}
+      <SyncStageBanner notice={syncNotice} />
       <div className="draft-layout">
         <section className="choice-zone">
           <div className="versus-label"><span>どっちを入れる？</span>{offer?.source === "advice" && <b>兄ちゃんの注文ピック</b>}</div>
@@ -219,6 +244,11 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, onPick,
   );
 }
 
+function AceSelectionScreen({ draft, cards, selectedCardId, onSelect, onConfirm, onSkip }: { draft: DraftState; cards: Card[]; selectedCardId: string | null; onSelect: (cardId: string) => void; onConfirm: () => void; onSkip: () => void }) {
+  const byId = new Map(cards.map((card) => [card.id, card]));
+  return <main className="ace-selection-screen"><section className="ace-selection-panel"><span className="section-kicker">DESTINY DRAW / UNLOCKED</span><h1>切り札を選べ！！</h1><p className="ace-flavor">ここぞの一枚を、運命のドローに指定しろ！</p><div className="ace-deck-grid">{draft.deck.map((item) => { const card = byId.get(item.cardId)!; const selected = selectedCardId === item.cardId; return <button key={item.instanceId} className={`ace-card-option ${selected ? "selected" : ""}`} onClick={() => onSelect(item.cardId)} aria-pressed={selected}><CardFace card={card} selected={selected} /><span>{selected ? "切り札に指定中" : "この札を選ぶ"}</span></button>; })}</div><div className="ace-selection-actions"><button className="secondary-action" onClick={onSkip}>切り札なしで開始</button><button className="primary-action" onClick={onConfirm} disabled={!selectedCardId}>このカードで決定<span>▶</span></button></div></section></main>;
+}
+
 function DeckScreen({ draft, cards, child, reaction, onBattle }: { draft: DraftState; cards: Card[]; child: ChildProfile; reaction: KidReaction | null; onBattle: () => void }) {
   const byId = new Map(cards.map((card) => [card.id, card]));
   return <main className="game-shell deck-screen">
@@ -232,25 +262,58 @@ function DeckScreen({ draft, cards, child, reaction, onBattle }: { draft: DraftS
   </main>;
 }
 
-function BoardCard({ instance, cards }: { instance: BattleState["brother"]["board"][number]; cards: Card[] }) {
+function BoardCard({ instance, cards, ace = false }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; ace?: boolean }) {
   const card = cards.find((item) => item.id === instance.cardId)!;
-  return <div className={`board-card ${instance.intervention ? "intervened" : ""}`} title={card.name}>{instance.intervention && <span className="intervention-mark">兄</span>}<b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
+  const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
+  return <div className={`board-card ${instance.intervention ? "intervened" : ""} ${syncBonus && !ace ? "sync-granted" : ""} ${ace ? "ace-granted" : ""}`} title={card.name}>{instance.intervention && <span className="intervention-mark">兄</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}<b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
+}
+
+function BattleHandCard({ instance, cards, ace }: { instance: BattleState["brother"]["hand"][number]; cards: Card[]; ace?: boolean }) {
+  const card = cards.find((item) => item.id === instance.cardId)!;
+  const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
+  return <div className={`hand-card ${syncBonus && !ace ? "sync-granted" : ""} ${ace ? "ace-granted" : ""}`}><CardFace compact card={card} intervention={instance.intervention} />{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}</div>;
+}
+
+function AceStatus({ battle, cards }: { battle: BattleState; cards: Card[] }) {
+  if (!battle.brother.aceUsed && !battle.brother.aceCard) return null;
+  const aceEvent = [...battle.events].reverse().find((item) => item.type === "ace");
+  const cardId = battle.brother.aceCard?.cardId ?? aceEvent?.cardId;
+  const card = cardId ? cards.find((item) => item.id === cardId) : undefined;
+  return <div className={`ace-status ${battle.brother.aceUsed ? "used" : "ready"}`}><span>切り札</span>{battle.brother.aceUsed ? <strong>発動済み</strong> : <><strong>{card?.name ?? "指定札"}</strong><small>待機中</small></>}</div>;
 }
 
 function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish, finalBattle }: { battle: BattleState; cards: Card[]; opponent: OpponentDefinition; onNext: () => void; onAuto: () => void; auto: boolean; onFinish: () => void; finalBattle: boolean }) {
-  const recent = battle.events.slice(-9).reverse();
   const dialogueEvent = [...battle.events].reverse().find((item) => item.dialogue);
+  const aceEvent = [...battle.events].reverse().find((item) => item.type === "ace");
+  const syncEvent = [...battle.events].reverse().find((item) => item.type === "sync_bonus");
+  const recent = battle.events.slice(-9);
+  for (const importantEvent of [syncEvent, aceEvent]) {
+    if (importantEvent && !recent.some((item) => item.id === importantEvent.id)) recent.push(importantEvent);
+  }
+  recent.reverse();
+  const aceInstanceId = aceEvent?.instanceId;
+  const [shownAceEventId, setShownAceEventId] = useState<string | null>(null);
+  const [showAceBanner, setShowAceBanner] = useState(false);
+  useEffect(() => {
+    if (!aceEvent || aceEvent.id === shownAceEventId) return;
+    setShownAceEventId(aceEvent.id);
+    setShowAceBanner(true);
+    const timer = window.setTimeout(() => setShowAceBanner(false), 1900);
+    return () => window.clearTimeout(timer);
+  }, [aceEvent, shownAceEventId]);
   return <main className="battle-screen">
     <header className="battle-header"><div><span>{opponent.title}</span><strong>{opponent.name}</strong></div><div className="battle-turn">TURN <b>{battle.turn}</b></div><div className="brother-name"><span>単純弟</span><strong>ユウタ</strong></div></header>
+    <AceStatus battle={battle} cards={cards} />
+    {showAceBanner && <div className="ace-reaction-banner" role="status"><span>DESTINY DRAW</span><strong>ディスティニードロー！！</strong><small>{aceEvent?.text}</small></div>}
     <section className="arena">
       <div className="fighter opponent-fighter"><div className="avatar" style={{ "--rival-color": opponent.color } as CSSProperties}>{opponent.name.slice(0, 1)}</div><div className="life"><span>LIFE</span><b>{battle.opponent.life}</b></div><div className="pp">PP {battle.opponent.pp}/{battle.opponent.maxPp}</div></div>
       <div className="board-zone opponent-board">{battle.opponent.board.map((item) => <BoardCard key={item.instanceId} instance={item} cards={cards} />)}{!battle.opponent.board.length && <span className="empty-board">相手の場は空</span>}</div>
       <div className="board-line"><b>AUTO CARD BATTLE</b></div>
-      <div className="board-zone brother-board">{battle.brother.board.map((item) => <BoardCard key={item.instanceId} instance={item} cards={cards} />)}{!battle.brother.board.length && <span className="empty-board">ユウタの場は空</span>}</div>
+      <div className="board-zone brother-board">{battle.brother.board.map((item) => <BoardCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} />)}{!battle.brother.board.length && <span className="empty-board">ユウタの場は空</span>}</div>
       <div className="fighter brother-fighter"><div className="avatar kid">ユ</div><div className="life"><span>LIFE</span><b>{battle.brother.life}</b></div><div className="pp">PP {battle.brother.pp}/{battle.brother.maxPp}</div></div>
-      <div className="hand-zone">{battle.brother.hand.map((item) => <div key={item.instanceId} className="hand-card"><CardFace compact card={cards.find((card) => card.id === item.cardId)!} intervention={item.intervention} /></div>)}</div>
+      <div className="hand-zone">{battle.brother.hand.map((item) => <BattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} />)}</div>
     </section>
-    <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
+    <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
     {dialogueEvent && !battle.winner && <div className="battle-speech"><Speech speaker={dialogueEvent.side === "brother" ? "ユウタ" : opponent.name} text={dialogueEvent.dialogue!} tone={dialogueEvent.side === "brother" ? "kid" : "rival"} /></div>}
     {!battle.winner && <div className="battle-controls"><button onClick={onNext} disabled={auto}>1ターン進める</button><button className="primary-action" onClick={onAuto}>{auto ? "自動再生中…" : "最後まで見る"}<span>▶</span></button></div>}
     {battle.winner && <div className="result-overlay"><div className={`result-burst ${battle.winner === "brother" ? "win" : "lose"}`}><span>{battle.winner === "brother" ? "VICTORY!" : battle.winner === "draw" ? "DRAW" : "DEFEAT"}</span><h1>{battle.winner === "brother" ? "ユウタの勝利！" : battle.winner === "draw" ? "引き分け！" : `${opponent.name}の勝利！`}</h1><p>{battle.winner === "brother" ? "デッキは狙い通りに仕事をしただろうか？" : "次の相手とのバトルへ進もう。"}</p><button className="primary-action" onClick={onFinish}>{finalBattle ? "結果を見る" : "次の相手へ"}<span>▶</span></button></div></div>}
@@ -259,7 +322,7 @@ function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish,
 
 function ClearScreen({ run, cards, child, opponents, onTitle }: { run: RunState; cards: Card[]; child: ChildProfile; opponents: OpponentDefinition[]; onTitle: () => void }) {
   const opponentById = new Map(opponents.map((opponent) => [opponent.id, opponent]));
-  return <main className="clear-screen"><section className="clear-panel"><span className="section-kicker">ARCADE CLEAR</span><h1>3戦完走！</h1><section className="run-results"><h2>バトルの記録</h2>{run.battleResults.map((result, index) => <div className="run-result-row" key={`${result.opponentId}-${index}`}><span>{index + 1}戦目</span><strong className={result.outcome}>{result.outcome === "win" ? "○" : result.outcome === "loss" ? "×" : "△"}</strong><b>{opponentById.get(result.opponentId)?.name ?? result.opponentId}</b></div>)}</section><section className="run-facts"><div className="run-fact"><span>受動介入</span><strong>{run.summary.passiveInterventions}回</strong><small>支持 {run.summary.passiveSupports} / 却下 {run.summary.passiveRejects}</small></div><div className="run-fact"><span>一目惚れで入った札</span>{run.summary.loveCardIds.length ? <ul>{run.summary.loveCardIds.map((cardId, index) => <li key={`${cardId}-${index}`}>{cards.find((card) => card.id === cardId)?.name ?? cardId}</li>)}</ul> : <strong>なし</strong>}</div><div className="run-fact"><span>最後のシンクロ率</span><strong>段階{syncStage(run.summary.finalSync, child)} / {child.sync.stageMinimums.length}</strong></div></section><button className="primary-action" onClick={onTitle}>タイトルへ<span>↻</span></button></section></main>;
+  return <main className="clear-screen"><section className="clear-panel"><span className="section-kicker">ARCADE CLEAR</span><h1>3戦完走！</h1><section className="run-results"><h2>バトルの記録</h2>{run.battleResults.map((result, index) => <div className="run-result-row" key={`${result.opponentId}-${index}`}><span>{index + 1}戦目</span><strong className={result.outcome}>{result.outcome === "win" ? "○" : result.outcome === "loss" ? "×" : "△"}</strong><b>{opponentById.get(result.opponentId)?.name ?? result.opponentId}</b></div>)}</section><section className="run-facts"><div className="run-fact"><span>受動介入</span><strong>{run.summary.passiveInterventions}回</strong><small>支持 {run.summary.passiveSupports} / 却下 {run.summary.passiveRejects}</small></div><div className="run-fact"><span>一目惚れで入った札</span>{run.summary.loveCardIds.length ? <ul>{run.summary.loveCardIds.map((cardId, index) => <li key={`${cardId}-${index}`}>{cards.find((card) => card.id === cardId)?.name ?? cardId}</li>)}</ul> : <strong>なし</strong>}</div><div className="run-fact"><span>最後のシンクロ状態</span><strong>{syncStageLabel(run.summary.finalSync, child)}</strong></div></section><button className="primary-action" onClick={onTitle}>タイトルへ<span>↻</span></button></section></main>;
 }
 
 export default function Home() {
@@ -270,6 +333,7 @@ export default function Home() {
   const [hydrated, setHydrated] = useState(false);
   const [autoBattle, setAutoBattle] = useState(false);
   const [reaction, setReaction] = useState<KidReaction | null>(null);
+  const [syncNotice, setSyncNotice] = useState<SyncNotice | null>(null);
 
   useEffect(() => {
     Promise.all([fetch("./data/cards.json").then((response) => response.json()), fetch("./data/children/tanjun.json").then((response) => response.json()), fetch("./data/opponents.json").then((response) => response.json())])
@@ -303,6 +367,7 @@ export default function Home() {
     if (!child) return;
     setAutoBattle(false);
     setReaction(null);
+    setSyncNotice(null);
     setGame({ ...createDefaultSave(child.sync.initial), phase: "mode" });
   }
 
@@ -317,6 +382,7 @@ export default function Home() {
   function startDraft() {
     if (!child || !getCurrentOpponentId(game.run)) return;
     setReaction(null);
+    setSyncNotice(null);
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
     const draft = createDraft(seed, child, game.run.carrySync);
     const generated = generateOffer(draft, cards, child);
@@ -334,7 +400,10 @@ export default function Home() {
     } else {
       setReaction(null);
     }
+    const beforeStage = syncStage(game.draft.syncRate, child);
     const next = resolveOffer(game.draft, game.offer, child, index);
+    const nextStage = syncStage(next.syncRate, child);
+    setSyncNotice(nextStage > beforeStage ? { stage: nextStage, label: syncStageLabel(next.syncRate, child) } : null);
     setGame(nextNormalOffer(next));
   }
 
@@ -346,27 +415,42 @@ export default function Home() {
     setGame({ ...game, draft: generated.state, offer: generated.offer, adviceOpen: false });
   }
 
-  function startBattle() {
+  function prepareBattle() {
+    if (!game.draft || !child) return;
+    if (isAceUnlocked(game.draft.syncRate, child)) {
+      setGame({ ...game, phase: "ace", aceCardId: null });
+      return;
+    }
+    startBattle(null);
+  }
+
+  function selectAceCard(cardId: string) {
+    setGame((current) => ({ ...current, aceCardId: cardId }));
+  }
+
+  function startBattle(aceCardId: string | null = game.aceCardId ?? null) {
     if (!game.draft || !child) return;
     setReaction(null);
+    setSyncNotice(null);
     const opponentId = getCurrentOpponentId(game.run);
     const opponent = opponentId ? getOpponentById(opponents, opponentId) : undefined;
     if (!opponent) return;
-    const battle = createBattle(game.draft.deck, opponent, cards, game.draft.seed ^ 0xa5a5a5a5, game.draft.syncRate, null);
-    setGame({ ...game, phase: "battle", battle });
+    const battle = createBattle(game.draft.deck, opponent, cards, game.draft.seed ^ 0xa5a5a5a5, game.draft.syncRate, aceCardId);
+    setGame({ ...game, phase: "battle", battle, aceCardId });
   }
 
   function finishBattle() {
     if (!game.draft || !game.battle?.winner || !child) return;
     const nextRun = advanceRun(game.run, game.draft, game.battle.winner, child);
     setAutoBattle(false);
-    setGame({ ...game, phase: isRunComplete(nextRun) ? "clear" : "opponent", draft: null, offer: null, adviceOpen: false, battle: null, run: nextRun });
+    setGame({ ...game, phase: isRunComplete(nextRun) ? "clear" : "opponent", draft: null, offer: null, adviceOpen: false, battle: null, run: nextRun, aceCardId: null });
   }
 
   function returnToTitle() {
     if (!child) return;
     setAutoBattle(false);
     setReaction(null);
+    setSyncNotice(null);
     setGame(createDefaultSave(child.sync.initial));
   }
 
@@ -377,8 +461,9 @@ export default function Home() {
   const currentOpponentId = getCurrentOpponentId(game.run);
   const currentOpponent = currentOpponentId ? getOpponentById(opponents, currentOpponentId) : undefined;
   if (game.phase === "opponent" && currentOpponent) return <OpponentPreviewScreen opponent={currentOpponent} battleNumber={game.run.currentBattle + 1} onStart={startDraft} />;
-  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} onPick={takePick} onAuto={() => takePick()} onAdvice={chooseAdvice} />;
-  if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} onBattle={startBattle} />;
+  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} onPick={takePick} onAuto={() => takePick()} onAdvice={chooseAdvice} />;
+  if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} onBattle={prepareBattle} />;
+  if (game.phase === "ace" && game.draft) return <AceSelectionScreen draft={game.draft} cards={cards} selectedCardId={game.aceCardId ?? null} onSelect={selectAceCard} onConfirm={() => startBattle()} onSkip={() => startBattle(null)} />;
   if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} opponent={currentOpponent} onNext={() => setGame({ ...game, battle: advanceBattle(game.battle!, cards, child, currentOpponent) })} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} />;
   if (game.phase === "clear") return <ClearScreen run={game.run} cards={cards} child={child} opponents={opponents} onTitle={returnToTitle} />;
   return <main className="boot-screen"><button className="primary-action" onClick={returnToTitle}>タイトルへ</button></main>;
