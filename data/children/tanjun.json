@@ -101,7 +101,7 @@
   },
   "ace": {
     "unlockStage": 5,
-    "lifeThreshold": 7,
+    "lifeThreshold": 9,
     "grant": {
       "keywords": [
         "rush"

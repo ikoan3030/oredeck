@@ -83,12 +83,12 @@ Node.js 22以上が必要です。
 ## 検証コマンド
 
 ```bash
-npm test              # src/core/ のユニットテスト（8件）
-npm run simulate -- 200000
+npm test              # src/core/ のユニットテスト（21件）
 npm run build         # tsc --noEmit のあと vite build
+npm run simulate -- 10000 --mode six --policy 0.8
 ```
 
-`npm run simulate` の20万周時の基準値は、一目惚れ約2.8回、受動介入約6回、欠損数約2.03です。ロジックを触ったらこの値から大きくずれていないか確認してください。
+`npm run simulate -- 10000 --mode six --policy 0.8` をシンクロ率・梯子構成の基準コマンドとする。現行の基準値は、受動介入約5.3回/戦、6戦目ビルド末の段階5到達率83.89%（約84%）、段階5のboss勝率76.99%（約77%、切り札閾値9）である。データやロジックを変更したら、この値からの変動を確認すること。
 
 ## 公開
 
