@@ -33,6 +33,29 @@ export interface Card {
 
 export type AdviceCategory = "removal" | "guard" | "low_cost" | "skip";
 
+export interface SyncStageBonus {
+  stage: number;
+  condition: {
+    maxCost: number | null;
+  };
+  keywords: Keyword[];
+  statModifiers: {
+    attack: number;
+  };
+  activationRate: number;
+}
+
+export interface AceDefinition {
+  unlockStage: number;
+  lifeThreshold: number;
+  grant: {
+    keywords: Keyword[];
+    statModifiers: {
+      attack: number;
+    };
+  };
+}
+
 export interface ChildProfile {
   id: string;
   name: string;
@@ -54,7 +77,9 @@ export interface ChildProfile {
     decayFloor: number;
     /** Lower bound of each stage, lowest first. */
     stageMinimums: number[];
+    stageBonuses: SyncStageBonus[];
   };
+  ace: AceDefinition;
   advice: {
     checkpoints: number[];
     categories: AdviceCategory[];
@@ -197,6 +222,8 @@ export interface BattleCardInstance {
   atk: number;
   hp: number;
   maxHp: number;
+  grantedKeywords: Keyword[];
+  grantedAtk: number;
   summonedTurn: number;
   attacked: boolean;
   revived: boolean;
@@ -213,9 +240,10 @@ export interface BattlePlayer {
   hand: BattleCardInstance[];
   board: BattleCardInstance[];
   graveyard: BattleCardInstance[];
+  aceCard: BattleCardInstance | null;
 }
 
-export type BattleEventType = "turn" | "draw" | "play" | "effect" | "attack" | "destroyed" | "attribution" | "taunt" | "result";
+export type BattleEventType = "turn" | "draw" | "play" | "effect" | "attack" | "destroyed" | "attribution" | "taunt" | "result" | "sync_bonus" | "ace";
 
 export interface BattleEvent {
   id: string;
@@ -231,6 +259,7 @@ export interface BattleEvent {
 
 export interface BattleState {
   seed: number;
+  syncRate: number;
   turn: number;
   activeSide: BattleSide;
   brother: BattlePlayer;

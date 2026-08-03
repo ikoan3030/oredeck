@@ -352,7 +352,7 @@ export default function Home() {
     const opponentId = getCurrentOpponentId(game.run);
     const opponent = opponentId ? getOpponentById(opponents, opponentId) : undefined;
     if (!opponent) return;
-    const battle = createBattle(game.draft.deck, opponent, cards, game.draft.seed ^ 0xa5a5a5a5);
+    const battle = createBattle(game.draft.deck, opponent, cards, game.draft.seed ^ 0xa5a5a5a5, game.draft.syncRate, null);
     setGame({ ...game, phase: "battle", battle });
   }
 

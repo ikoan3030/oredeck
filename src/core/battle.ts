@@ -1,4 +1,5 @@
 import { nextRandom, shuffle } from "./random";
+import { syncStage } from "./sync";
 import type {
   BattleCardInstance,
   BattleEvent,
@@ -28,6 +29,8 @@ function makeInstance(card: Card, instanceId: string, draft?: DraftCard): Battle
     atk: card.atk,
     hp: card.hp,
     maxHp: card.hp,
+    grantedKeywords: [],
+    grantedAtk: 0,
     summonedTurn: -1,
     attacked: false,
     revived: false,
@@ -53,10 +56,42 @@ function cardById(cards: readonly Card[], id: string): Card {
   return card;
 }
 
+export function instanceHasKeyword(instance: BattleCardInstance, cards: readonly Card[], keyword: Keyword): boolean {
+  return instance.grantedKeywords.includes(keyword) || cardById(cards, instance.cardId).effects.some((effect) => effect.keyword === keyword);
+}
+
+function grantToInstance(instance: BattleCardInstance, keywords: readonly Keyword[], atk: number): BattleCardInstance {
+  return {
+    ...instance,
+    grantedKeywords: [...new Set([...instance.grantedKeywords, ...keywords])],
+    grantedAtk: instance.grantedAtk + atk,
+    atk: instance.atk + atk,
+  };
+}
+
 function drawOne(player: BattlePlayer): { player: BattlePlayer; drawn?: BattleCardInstance } {
   if (player.deck.length === 0) return { player };
   const [drawn, ...deck] = player.deck;
   return { player: { ...player, deck, hand: [...player.hand, drawn] }, drawn };
+}
+
+function drawAtTurnStart(
+  state: BattleState,
+  player: BattlePlayer,
+  child: ChildProfile,
+): { player: BattlePlayer; drawn?: BattleCardInstance; ace: boolean; aceCard?: BattleCardInstance } {
+  const ace = child.ace;
+  const stage = syncStage(state.syncRate, child);
+  if (player.side !== "brother" || !player.aceCard || stage < ace.unlockStage || player.life > ace.lifeThreshold) {
+    const drawn = drawOne(player);
+    return { ...drawn, ace: false };
+  }
+  const drawn = grantToInstance(player.aceCard, ace.grant.keywords, ace.grant.statModifiers.attack);
+  return {
+    player: { ...player, aceCard: null, hand: [...player.hand, drawn] },
+    ace: true,
+    aceCard: drawn,
+  };
 }
 
 function canPlay(instance: BattleCardInstance, player: BattlePlayer, enemy: BattlePlayer, cards: readonly Card[]): boolean {
@@ -135,6 +170,48 @@ function conditionMet(card: Card, player: BattlePlayer, cards: readonly Card[]):
   return true;
 }
 
+function applySyncBonus(
+  state: BattleState,
+  side: BattleSide,
+  summoned: BattleCardInstance,
+  card: Card,
+  child: ChildProfile,
+): { state: BattleState; instance: BattleCardInstance } {
+  if (side !== "brother") return { state, instance: summoned };
+
+  const stage = syncStage(state.syncRate, child);
+  const bonus = child.sync.stageBonuses.find((item) => item.stage === stage);
+  const maxCost = bonus?.condition.maxCost;
+  if (!bonus || maxCost === null || maxCost === undefined || card.cost > maxCost) {
+    return { state, instance: summoned };
+  }
+
+  const random = nextRandom(state.seed);
+  let next = { ...state, seed: random.seed };
+  if (random.value >= bonus.activationRate) return { state: next, instance: summoned };
+
+  const granted = grantToInstance(summoned, bonus.keywords, bonus.statModifiers.attack);
+  const active = next[side];
+  next = updatePlayers(next, {
+    ...active,
+    board: active.board.map((item) => item.instanceId === granted.instanceId ? granted : item),
+  }, next[other(side)]);
+  const grants = [
+    ...bonus.keywords,
+    ...(bonus.statModifiers.attack ? [`強化+${bonus.statModifiers.attack}`] : []),
+  ].join("・");
+  next = event(next, {
+    type: "sync_bonus",
+    side,
+    text: `シンクロ発動！ ${card.name}に${grants}`,
+    cardId: card.id,
+    instanceId: granted.instanceId,
+    keyword: bonus.keywords[0],
+    effective: true,
+  });
+  return { state: next, instance: granted };
+}
+
 function resolvePlay(
   state: BattleState,
   side: BattleSide,
@@ -154,6 +231,9 @@ function resolvePlay(
     active = next[side];
     active = { ...active, board: [...active.board, summoned] };
     next = updatePlayers(next, active, next[other(side)]);
+    const syncBonus = applySyncBonus(next, side, summoned, card, child);
+    next = syncBonus.state;
+    summoned = syncBonus.instance;
     const aura = card.effects.find((effect) => effect.trigger === "aura" && effect.keyword === "buff");
     if (aura && conditionMet(card, active, cards)) {
       summoned = { ...summoned, atk: summoned.atk + aura.value, buffSources: [...summoned.buffSources, { instanceId: summoned.instanceId, amount: aura.value, intervention: summoned.intervention }] };
@@ -226,7 +306,7 @@ function resolveAttack(state: BattleState, side: BattleSide, attackerIndex: numb
   let active = state[side]; let enemy = state[other(side)];
   const attacker = active.board[attackerIndex];
   if (!attacker || attacker.attacked) return state;
-  const guards = enemy.board.map((card, index) => ({ card, index })).filter(({ card }) => cardById(cards, card.cardId).effects.some((effect) => effect.keyword === "guard"));
+  const guards = enemy.board.map((card, index) => ({ card, index })).filter(({ card }) => instanceHasKeyword(card, cards, "guard"));
   const random = nextRandom(state.seed);
   let next = { ...state, seed: random.seed };
   const attackFace = guards.length === 0 && (enemy.board.length === 0 || random.value < faceBias);
@@ -237,7 +317,7 @@ function resolveAttack(state: BattleState, side: BattleSide, attackerIndex: numb
     next = updatePlayers(next, active, enemy);
     next = event(next, { type: "attack", side, text: `${cardById(cards, attacker.cardId).name}がリーダーに${attacker.atk}ダメージ`, cardId: attacker.cardId, instanceId: attacker.instanceId, keyword: "damage", effective: attacker.atk > 0 });
     if (attacker.atk > 0) next = markAttribution(next, attacker, "damage", child, enemy.life === 0);
-    const baseAttack = attacker.atk - attacker.buffSources.reduce((sum, source) => sum + source.amount, 0);
+    const baseAttack = attacker.atk - attacker.grantedAtk - attacker.buffSources.reduce((sum, source) => sum + source.amount, 0);
     const usefulBuff = attacker.buffSources.find((source) => source.intervention && beforeLife > baseAttack && beforeLife <= attacker.atk);
     if (usefulBuff) next = markAttribution(next, { ...attacker, instanceId: usefulBuff.instanceId, intervention: true }, "buff", child, enemy.life === 0);
     return next;
@@ -254,7 +334,7 @@ function resolveAttack(state: BattleState, side: BattleSide, attackerIndex: numb
   if (damagedTarget.hp <= 0) {
     const result = destroyAtIndex(next, next[other(side)], targetIndex, cards); next = updatePlayers(result.state, next[side], result.player);
     next = markAttribution(next, attacker, "damage", child, false);
-    const baseAttack = attacker.atk - attacker.buffSources.reduce((sum, source) => sum + source.amount, 0);
+    const baseAttack = attacker.atk - attacker.grantedAtk - attacker.buffSources.reduce((sum, source) => sum + source.amount, 0);
     const usefulBuff = attacker.buffSources.find((source) => source.intervention && target.hp > baseAttack && target.hp <= attacker.atk);
     if (usefulBuff) next = markAttribution(next, { ...attacker, instanceId: usefulBuff.instanceId, intervention: true }, "buff", child, false);
   }
@@ -271,24 +351,67 @@ export function createBattle(
   opponent: OpponentDefinition,
   cards: readonly Card[],
   seed: number,
+  aceCardId?: string | null,
+): BattleState;
+
+export function createBattle(
+  deck: readonly DraftCard[],
+  opponent: OpponentDefinition,
+  cards: readonly Card[],
+  seed: number,
+  syncRate: number,
+  aceCardId?: string | null,
+): BattleState;
+
+export function createBattle(
+  deck: readonly DraftCard[],
+  opponent: OpponentDefinition,
+  cards: readonly Card[],
+  seed: number,
+  aceCardId: string | null,
+  syncRate: number,
+): BattleState;
+
+export function createBattle(
+  deck: readonly DraftCard[],
+  opponent: OpponentDefinition,
+  cards: readonly Card[],
+  seed: number,
+  syncRateOrAceCardId: number | string | null = 0,
+  maybeAceCardId: number | string | null = null,
 ): BattleState {
+  const syncRate = typeof syncRateOrAceCardId === "number" ? syncRateOrAceCardId : typeof maybeAceCardId === "number" ? maybeAceCardId : 0;
+  const aceCardId = typeof syncRateOrAceCardId === "number" ? typeof maybeAceCardId === "string" ? maybeAceCardId : null : syncRateOrAceCardId;
   const byId = new Map(cards.map((card) => [card.id, card]));
-  const brotherInstances = deck.map((item, index) => makeInstance(byId.get(item.cardId)!, `b-${index}-${item.instanceId}`, item));
+  let brotherInstances = deck.map((item, index) => makeInstance(byId.get(item.cardId)!, `b-${index}-${item.instanceId}`, item));
+  let aceCard: BattleCardInstance | null = null;
+  if (aceCardId !== null) {
+    const aceIndex = brotherInstances.findIndex((item) => item.cardId === aceCardId);
+    if (aceIndex < 0) throw new Error(`Ace card is not in the deck: ${aceCardId}`);
+    aceCard = brotherInstances[aceIndex];
+    brotherInstances = brotherInstances.filter((_, index) => index !== aceIndex);
+  }
   const opponentInstances = opponent.deck.map((id, index) => makeInstance(byId.get(id)!, `o-${index}-${id}`));
   const shuffledBrother = shuffle(seed, brotherInstances);
   const shuffledOpponent = shuffle(shuffledBrother.seed, opponentInstances);
   const brotherHand = shuffledBrother.values.slice(0, 3);
   const opponentHand = shuffledOpponent.values.slice(0, 3);
-  return {
+  const result = {
     seed: shuffledOpponent.seed,
+    syncRate,
     turn: 0,
-    activeSide: "brother",
+    activeSide: "brother" as const,
     brother: { side: "brother", name: "ユウタ", life: 20, maxPp: 0, pp: 0, deck: shuffledBrother.values.slice(3), hand: brotherHand, board: [], graveyard: [] },
     opponent: { side: "opponent", name: opponent.name, life: 20, maxPp: 0, pp: 0, deck: shuffledOpponent.values.slice(3), hand: opponentHand, board: [], graveyard: [] },
     winner: null,
     events: [],
     attributionFired: [],
     nextEventId: 1,
+  };
+  return {
+    ...result,
+    brother: { ...result.brother, aceCard } as BattlePlayer,
+    opponent: { ...result.opponent, aceCard: null } as BattlePlayer,
   };
 }
 
@@ -303,8 +426,11 @@ export function advanceBattle(
   let active = state[side]; let enemy = state[other(side)];
   const turn = state.turn + 1;
   active = { ...active, maxPp: Math.min(10, active.maxPp + 1), pp: Math.min(10, active.maxPp + 1), board: active.board.map((item) => ({ ...item, attacked: false })) };
-  const draw = drawOne(active); active = draw.player;
+  const draw = drawAtTurnStart(state, active, child); active = draw.player;
   let next = updatePlayers({ ...state, turn }, active, enemy);
+  if (draw.aceCard) {
+    next = event(next, { type: "ace", side, text: `ディスティニードロー！ ${cardById(cards, draw.aceCard.cardId).name}に切り札効果`, cardId: draw.aceCard.cardId, instanceId: draw.aceCard.instanceId, keyword: "buff", effective: true });
+  }
   next = event(next, { type: "turn", side, text: `${turn}ターン目・${active.name}のターン` });
   if (draw.drawn) next = event(next, { type: "draw", side, text: `${active.name}が1枚ドロー`, cardId: draw.drawn.cardId });
 
@@ -323,8 +449,7 @@ export function advanceBattle(
   let attackerCursor = 0;
   while (attackerCursor < next[side].board.length) {
     const attacker = next[side].board[attackerCursor];
-    const card = cardById(cards, attacker.cardId);
-    const rush = card.effects.some((effect) => effect.keyword === "rush");
+    const rush = instanceHasKeyword(attacker, cards, "rush");
     if (!attacker.attacked && (attacker.summonedTurn < turn || rush)) next = resolveAttack(next, side, attackerCursor, faceBias, cards, child);
     if (next.brother.life <= 0 || next.opponent.life <= 0) break;
     const stillAtCursor = next[side].board[attackerCursor]?.instanceId === attacker.instanceId;

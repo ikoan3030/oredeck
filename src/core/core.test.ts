@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
-import { advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createRun, decaySync, decideOffer, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition } from "./index";
+import { advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createRun, decaySync, decideOffer, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, instanceHasKeyword, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition } from "./index";
 
 const cards = JSON.parse(readFileSync(resolve("data/cards.json"), "utf8")) as Card[];
 const child = JSON.parse(readFileSync(resolve("data/children/tanjun.json"), "utf8")) as ChildProfile;
 const opponents = JSON.parse(readFileSync(resolve("data/opponents.json"), "utf8")) as OpponentDefinition[];
 const get = (id: string) => cards.find((card) => card.id === id)!;
 const getOpponent = (id: string) => getOpponentById(opponents, id)!;
+const battleDeck = (cardId: string): DraftCard[] => Array.from({ length: 15 }, (_, index) => ({ instanceId: `battle-${index}`, cardId, intervention: false, source: "auto" }));
 
 test("aesthetic score follows the fixed C/H/B/K weights", () => {
   assert.equal(aestheticScore(get("gravewald"), child), 2.7);
@@ -95,6 +96,80 @@ test("battle resolves within the turn limit without mutating the input state", (
   const result = runBattle(initial, cards, child, getOpponent("wall"));
   assert.ok(result.winner);
   assert.ok(result.turn <= 30);
+});
+
+test("sync bonuses use the stage data and affect instance keyword checks", () => {
+  const opponent = getOpponent("wall");
+  const before = createBattle(battleDeck("noelka"), opponent, cards, 5, 20, null);
+  assert.equal(instanceHasKeyword(before.brother.hand[0], cards, "rush"), false);
+
+  const activated = advanceBattle(before, cards, child, opponent);
+  const activatedCard = activated.brother.board[0];
+  assert.ok(activatedCard);
+  assert.deepEqual(activatedCard.grantedKeywords, ["rush"]);
+  assert.equal(instanceHasKeyword(activatedCard, cards, "rush"), true);
+  assert.equal(activated.events.filter((item) => item.type === "sync_bonus").length, 1);
+  assert.equal(activated.opponent.life, 19);
+
+  const missed = advanceBattle(createBattle(battleDeck("noelka"), opponent, cards, 1, 20, null), cards, child, opponent);
+  assert.equal(missed.events.filter((item) => item.type === "sync_bonus").length, 0);
+  assert.equal(missed.opponent.life, 20);
+
+  const stageOne = advanceBattle(createBattle(battleDeck("noelka"), opponent, cards, 5, 0, null), cards, child, opponent);
+  assert.equal(stageOne.events.filter((item) => item.type === "sync_bonus").length, 0);
+  assert.equal(stageOne.opponent.life, 20);
+
+  const tooExpensive = createBattle(battleDeck("dolga"), opponent, cards, 5, 20, null);
+  const enoughPp = { ...tooExpensive, brother: { ...tooExpensive.brother, maxPp: 1, pp: 1 } };
+  const costMiss = advanceBattle(enoughPp, cards, child, opponent);
+  assert.equal(costMiss.events.filter((item) => item.type === "sync_bonus").length, 0);
+
+  const stageFive = createBattle(battleDeck("dolga"), opponent, cards, 1, 80, null);
+  const stageFiveNext = advanceBattle({ ...stageFive, brother: { ...stageFive.brother, maxPp: 1, pp: 1 } }, cards, child, opponent);
+  assert.equal(stageFiveNext.events.filter((item) => item.type === "sync_bonus").length, 1);
+  assert.equal(stageFiveNext.brother.board[0].grantedAtk, 1);
+  assert.equal(instanceHasKeyword(stageFiveNext.brother.board[0], cards, "rush"), true);
+
+  const guardGranted = { ...before.brother.hand[0], grantedKeywords: ["guard"] as ["guard"] };
+  assert.equal(instanceHasKeyword(guardGranted, cards, "guard"), true);
+});
+
+test("the ace card uses the 14-card deck, life threshold, and one-use turn-start draw", () => {
+  const opponent = getOpponent("wall");
+  const battle = createBattle(battleDeck("grim"), opponent, cards, 123, 80, "grim");
+  const aceId = battle.brother.aceCard?.instanceId;
+  assert.ok(aceId);
+  assert.equal(battle.brother.deck.length + battle.brother.hand.length, 14);
+  assert.equal(battle.brother.deck.length, 11);
+
+  const primed = { ...battle, brother: { ...battle.brother, life: 7 } };
+  const first = advanceBattle(primed, cards, child, opponent);
+  const drawnAce = first.brother.hand.find((item) => item.instanceId === aceId);
+  assert.ok(drawnAce);
+  assert.equal(drawnAce.grantedAtk, 2);
+  assert.deepEqual(drawnAce.grantedKeywords, ["rush"]);
+  assert.equal(first.brother.aceCard, null);
+  assert.equal(first.brother.deck.length, battle.brother.deck.length);
+  assert.equal(first.events.filter((item) => item.type === "ace").length, 1);
+  assert.equal(first.events.filter((item) => item.type === "draw").length, 0);
+
+  const second = advanceBattle(first, cards, child, opponent);
+  const third = advanceBattle(second, cards, child, opponent);
+  assert.equal(third.events.filter((item) => item.type === "ace").length, 1);
+
+  const drawDeck: DraftCard[] = [
+    { instanceId: "ace", cardId: "grim", intervention: false, source: "auto" },
+    ...Array.from({ length: 14 }, (_, index) => ({ instanceId: `draw-${index}`, cardId: "wisdom", intervention: false, source: "auto" as const })),
+  ];
+  const drawBattle = createBattle(drawDeck, opponent, cards, 1, 80, "grim");
+  const drawEffect = advanceBattle({ ...drawBattle, brother: { ...drawBattle.brother, maxPp: 1, pp: 1 } }, cards, child, opponent);
+  assert.ok(drawEffect.events.some((item) => item.type === "effect" && item.keyword === "draw"));
+  assert.equal(drawEffect.events.filter((item) => item.type === "ace").length, 0);
+  assert.ok(drawEffect.brother.aceCard);
+
+  const noAce = createBattle(battleDeck("grim"), opponent, cards, 123, 80, null);
+  assert.equal(noAce.brother.aceCard, null);
+  assert.equal(noAce.brother.deck.length, 12);
 });
 
 test("attribution only appears on effective work and never on card play", () => {
