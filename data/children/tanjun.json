@@ -25,7 +25,14 @@
     "supportGain": 8,
     "decayMultiplier": 0.7,
     "decayFloor": 20,
-    "stageMinimums": [0, 20, 40, 60, 80]
+    "stageMinimums": [0, 20, 40, 60, 80],
+    "stageLabels": [
+      {"minimum": 0, "label": "カードがよそよそしい"},
+      {"minimum": 20, "label": "ちょっとずつ息が合ってきた"},
+      {"minimum": 40, "label": "カードがこたえてくれる！"},
+      {"minimum": 60, "label": "デッキが熱い！ノッてきた！"},
+      {"minimum": 80, "label": "完全シンクロ！！"}
+    ]
   },
   "advice": {
     "checkpoints": [5, 10],
