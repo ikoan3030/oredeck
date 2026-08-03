@@ -48,6 +48,8 @@ interface BattleAggregate {
   opponentStage: Record<string, { battles: number; wins: number }>;
   aceEligible: number;
   aceActivated: number;
+  aceActivatedWins: number;
+  aceComebackWins: number;
   aceLifeReached: number;
   withAceWins: number;
   withoutAceWins: number;
@@ -70,9 +72,17 @@ const runs = Number(positionalRuns ?? 10000);
 const mode = (optionValue("--mode") ?? "six") as LadderMode;
 const rawPolicy = optionValue("--policy") ?? "always-match";
 const rawMatchRate = optionValue("--match-rate");
+const rawAceThreshold = optionValue("--ace-threshold");
 
 if (!Number.isInteger(runs) || runs < 1) throw new Error("runs must be a positive integer");
 if (mode !== "six" && mode !== "three") throw new Error("--mode must be six or three");
+
+const aceThreshold = rawAceThreshold === undefined ? child.ace.lifeThreshold : Number(rawAceThreshold);
+if (!Number.isInteger(aceThreshold) || aceThreshold < 0) throw new Error("--ace-threshold must be a non-negative integer");
+const simulationChild: ChildProfile = {
+  ...child,
+  ace: { ...child.ace, lifeThreshold: aceThreshold },
+};
 
 function parseRate(value: string): number {
   const rate = Number(value);
@@ -97,7 +107,7 @@ function opponentById(id: string): OpponentDefinition {
 }
 
 function chooseAdviceCategory(): Exclude<AdviceCategory, "skip"> | undefined {
-  return child.advice.categories.find((category): category is Exclude<AdviceCategory, "skip"> => category !== "skip");
+  return simulationChild.advice.categories.find((category): category is Exclude<AdviceCategory, "skip"> => category !== "skip");
 }
 
 function policyMatches(policyValue: AdjudicationPolicy, seed: number): { matches: boolean; seed: number } {
@@ -109,42 +119,49 @@ function policyMatches(policyValue: AdjudicationPolicy, seed: number): { matches
 }
 
 function simulateDraft(seed: number, initialSync: number, policyValue: AdjudicationPolicy, initialPolicySeed: number): { draft: DraftState; policySeed: number } {
-  let state = createDraft(seed, child, initialSync);
+  let state = createDraft(seed, simulationChild, initialSync);
   let policySeed = initialPolicySeed >>> 0;
   while (state.pick < 15) {
-    if (isAdviceDue(state, child)) {
+    if (isAdviceDue(state, simulationChild)) {
       const category = chooseAdviceCategory();
       if (!category) {
         state = markAdviceSkipped(state);
         continue;
       }
-      const generated = generateOffer(state, cards, child, category);
-      state = resolveOffer(generated.state, generated.offer, child, generated.offer.decision.preferredIndex);
+      const generated = generateOffer(state, cards, simulationChild, category);
+      state = resolveOffer(generated.state, generated.offer, simulationChild, generated.offer.decision.preferredIndex);
       continue;
     }
 
-    const generated = generateOffer(state, cards, child);
+    const generated = generateOffer(state, cards, simulationChild);
     let selectedIndex: 0 | 1 | undefined;
     if (generated.offer.wantsIntervention) {
       const result = policyMatches(policyValue, policySeed);
       policySeed = result.seed;
       selectedIndex = result.matches ? generated.offer.decision.preferredIndex : generated.offer.decision.preferredIndex === 0 ? 1 : 0;
     }
-    state = resolveOffer(generated.state, generated.offer, child, selectedIndex);
+    state = resolveOffer(generated.state, generated.offer, simulationChild, selectedIndex);
   }
   return { draft: state, policySeed };
 }
 
-function runBattleWithMetrics(initial: BattleState, opponent: OpponentDefinition): { battle: BattleState; lifeThresholdReached: boolean; deckExhausted: boolean } {
+function runBattleWithMetrics(initial: BattleState, opponent: OpponentDefinition): { battle: BattleState; lifeThresholdReached: boolean; deckExhausted: boolean; aceActivated: boolean; comebackWin: boolean } {
   let next = initial;
-  let lifeThresholdReached = next.brother.life <= child.ace.lifeThreshold;
+  let lifeThresholdReached = next.brother.life <= simulationChild.ace.lifeThreshold;
   let deckExhausted = next.brother.deck.length === 0 || next.opponent.deck.length === 0;
+  let aceActivated = false;
+  let wasBehindAtAce = false;
   while (!next.winner) {
-    next = advanceBattle(next, cards, child, opponent);
-    lifeThresholdReached ||= next.brother.life <= child.ace.lifeThreshold;
+    const before = next;
+    next = advanceBattle(next, cards, simulationChild, opponent);
+    if (!before.brother.aceUsed && next.brother.aceUsed) {
+      aceActivated = true;
+      wasBehindAtAce = before.brother.life < before.opponent.life;
+    }
+    lifeThresholdReached ||= next.brother.life <= simulationChild.ace.lifeThreshold;
     deckExhausted ||= next.brother.deck.length === 0 || next.opponent.deck.length === 0;
   }
-  return { battle: next, lifeThresholdReached, deckExhausted };
+  return { battle: next, lifeThresholdReached, deckExhausted, aceActivated, comebackWin: aceActivated && wasBehindAtAce && next.winner === "brother" };
 }
 
 function createAggregate(): BattleAggregate {
@@ -159,6 +176,8 @@ function createAggregate(): BattleAggregate {
     opponentStage: {},
     aceEligible: 0,
     aceActivated: 0,
+    aceActivatedWins: 0,
+    aceComebackWins: 0,
     aceLifeReached: 0,
     withAceWins: 0,
     withoutAceWins: 0,
@@ -185,7 +204,7 @@ function percentile(values: number[], ratio: number): number {
 }
 
 function distribution(values: number[]): Record<string, number> {
-  return Object.fromEntries([1, 2, 3, 4, 5].map((stage) => [String(stage), values.filter((value) => syncStage(value, child) === stage).length]));
+  return Object.fromEntries([1, 2, 3, 4, 5].map((stage) => [String(stage), values.filter((value) => syncStage(value, simulationChild) === stage).length]));
 }
 
 function summarize(values: number[]): Record<string, number> {
@@ -201,7 +220,7 @@ function summarize(values: number[]): Record<string, number> {
 }
 
 function ladderFor(modeValue: LadderMode, seed: number): RunState {
-  return modeValue === "six" ? createLadderRun(seed, child.sync.initial) : createRun(["rush", "wall", "boss"], child.sync.initial);
+  return modeValue === "six" ? createLadderRun(seed, simulationChild.sync.initial) : createRun(["rush", "wall", "boss"], simulationChild.sync.initial);
 }
 
 const battleCount = mode === "six" ? 6 : 3;
@@ -211,6 +230,7 @@ const variablePairCounts = new Map<string, number>();
 const allBuildValues: number[] = [];
 const allCarryValues: number[] = [];
 const stage5ByBattle = Array.from({ length: battleCount }, () => 0);
+const runWinHistogram = new Map<number, number>();
 let totalWins = 0;
 let totalBattles = 0;
 let totalDeckExhaustions = 0;
@@ -230,15 +250,15 @@ for (let runIndex = 0; runIndex < runs; runIndex += 1) {
     policySeed = drafted.policySeed;
     const draft = drafted.draft;
     const opponent = opponentById(run.opponentIds[battleIndex]);
-    const buildStage = syncStage(draft.syncRate, child);
-    const aceEligible = isAceUnlocked(draft.syncRate, child);
+    const buildStage = syncStage(draft.syncRate, simulationChild);
+    const aceEligible = isAceUnlocked(draft.syncRate, simulationChild);
     const aceCardId = aceEligible ? draft.deck[0]?.cardId ?? null : null;
     const battleSeed = (draft.seed ^ 0xa5a5a5a5) >>> 0;
     const withAce = runBattleWithMetrics(createBattle(draft.deck, opponent, cards, battleSeed, draft.syncRate, aceCardId), opponent);
     let withoutAce: ReturnType<typeof runBattleWithMetrics> | undefined;
     if (aceEligible) withoutAce = runBattleWithMetrics(createBattle(draft.deck, opponent, cards, battleSeed, draft.syncRate, null), opponent);
 
-    run = advanceRun(run, draft, withAce.battle.winner!, child);
+    run = advanceRun(run, draft, withAce.battle.winner!, simulationChild);
     const result = run.battleResults.at(-1)!;
     const aggregate = aggregates[battleIndex];
     aggregate.battles += 1;
@@ -247,12 +267,14 @@ for (let runIndex = 0; runIndex < runs; runIndex += 1) {
     aggregate.carrySync.push(result.syncAfterDecay);
     aggregate.passiveInterventions += result.passiveInterventions;
     addStage(aggregate.buildStages, buildStage);
-    addStage(aggregate.carryStages, syncStage(result.syncAfterDecay, child));
+    addStage(aggregate.carryStages, syncStage(result.syncAfterDecay, simulationChild));
     aggregate.opponentStage[`${result.opponentId}|${buildStage}`] ??= { battles: 0, wins: 0 };
     aggregate.opponentStage[`${result.opponentId}|${buildStage}`].battles += 1;
     aggregate.opponentStage[`${result.opponentId}|${buildStage}`].wins += Number(result.winner === "brother");
     aggregate.aceEligible += Number(aceEligible);
-    aggregate.aceActivated += Number(withAce.battle.brother.aceUsed);
+    aggregate.aceActivated += Number(withAce.aceActivated);
+    aggregate.aceActivatedWins += Number(withAce.aceActivated && result.winner === "brother");
+    aggregate.aceComebackWins += Number(withAce.comebackWin);
     aggregate.aceLifeReached += Number(aceEligible && withAce.lifeThresholdReached);
     aggregate.withAceWins += Number(aceEligible && result.winner === "brother");
     aggregate.withoutAceWins += Number(aceEligible && withoutAce?.battle.winner === "brother");
@@ -270,6 +292,7 @@ for (let runIndex = 0; runIndex < runs; runIndex += 1) {
     totalBattles += 1;
     totalDeckExhaustions += Number(withAce.deckExhausted);
   }
+  runWinHistogram.set(run.summary.wins, (runWinHistogram.get(run.summary.wins) ?? 0) + 1);
 }
 
 const formatRate = (value: number, denominator: number) => denominator ? Number((value / denominator * 100).toFixed(3)) : 0;
@@ -288,6 +311,10 @@ const formatAggregate = (aggregate: BattleAggregate, battleIndex: number) => ({
     lifeThresholdReached: aggregate.aceLifeReached,
     activated: aggregate.aceActivated,
     exposureRate: formatRate(aggregate.aceActivated, aggregate.aceEligible),
+    activatedWinRate: formatRate(aggregate.aceActivatedWins, aggregate.aceActivated),
+    comebackWins: aggregate.aceComebackWins,
+    comebackRateAmongActivated: formatRate(aggregate.aceComebackWins, aggregate.aceActivated),
+    comebackRateAmongActivatedWins: formatRate(aggregate.aceComebackWins, aggregate.aceActivatedWins),
     withAceWinRate: formatRate(aggregate.withAceWins, aggregate.aceEligible),
     withoutAceWinRate: formatRate(aggregate.withoutAceWins, aggregate.aceEligible),
     winRateDifferencePoints: Number((formatRate(aggregate.withAceWins, aggregate.aceEligible) - formatRate(aggregate.withoutAceWins, aggregate.aceEligible)).toFixed(3)),
@@ -307,6 +334,7 @@ for (const id of ["rush", "wall", "boss", "sister", "smart-brother", "cousin", "
 console.log(JSON.stringify({
   runs,
   mode,
+  aceThreshold,
   policy,
   ladderBattles: battleCount,
   overallWinRate: formatRate(totalWins, totalBattles),
@@ -320,5 +348,6 @@ console.log(JSON.stringify({
   allBuildSync: summarize(allBuildValues),
   allCarrySync: summarize(allCarryValues),
   deckExhaustionRate: formatRate(totalDeckExhaustions, totalBattles),
+  runWinHistogram: Object.fromEntries([...runWinHistogram.entries()].sort((a, b) => a[0] - b[0])),
   variablePairCounts: Object.fromEntries([...variablePairCounts.entries()].sort()),
 }, null, 2));

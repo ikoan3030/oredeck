@@ -19,15 +19,15 @@
       "gaiorg",
       "lilibel",
       "lilibel",
-      "fiorina",
-      "fiorina",
-      "grim",
-      "grim",
+      "gorganos",
+      "dragonseal",
+      "drakevine",
+      "alvine",
       "holyblade",
       "judgment",
-      "steel-blessing",
+      "vanishflash",
       "phoenixeed",
-      "drakevine"
+      "followarrow"
     ]
   },
   {
@@ -46,19 +46,19 @@
     "deck": [
       "noelka",
       "noelka",
-      "flamebullet",
-      "flamebullet",
-      "balga",
-      "balga",
-      "dolga",
-      "dolga",
+      "grim",
+      "grim",
+      "valzeid",
+      "valzeid",
+      "gaiorg",
+      "gaiorg",
       "mewrin",
       "mewrin",
-      "shadowkite",
-      "shadowkite",
-      "followarrow",
-      "thunder",
-      "alvine"
+      "gaiorg",
+      "gaiorg",
+      "valzeid",
+      "valzeid",
+      "lilibel"
     ]
   },
   {
@@ -81,15 +81,15 @@
       "gaiorg",
       "lilibel",
       "lilibel",
-      "fiorina",
-      "fiorina",
+      "noelka",
+      "noelka",
       "mewrin",
       "mewrin",
-      "phoenixeed",
+      "fiorina",
       "phoenixeed",
       "steel-blessing",
-      "wisdom",
-      "valzeid"
+      "drakevine",
+      "gorganos"
     ]
   },
   {
@@ -118,8 +118,8 @@
       "followarrow",
       "thunder",
       "blastwave",
-      "wisdom",
-      "valzeid",
+      "volganid",
+      "gaiorg",
       "noelka"
     ]
   },
@@ -149,9 +149,9 @@
       "zamud",
       "volganid",
       "volganid",
-      "phoenixeed",
-      "zexvain",
-      "dragbalt"
+      "judgment",
+      "judgment",
+      "followarrow"
     ]
   },
   {
@@ -169,20 +169,20 @@
     ],
     "deck": [
       "dolguard",
-      "dolguard",
+      "noelka",
       "gaiorg",
       "gaiorg",
-      "lilibel",
-      "grim",
-      "grim",
+      "kagerou",
+      "gorganos",
+      "dragonseal",
       "alvine",
       "alvine",
-      "valzeid",
-      "phoenixeed",
+      "inferdos",
+      "alvine",
       "judgment",
       "judgment",
       "dragonseal",
-      "steel-blessing"
+      "baldrogia"
     ]
   },
   {
@@ -199,21 +199,21 @@
       "切り札はまだ温存している。ここからが本番だ！"
     ],
     "deck": [
-      "grim",
-      "grim",
-      "alvine",
-      "alvine",
-      "gaiorg",
-      "gaiorg",
-      "volganid",
-      "volganid",
-      "phoenixeed",
-      "valzeid",
-      "valzeid",
-      "judgment",
-      "judgment",
+      "thunder",
       "baldrogia",
-      "inferdos"
+      "gaiorg",
+      "gaiorg",
+      "judgment",
+      "judgment",
+      "dragonseal",
+      "vanishflash",
+      "thunder",
+      "thunder",
+      "thunder",
+      "thunder",
+      "followarrow",
+      "followarrow",
+      "flamebullet"
     ]
   }
 ]
