@@ -3,6 +3,8 @@ import { syncStage } from "./sync";
 import type {
   BattleCardInstance,
   BattleEvent,
+  BattleEventSnapshot,
+  BattleEventSnapshotPlayer,
   BattlePlayer,
   BattleSide,
   BattleState,
@@ -38,11 +40,38 @@ function makeInstance(card: Card, instanceId: string, draft?: DraftCard): Battle
   };
 }
 
-function event(state: BattleState, value: Omit<BattleEvent, "id">): BattleState {
+function snapshotPlayer(player: BattlePlayer): BattleEventSnapshotPlayer {
   return {
+    side: player.side,
+    name: player.name,
+    life: player.life,
+    maxPp: player.maxPp,
+    pp: player.pp,
+    deckCount: player.deck.length,
+    hand: [...player.hand],
+    board: [...player.board],
+    graveyard: [...player.graveyard],
+    aceCard: player.aceCard,
+    aceUsed: player.aceUsed,
+  };
+}
+
+function snapshot(state: BattleState): BattleEventSnapshot {
+  return {
+    brother: snapshotPlayer(state.brother),
+    opponent: snapshotPlayer(state.opponent),
+  };
+}
+
+function event(state: BattleState, value: Omit<BattleEvent, "id">): BattleState {
+  const id = `event-${state.nextEventId}`;
+  const next = {
     ...state,
     nextEventId: state.nextEventId + 1,
-    events: [...state.events, { ...value, id: `event-${state.nextEventId}` }],
+  };
+  return {
+    ...next,
+    events: [...state.events, { ...value, id, beforeSnapshot: value.beforeSnapshot ?? snapshot(state), snapshot: value.snapshot ?? snapshot(next) }],
   };
 }
 
@@ -150,12 +179,32 @@ function destroyAtIndex(
   if (!target) return { state, player };
   const board = player.board.filter((_, itemIndex) => itemIndex !== index);
   let nextPlayer = { ...player, board, graveyard: [...player.graveyard, target] };
-  let nextState = event(state, { type: "destroyed", side: player.side, text: `${cardById(cards, target.cardId).name}が破壊された`, cardId: target.cardId, instanceId: target.instanceId });
+  let nextState = event(state, {
+    type: "destroyed",
+    side: player.side,
+    text: `${cardById(cards, target.cardId).name}が破壊された`,
+    cardId: target.cardId,
+    instanceId: target.instanceId,
+    targetInstanceId: target.instanceId,
+    targetInstances: [target],
+    destroyed: true,
+  });
   const hasRevive = cardById(cards, target.cardId).effects.some((effect) => effect.keyword === "revive");
   if (hasRevive && !target.revived) {
     const revived = { ...target, hp: target.maxHp, attacked: false, revived: true, buffSources: [] };
     nextPlayer = { ...nextPlayer, hand: [...nextPlayer.hand, revived] };
-    nextState = event(nextState, { type: "effect", side: player.side, text: `${cardById(cards, target.cardId).name}が手札に復活した`, cardId: target.cardId, keyword: "revive", effective: true });
+    nextState = event(nextState, {
+      type: "effect",
+      side: player.side,
+      text: `${cardById(cards, target.cardId).name}が手札に復活した`,
+      cardId: target.cardId,
+      keyword: "revive",
+      sourceInstanceId: target.instanceId,
+      targetInstanceIds: [revived.instanceId],
+      sourceInstance: target,
+      targetInstances: [revived],
+      effective: true,
+    });
   }
   return { state: nextState, player: nextPlayer, destroyed: target };
 }
@@ -206,7 +255,12 @@ function applySyncBonus(
     text: `シンクロ発動！ ${card.name}に${grants}`,
     cardId: card.id,
     instanceId: granted.instanceId,
+    sourceInstanceId: granted.instanceId,
+    targetInstanceIds: [granted.instanceId],
     keyword: bonus.keywords[0],
+    value: bonus.statModifiers.attack,
+    sourceInstance: granted,
+    targetInstances: [granted],
     effective: true,
   });
   return { state: next, instance: granted };
@@ -239,7 +293,17 @@ function resolvePlay(
       summoned = { ...summoned, atk: summoned.atk + aura.value, buffSources: [...summoned.buffSources, { instanceId: summoned.instanceId, amount: aura.value, intervention: summoned.intervention }] };
       active = { ...active, board: active.board.map((item) => item.instanceId === summoned.instanceId ? summoned : item) };
       next = updatePlayers(next, active, next[other(side)]);
-      next = event(next, { type: "effect", side, text: `${card.name}が強化された`, cardId: card.id, keyword: "buff", effective: true });
+      next = event(next, {
+        type: "effect",
+        side,
+        text: `${card.name}が強化された`,
+        cardId: card.id,
+        keyword: "buff",
+        sourceInstanceId: instance.instanceId,
+        targetInstanceIds: [summoned.instanceId],
+        value: aura.value,
+        effective: true,
+      });
     }
   }
 
@@ -251,11 +315,29 @@ function resolvePlay(
     }
     if (effect.keyword === "draw") {
       let drawn = 0;
+      const drawnInstanceIds: string[] = [];
+      const drawnInstances: BattleCardInstance[] = [];
       for (let count = 0; count < effect.value; count += 1) {
         const result = drawOne(active); active = result.player; drawn += Number(Boolean(result.drawn));
+        if (result.drawn) {
+          drawnInstanceIds.push(result.drawn.instanceId);
+          drawnInstances.push(result.drawn);
+        }
       }
       next = updatePlayers(next, active, enemy);
-      if (drawn) next = event(next, { type: "effect", side, text: `${drawn}枚ドローした`, cardId: card.id, keyword: "draw", effective: true });
+      if (drawn) next = event(next, {
+        type: "effect",
+        side,
+        text: `${drawn}枚ドローした`,
+        cardId: card.id,
+        keyword: "draw",
+        sourceInstanceId: instance.instanceId,
+        targetInstanceIds: drawnInstanceIds,
+        value: drawn,
+        sourceInstance: instance,
+        targetInstances: drawnInstances,
+        effective: true,
+      });
     }
     if (effect.keyword === "buff" && active.board.length) {
       const targetIndex = active.board.reduce((best, item, index, all) => item.atk > all[best].atk ? index : best, 0);
@@ -263,12 +345,28 @@ function resolvePlay(
       const buffed = { ...target, atk: target.atk + effect.value, buffSources: [...target.buffSources, { instanceId: instance.instanceId, amount: effect.value, intervention: instance.intervention }] };
       active = { ...active, board: active.board.map((item, index) => index === targetIndex ? buffed : item) };
       next = updatePlayers(next, active, enemy);
-      next = event(next, { type: "effect", side, text: `${cardById(cards, target.cardId).name}を+${effect.value}強化した`, cardId: card.id, keyword: "buff", effective: true });
+      next = event(next, {
+        type: "effect",
+        side,
+        text: `${cardById(cards, target.cardId).name}を+${effect.value}強化した`,
+        cardId: card.id,
+        keyword: "buff",
+        sourceInstanceId: instance.instanceId,
+        targetInstanceIds: [target.instanceId],
+        value: effect.value,
+        sourceInstance: instance,
+        targetInstances: [target],
+        effective: true,
+      });
     }
     if (effect.keyword === "damage") {
       const targets = effect.target === "all_enemies" ? enemy.board.map((_, index) => index).reverse() : [chooseEnemyTarget(enemy)];
+      const targetInstanceIds = targets.map((targetIndex) => enemy.board[targetIndex]?.instanceId).filter((instanceId): instanceId is string => Boolean(instanceId));
+      const targetInstances = targets.map((targetIndex) => enemy.board[targetIndex]).filter((target): target is BattleCardInstance => Boolean(target));
+      const targetLeader = targets[0] === -1 && effect.target !== "all_enemies";
       let worked = false;
-      if (targets[0] === -1 && effect.target !== "all_enemies") {
+      let destroyed = false;
+      if (targetLeader) {
         const before = enemy.life; enemy = { ...enemy, life: Math.max(0, enemy.life - effect.value) }; worked = enemy.life < before;
         next = updatePlayers(next, active, enemy);
         if (worked) next = markAttribution(next, instance, "damage", child, enemy.life === 0);
@@ -282,20 +380,48 @@ function resolvePlay(
           next = updatePlayers(next, next[side], enemy);
           if (damaged.hp <= 0) {
             const result = destroyAtIndex(next, enemy, targetIndex, cards); next = updatePlayers(result.state, next[side], result.player); worked = true;
+            destroyed = true;
           }
         }
         if (worked) next = markAttribution(next, instance, "damage", child, false);
       }
-      next = event(next, { type: "effect", side, text: `${card.name}のダメージ効果`, cardId: card.id, keyword: "damage", effective: worked });
+      next = event(next, {
+        type: "effect",
+        side,
+        text: `${card.name}のダメージ効果`,
+        cardId: card.id,
+        keyword: "damage",
+        sourceInstanceId: instance.instanceId,
+        targetInstanceIds: targetInstanceIds.length ? targetInstanceIds : undefined,
+        targetLeader: targetLeader || undefined,
+        damage: effect.value,
+        destroyed: destroyed || undefined,
+        sourceInstance: instance,
+        targetInstances: targetInstances.length ? targetInstances : undefined,
+        effective: worked,
+      });
     }
     if (effect.keyword === "destroy") {
       enemy = next[other(side)];
       const valid = enemy.board.map((target, index) => ({ target, index })).filter(({ target }) => !effect.condition || target.atk <= effect.condition.value);
       if (valid.length) {
-        const targetIndex = valid.sort((a, b) => b.target.atk - a.target.atk)[0].index;
+        const selected = valid.sort((a, b) => b.target.atk - a.target.atk)[0];
+        const targetIndex = selected.index;
         const result = destroyAtIndex(next, enemy, targetIndex, cards); next = updatePlayers(result.state, next[side], result.player);
         next = markAttribution(next, instance, "destroy", child, false);
-        next = event(next, { type: "effect", side, text: `${card.name}が敵を破壊した`, cardId: card.id, keyword: "destroy", effective: true });
+        next = event(next, {
+          type: "effect",
+          side,
+          text: `${card.name}が敵を破壊した`,
+          cardId: card.id,
+          keyword: "destroy",
+          sourceInstanceId: instance.instanceId,
+          targetInstanceIds: [selected.target.instanceId],
+          destroyed: true,
+          sourceInstance: instance,
+          targetInstances: [selected.target],
+          effective: true,
+        });
       }
     }
   }
@@ -315,7 +441,18 @@ function resolveAttack(state: BattleState, side: BattleSide, attackerIndex: numb
     const beforeLife = enemy.life;
     enemy = { ...enemy, life: Math.max(0, enemy.life - attacker.atk) };
     next = updatePlayers(next, active, enemy);
-    next = event(next, { type: "attack", side, text: `${cardById(cards, attacker.cardId).name}がリーダーに${attacker.atk}ダメージ`, cardId: attacker.cardId, instanceId: attacker.instanceId, keyword: "damage", effective: attacker.atk > 0 });
+    next = event(next, {
+      type: "attack",
+      side,
+      text: `${cardById(cards, attacker.cardId).name}がリーダーに${attacker.atk}ダメージ`,
+      cardId: attacker.cardId,
+      instanceId: attacker.instanceId,
+      targetLeader: true,
+      damage: attacker.atk,
+      sourceInstance: attacker,
+      keyword: "damage",
+      effective: attacker.atk > 0,
+    });
     if (attacker.atk > 0) next = markAttribution(next, attacker, "damage", child, enemy.life === 0);
     const baseAttack = attacker.atk - attacker.grantedAtk - attacker.buffSources.reduce((sum, source) => sum + source.amount, 0);
     const usefulBuff = attacker.buffSources.find((source) => source.intervention && beforeLife > baseAttack && beforeLife <= attacker.atk);
@@ -330,7 +467,21 @@ function resolveAttack(state: BattleState, side: BattleSide, attackerIndex: numb
   active = { ...active, board: active.board.map((item, index) => index === attackerIndex ? damagedAttacker : item) };
   enemy = { ...enemy, board: enemy.board.map((item, index) => index === targetIndex ? damagedTarget : item) };
   next = updatePlayers(next, active, enemy);
-  next = event(next, { type: "attack", side, text: `${cardById(cards, attacker.cardId).name}が${cardById(cards, target.cardId).name}を攻撃`, cardId: attacker.cardId, instanceId: attacker.instanceId, keyword: "damage", effective: damagedTarget.hp <= 0 });
+  next = event(next, {
+    type: "attack",
+    side,
+    text: `${cardById(cards, attacker.cardId).name}が${cardById(cards, target.cardId).name}を攻撃`,
+    cardId: attacker.cardId,
+    instanceId: attacker.instanceId,
+    targetInstanceId: target.instanceId,
+    damage: attacker.atk,
+    retaliationDamage: target.atk,
+    sourceInstance: attacker,
+    targetInstances: [target],
+    keyword: "damage",
+    destroyed: damagedTarget.hp <= 0,
+    effective: damagedTarget.hp <= 0,
+  });
   if (damagedTarget.hp <= 0) {
     const result = destroyAtIndex(next, next[other(side)], targetIndex, cards); next = updatePlayers(result.state, next[side], result.player);
     next = markAttribution(next, attacker, "damage", child, false);

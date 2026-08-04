@@ -247,6 +247,25 @@ export interface BattlePlayer {
 
 export type BattleEventType = "turn" | "draw" | "play" | "effect" | "attack" | "destroyed" | "attribution" | "taunt" | "result" | "sync_bonus" | "ace";
 
+export interface BattleEventSnapshotPlayer {
+  side: BattleSide;
+  name: string;
+  life: number;
+  maxPp: number;
+  pp: number;
+  deckCount: number;
+  hand: BattleCardInstance[];
+  board: BattleCardInstance[];
+  graveyard: BattleCardInstance[];
+  aceCard: BattleCardInstance | null;
+  aceUsed: boolean;
+}
+
+export interface BattleEventSnapshot {
+  brother: BattleEventSnapshotPlayer;
+  opponent: BattleEventSnapshotPlayer;
+}
+
 export interface BattleEvent {
   id: string;
   type: BattleEventType;
@@ -257,6 +276,18 @@ export interface BattleEvent {
   keyword?: Keyword;
   dialogue?: string;
   effective?: boolean;
+  targetInstanceId?: string;
+  targetInstanceIds?: string[];
+  targetLeader?: boolean;
+  sourceInstanceId?: string;
+  damage?: number;
+  retaliationDamage?: number;
+  value?: number;
+  destroyed?: boolean;
+  sourceInstance?: BattleCardInstance;
+  targetInstances?: BattleCardInstance[];
+  beforeSnapshot?: BattleEventSnapshot;
+  snapshot?: BattleEventSnapshot;
 }
 
 export interface BattleState {

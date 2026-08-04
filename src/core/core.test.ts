@@ -103,6 +103,87 @@ test("opponent leader life uses the data override and defaults to twenty", () =>
   assert.equal(createBattle(battleDeck("grim"), getOpponent("boss"), cards, 1).opponent.life, 25);
 });
 
+test("attack events carry structured card and leader targets", () => {
+  const base = createBattle(battleDeck("grim"), getOpponent("wall"), cards, 1);
+  const attacker = { ...base.brother.hand[0], summonedTurn: 0, attacked: false };
+  const target = { ...base.opponent.hand[0], cardId: "gaiorg", atk: 3, hp: 5, maxHp: 5, summonedTurn: 0 };
+  const cardTargetState = {
+    ...base,
+    turn: 1,
+    activeSide: "brother" as const,
+    brother: { ...base.brother, maxPp: 0, pp: 0, hand: [], deck: [], board: [attacker] },
+    opponent: { ...base.opponent, maxPp: 0, pp: 0, hand: [], deck: [], board: [target] },
+  };
+  const cardTargetResult = advanceBattle(cardTargetState, cards, child, getOpponent("wall"));
+  const cardAttack = cardTargetResult.events.find((item) => item.type === "attack" && item.targetInstanceId);
+  assert.ok(cardAttack);
+  assert.equal(cardAttack.instanceId, attacker.instanceId);
+  assert.equal(cardAttack.targetInstanceId, target.instanceId);
+  assert.equal(cardAttack.damage, attacker.atk);
+  assert.equal(cardAttack.retaliationDamage, target.atk);
+  assert.deepEqual(cardAttack.targetInstances?.map((item) => item.instanceId), [target.instanceId]);
+  assert.ok(cardAttack.beforeSnapshot?.opponent.board.some((item) => item.instanceId === target.instanceId));
+  assert.ok(cardAttack.snapshot?.brother.board.some((item) => item.instanceId === attacker.instanceId));
+
+  const leaderTargetState = { ...cardTargetState, opponent: { ...cardTargetState.opponent, board: [] } };
+  const leaderTargetResult = advanceBattle(leaderTargetState, cards, child, getOpponent("wall"));
+  const leaderAttack = leaderTargetResult.events.find((item) => item.type === "attack" && item.targetLeader);
+  assert.ok(leaderAttack);
+  assert.equal(leaderAttack.instanceId, attacker.instanceId);
+  assert.equal(leaderAttack.targetLeader, true);
+  assert.equal(leaderAttack.damage, attacker.atk);
+  assert.equal(leaderAttack.targetInstanceId, undefined);
+});
+
+test("effect events carry their source, target collection, damage, and destruction data", () => {
+  const base = createBattle(battleDeck("thunder"), getOpponent("wall"), cards, 1);
+  const source = base.brother.hand[0];
+  const target = { ...base.opponent.hand[0], cardId: "gaiorg", atk: 3, hp: 5, maxHp: 5, summonedTurn: 0 };
+  const state = {
+    ...base,
+    turn: 1,
+    activeSide: "brother" as const,
+    brother: { ...base.brother, maxPp: 3, pp: 3, hand: [source], deck: [], board: [] },
+    opponent: { ...base.opponent, maxPp: 0, pp: 0, hand: [], deck: [], board: [target] },
+  };
+  const result = advanceBattle(state, cards, child, getOpponent("wall"));
+  const damage = result.events.find((item) => item.type === "effect" && item.keyword === "damage");
+  assert.ok(damage);
+  assert.equal(damage.sourceInstanceId, source.instanceId);
+  assert.deepEqual(damage.targetInstanceIds, [target.instanceId]);
+  assert.equal(damage.damage, 4);
+  assert.equal(damage.targetLeader, undefined);
+  assert.equal(damage.destroyed, undefined);
+  assert.equal(damage.sourceInstance?.instanceId, source.instanceId);
+  assert.equal(damage.targetInstances?.[0].instanceId, target.instanceId);
+  assert.equal(damage.snapshot?.opponent.board[0].hp, 1);
+
+  const leaderState = { ...state, opponent: { ...state.opponent, board: [] } };
+  const leaderResult = advanceBattle(leaderState, cards, child, getOpponent("wall"));
+  const leaderDamage = leaderResult.events.find((item) => item.type === "effect" && item.keyword === "damage");
+  assert.ok(leaderDamage);
+  assert.equal(leaderDamage.targetLeader, true);
+  assert.deepEqual(leaderDamage.targetInstanceIds, undefined);
+
+  const destroyBase = createBattle(battleDeck("judgment"), getOpponent("wall"), cards, 1);
+  const destroySource = destroyBase.brother.hand[0];
+  const destroyTarget = { ...destroyBase.opponent.hand[0], cardId: "dolga", atk: 3, hp: 1, maxHp: 1, summonedTurn: 0 };
+  const destroyState = {
+    ...destroyBase,
+    turn: 1,
+    activeSide: "brother" as const,
+    brother: { ...destroyBase.brother, maxPp: 3, pp: 3, hand: [destroySource], deck: [], board: [] },
+    opponent: { ...destroyBase.opponent, maxPp: 0, pp: 0, hand: [], deck: [], board: [destroyTarget] },
+  };
+  const destroyResult = advanceBattle(destroyState, cards, child, getOpponent("wall"));
+  const destroy = destroyResult.events.find((item) => item.type === "effect" && item.keyword === "destroy");
+  assert.ok(destroy);
+  assert.equal(destroy.sourceInstanceId, destroySource.instanceId);
+  assert.deepEqual(destroy.targetInstanceIds, [destroyTarget.instanceId]);
+  assert.equal(destroy.destroyed, true);
+  assert.equal(destroy.targetInstances?.[0].instanceId, destroyTarget.instanceId);
+});
+
 test("sync bonuses use the stage data and affect instance keyword checks", () => {
   const opponent = getOpponent("wall");
   const before = createBattle(battleDeck("noelka"), opponent, cards, 5, 20, null);
