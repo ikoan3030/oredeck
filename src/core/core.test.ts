@@ -103,6 +103,15 @@ test("opponent leader life uses the data override and defaults to twenty", () =>
   assert.equal(createBattle(battleDeck("grim"), getOpponent("boss"), cards, 1).opponent.life, 25);
 });
 
+test("monster play events snapshot the summoned card on the board", () => {
+  const initial = createBattle(battleDeck("grim"), getOpponent("wall"), cards, 1);
+  const primed = { ...initial, brother: { ...initial.brother, maxPp: 3, pp: 3 } };
+  const result = advanceBattle(primed, cards, child, getOpponent("wall"));
+  const play = result.events.find((item) => item.type === "play" && item.side === "brother" && item.cardId === "grim");
+  assert.ok(play);
+  assert.ok(play.snapshot?.brother.board.some((item) => item.instanceId === play.instanceId));
+});
+
 test("attack events carry structured card and leader targets", () => {
   const base = createBattle(battleDeck("grim"), getOpponent("wall"), cards, 1);
   const attacker = { ...base.brother.hand[0], summonedTurn: 0, attacked: false };

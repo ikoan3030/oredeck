@@ -331,7 +331,7 @@ function eventCardClass(instance: BattleState["brother"]["board"][number], activ
   const isTarget = activeEvent.targetInstanceId === instance.instanceId || activeEvent.targetInstanceIds?.includes(instance.instanceId);
   if (!isSource && !isTarget) return "";
   if (activeEvent.type === "attack" && isSource) return "event-attack " + (activeEvent.side === "brother" ? "attack-toward-opponent" : "attack-toward-brother") + (activeEvent.targetLeader ? " attack-to-leader" : "");
-  if (activeEvent.type === "attack" && isTarget) return "attack-contact-target";
+  if (activeEvent.type === "attack" && isTarget) return "attack-contact-target " + (activeEvent.side === "brother" ? "target-knockback-opponent" : "target-knockback-brother");
   if (activeEvent.type === "play" && isSource) return "event-summon";
   if (activeEvent.type === "effect" && isSource) return "effect-source-flash";
   if ((activeEvent.type === "effect" || activeEvent.type === "destroyed") && isTarget) return "effect-target-flash";
@@ -429,6 +429,7 @@ function BattleEffectLayer({ activeEvent, cards }: { activeEvent: BattleEvent | 
   const isAttackOnCard = activeEvent.type === "attack" && Boolean(activeEvent.targetInstanceId);
   const attackerSide = activeEvent.side;
   return <div className="battle-effect-layer" aria-live="polite">
+    {isAttackOnCard && <span className={`attack-impact ${attackerSide === "brother" ? "opponent" : "brother"}`} aria-hidden="true" />}
     {isAttackOnCard && activeEvent.retaliationDamage !== undefined && <span className={`damage-pop attack-retaliation ${attackerSide}`}>-{activeEvent.retaliationDamage}</span>}
     {amount !== null && <span className={`damage-pop ${targetSide} ${isAttackOnCard ? "attack-contact" : "effect-hit"}`}>-{amount}</span>}
     {activeEvent.type === "play" && <span className={"summon-pop " + activeEvent.side}>登場！</span>}
@@ -497,6 +498,7 @@ function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish,
   const lifeBrother = lifeSnapshot?.brother ?? battle.brother;
   const leaderHitSide = activeEvent && isDamageEvent(activeEvent) && activeEvent.targetLeader ? activeEvent.side === "brother" ? "opponent" : "brother" : null;
   const visualDuration = activeEvent ? `${EVENT_PLAYBACK_TIMING[activeEvent.type].visual?.[speed] ?? EVENT_PLAYBACK_TIMING[activeEvent.type][speed]}ms` : undefined;
+  const cardAttackHit = activeEvent?.type === "attack" && Boolean(activeEvent.targetInstanceId);
 
   useEffect(() => {
     if (!auto || battle.winner || !playbackComplete) return;
@@ -508,7 +510,7 @@ function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish,
     <header className="battle-header"><div><span>{opponent.title}</span><strong>{opponent.name}</strong></div><div className="battle-turn">TURN <b>{battle.turn}</b></div><div className="brother-name"><span>単純弟</span><strong>ユウタ</strong></div></header>
     <BattleSpeedControls speed={speed} onChange={onSpeedChange} />
     <AceStatus battle={battle} cards={cards} />
-    <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""}`} style={visualDuration ? { "--event-duration": visualDuration } as CSSProperties : undefined}>
+    <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""}`} style={visualDuration ? { "--event-duration": visualDuration } as CSSProperties : undefined}>
       <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" || leaderHitSide === "opponent" ? "life-target" : "")}><div className="avatar" style={{ "--rival-color": opponent.color } as CSSProperties}>{opponent.name.slice(0, 1)}</div><div className="life"><span>LIFE</span><b>{lifeOpponent.life}</b></div><div className="pp">PP {lifeOpponent.pp}/{lifeOpponent.maxPp}</div></div>
       <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{boardOpponent.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} />)}{!boardOpponent.board.length && <span className="empty-board">相手の場は空</span>}</div>
       <div className="board-line"><b>AUTO CARD BATTLE</b></div>

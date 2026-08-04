@@ -278,13 +278,14 @@ function resolvePlay(
   const instance = active.hand[handIndex];
   const card = cardById(cards, instance.cardId);
   active = { ...active, pp: active.pp - card.cost, hand: active.hand.filter((_, index) => index !== handIndex) };
-  let next = event(updatePlayers(state, active, enemy), { type: "play", side, text: `${active.name}は${card.name}を使った`, cardId: card.id, instanceId: instance.instanceId });
+  let next = updatePlayers(state, active, enemy);
 
   if (card.type === "monster") {
     let summoned = { ...instance, summonedTurn: state.turn, attacked: false };
     active = next[side];
     active = { ...active, board: [...active.board, summoned] };
     next = updatePlayers(next, active, next[other(side)]);
+    next = event(next, { type: "play", side, text: `${active.name}は${card.name}を使った`, cardId: card.id, instanceId: instance.instanceId });
     const syncBonus = applySyncBonus(next, side, summoned, card, child);
     next = syncBonus.state;
     summoned = syncBonus.instance;
@@ -305,6 +306,8 @@ function resolvePlay(
         effective: true,
       });
     }
+  } else {
+    next = event(next, { type: "play", side, text: `${active.name}は${card.name}を使った`, cardId: card.id, instanceId: instance.instanceId });
   }
 
   for (const effect of card.effects.filter((item) => item.trigger === "on_play")) {

@@ -406,7 +406,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-header strong { font-size: 22px; }
 .brother-name { text-align: right; }
 .battle-turn { padding: 7px 16px; color: var(--ink); background: var(--yellow); border: 3px solid white; transform: skew(-8deg); }
-.arena { position: relative; z-index: 2; min-height: calc(100vh - 72px); margin-right: 300px; padding: 20px 100px 165px; display: grid; grid-template-rows: auto minmax(120px, 1fr) 26px minmax(120px, 1fr) auto; gap: 8px; }
+.arena { --attack-reach: clamp(180px, 26vh, 260px); position: relative; z-index: 2; min-height: calc(100vh - 72px); margin-right: 300px; padding: 20px 100px 165px; display: grid; grid-template-rows: auto minmax(120px, 1fr) 26px minmax(120px, 1fr) auto; gap: 8px; }
 .fighter { display: flex; align-items: center; gap: 12px; }
 .opponent-fighter { justify-content: flex-end; }
 .brother-fighter { justify-content: flex-start; }
@@ -791,6 +791,9 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .board-card.event-attack.attack-toward-opponent { animation: attack-toward-opponent var(--event-duration, .72s) cubic-bezier(.2,.8,.25,1); }
 .board-card.event-attack.attack-toward-brother { animation: attack-toward-brother var(--event-duration, .72s) cubic-bezier(.2,.8,.25,1); }
 .board-card.attack-contact-target { animation: attack-contact-target var(--event-duration, .72s) ease-out; }
+.board-card.attack-contact-target.target-knockback-opponent { animation: attack-contact-knockback-opponent var(--event-duration, .72s) ease-out; }
+.board-card.attack-contact-target.target-knockback-brother { animation: attack-contact-knockback-brother var(--event-duration, .72s) ease-out; }
+.arena.attack-hit-card { animation: attack-arena-shake var(--event-duration, .72s) ease-out; }
 .board-card.effect-source-flash,
 .hand-card.effect-source-flash { animation: effect-source-flash var(--event-duration, .72s) ease-out; }
 .board-card.effect-target-flash { animation: effect-target-flash var(--event-duration, .72s) ease-out; }
@@ -807,6 +810,19 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   inset: 0;
   pointer-events: none;
   overflow: hidden;
+}
+.attack-impact {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  left: 50%;
+  width: clamp(115px, 16vw, 190px);
+  height: clamp(115px, 16vw, 190px);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 7%, var(--yellow) 8% 13%, transparent 14% 100%), repeating-conic-gradient(from 5deg, transparent 0 7deg, #fff 8deg 10deg, transparent 11deg 19deg);
+  filter: drop-shadow(0 0 12px var(--yellow)) drop-shadow(0 0 22px white);
+  transform: translate(-50%, -50%);
+  animation: attack-impact var(--event-duration, .72s) ease-out both;
 }
 .damage-pop {
   position: absolute;
@@ -942,16 +958,16 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 
 @keyframes attack-toward-opponent {
   0% { transform: translateY(0) rotate(0); }
-  34% { transform: translateY(-74px) rotate(-4deg) scale(1.1); filter: brightness(1.45) drop-shadow(0 0 16px var(--yellow)); }
-  52% { transform: translateY(-74px) rotate(2deg) scale(1.08); filter: brightness(1.8) drop-shadow(0 0 24px #fff); }
-  68% { transform: translateY(10px) rotate(4deg) scale(.98); filter: brightness(1.15); }
+  30% { transform: translateY(calc(var(--attack-reach) * -1)) rotate(-4deg) scale(1.1); filter: brightness(1.45) drop-shadow(0 0 16px var(--yellow)); }
+  48% { transform: translateY(calc(var(--attack-reach) * -1)) rotate(2deg) scale(1.16); filter: brightness(2.2) drop-shadow(0 0 28px #fff); }
+  63% { transform: translateY(-18px) rotate(4deg) scale(1.02); filter: brightness(1.25); }
   100% { transform: translateY(0) rotate(0); }
 }
 @keyframes attack-toward-brother {
   0% { transform: translateY(0) rotate(0); }
-  34% { transform: translateY(74px) rotate(4deg) scale(1.1); filter: brightness(1.45) drop-shadow(0 0 16px var(--yellow)); }
-  52% { transform: translateY(74px) rotate(-2deg) scale(1.08); filter: brightness(1.8) drop-shadow(0 0 24px #fff); }
-  68% { transform: translateY(-10px) rotate(-4deg) scale(.98); filter: brightness(1.15); }
+  30% { transform: translateY(var(--attack-reach)) rotate(4deg) scale(1.1); filter: brightness(1.45) drop-shadow(0 0 16px var(--yellow)); }
+  48% { transform: translateY(var(--attack-reach)) rotate(-2deg) scale(1.16); filter: brightness(2.2) drop-shadow(0 0 28px #fff); }
+  63% { transform: translateY(18px) rotate(-4deg) scale(1.02); filter: brightness(1.25); }
   100% { transform: translateY(0) rotate(0); }
 }
 @keyframes attack-contact-target {
@@ -959,6 +975,30 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   42% { transform: translate(-7px, -3px) rotate(-4deg) scale(1.05); filter: brightness(1.5); }
   51% { transform: translate(8px, 3px) rotate(4deg) scale(1.05); filter: brightness(2); }
   61% { transform: translate(-4px, 1px) rotate(-2deg); }
+}
+@keyframes attack-contact-knockback-opponent {
+  0%, 30%, 100% { transform: translate(0) rotate(0); }
+  42% { transform: translateY(-20px) scale(1.1) rotate(-4deg); filter: brightness(1.7) drop-shadow(0 0 16px var(--yellow)); }
+  52% { transform: translateY(11px) scale(1.06) rotate(5deg); filter: brightness(2.25) drop-shadow(0 0 24px white); }
+  66% { transform: translateY(-5px) rotate(-2deg); }
+}
+@keyframes attack-contact-knockback-brother {
+  0%, 30%, 100% { transform: translate(0) rotate(0); }
+  42% { transform: translateY(20px) scale(1.1) rotate(4deg); filter: brightness(1.7) drop-shadow(0 0 16px var(--yellow)); }
+  52% { transform: translateY(-11px) scale(1.06) rotate(-5deg); filter: brightness(2.25) drop-shadow(0 0 24px white); }
+  66% { transform: translateY(5px) rotate(2deg); }
+}
+@keyframes attack-arena-shake {
+  0%, 35%, 100% { transform: translate(0); }
+  43% { transform: translate(-5px, 2px); }
+  50% { transform: translate(7px, -2px); }
+  58% { transform: translate(-4px, 1px); }
+}
+@keyframes attack-impact {
+  0%, 30% { opacity: 0; transform: translate(-50%, -50%) scale(.18) rotate(0); }
+  43% { opacity: 1; transform: translate(-50%, -50%) scale(1.05) rotate(12deg); }
+  62% { opacity: .85; transform: translate(-50%, -50%) scale(1.55) rotate(28deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2.15) rotate(46deg); }
 }
 @keyframes effect-source-flash {
   0%, 100% { filter: brightness(1); }
@@ -1043,6 +1083,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 }
 
 @media (max-width: 720px) {
+  .arena { --attack-reach: clamp(105px, 22vh, 180px); }
   .battle-speed-controls {
     top: 76px;
     right: 8px;
@@ -1075,6 +1116,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .battle-speed-controls,
   .board-card.event-attack,
   .board-card.attack-contact-target,
+  .arena.attack-hit-card,
   .board-card.effect-source-flash,
   .hand-card.effect-source-flash,
   .board-card.effect-target-flash,
@@ -1087,6 +1129,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .battle-target,
   .life-target .life,
   .damage-pop,
+  .attack-impact,
   .effect-hit-label,
   .effect-source-label,
   .summon-pop,
