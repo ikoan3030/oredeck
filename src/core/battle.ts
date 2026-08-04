@@ -402,7 +402,7 @@ export function createBattle(
     turn: 0,
     activeSide: "brother" as const,
     brother: { side: "brother", name: "ユウタ", life: 20, maxPp: 0, pp: 0, deck: shuffledBrother.values.slice(3), hand: brotherHand, board: [], graveyard: [] },
-    opponent: { side: "opponent", name: opponent.name, life: 20, maxPp: 0, pp: 0, deck: shuffledOpponent.values.slice(3), hand: opponentHand, board: [], graveyard: [] },
+    opponent: { side: "opponent", name: opponent.name, life: opponent.leaderLife ?? 20, maxPp: 0, pp: 0, deck: shuffledOpponent.values.slice(3), hand: opponentHand, board: [], graveyard: [] },
     winner: null,
     events: [],
     attributionFired: [],

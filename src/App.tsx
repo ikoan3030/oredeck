@@ -16,6 +16,8 @@ import {
   resolveOffer,
   syncStage,
   type AdviceCategory,
+  type BattleEvent,
+  type BattleEventType,
   type BattleState,
   type Card,
   type ChildProfile,
@@ -52,6 +54,56 @@ interface SyncStageLabel {
 interface SyncNotice {
   stage: number;
   label: string;
+}
+
+type PlaybackSpeed = "normal" | "fast" | "skip";
+type CutInKind = "ace" | "finisher";
+
+interface EventPlaybackTiming {
+  normal: number;
+  fast: number;
+  skip: number;
+  cutIn?: Record<PlaybackSpeed, { before: number; hold: number; after: number }>;
+}
+
+const PLAYBACK_SPEED_KEY = "oredeck-battle-playback-speed";
+const PLAYBACK_SPEED_LABELS: Record<PlaybackSpeed, string> = { normal: "等速", fast: "倍速", skip: "スキップ" };
+const EVENT_PLAYBACK_TIMING: Record<BattleEventType, EventPlaybackTiming> = {
+  turn: { normal: 260, fast: 130, skip: 70 },
+  draw: { normal: 420, fast: 210, skip: 70 },
+  play: { normal: 580, fast: 290, skip: 80 },
+  effect: { normal: 520, fast: 260, skip: 80 },
+  attack: { normal: 760, fast: 380, skip: 90 },
+  destroyed: { normal: 520, fast: 260, skip: 80 },
+  attribution: { normal: 1100, fast: 550, skip: 100 },
+  taunt: { normal: 900, fast: 450, skip: 100 },
+  result: {
+    normal: 900,
+    fast: 500,
+    skip: 500,
+    cutIn: {
+      normal: { before: 100, hold: 1000, after: 300 },
+      fast: { before: 100, hold: 650, after: 300 },
+      skip: { before: 50, hold: 400, after: 50 },
+    },
+  },
+  sync_bonus: { normal: 900, fast: 450, skip: 100 },
+  ace: {
+    normal: 1200,
+    fast: 700,
+    skip: 500,
+    cutIn: {
+      normal: { before: 100, hold: 1000, after: 300 },
+      fast: { before: 100, hold: 650, after: 300 },
+      skip: { before: 50, hold: 400, after: 50 },
+    },
+  },
+};
+
+function loadPlaybackSpeed(): PlaybackSpeed {
+  if (typeof window === "undefined") return "normal";
+  const saved = window.localStorage.getItem(PLAYBACK_SPEED_KEY);
+  return saved === "normal" || saved === "fast" || saved === "skip" ? saved : "normal";
 }
 
 const SAVE_KEY = "oredeck-prototype-v2";
@@ -175,7 +227,7 @@ function ReactionBanner({ reaction, speaker }: { reaction: KidReaction; speaker:
 }
 
 function ModeSelectScreen({ onSelect }: { onSelect: () => void }) {
-  return <main className="mode-select-screen"><section className="mode-select-panel"><span className="section-kicker">SELECT MODE</span><h1>遊び方を選べ！</h1><button className="mode-card active" onClick={onSelect}><strong>アーケードモード</strong><span>3人の相手と連続バトル</span><b>START ▶</b></button></section></main>;
+  return <main className="mode-select-screen"><section className="mode-select-panel"><span className="section-kicker">SELECT MODE</span><h1>遊び方を選べ！</h1><button className="mode-card active" onClick={onSelect}><strong>アーケードモード</strong><span>6戦の連続バトル</span><b>START ▶</b></button></section></main>;
 }
 
 function CharacterSelectScreen({ onSelect }: { onSelect: () => void }) {
@@ -186,7 +238,7 @@ function CharacterSelectScreen({ onSelect }: { onSelect: () => void }) {
 }
 
 function OpponentPreviewScreen({ opponent, battleNumber, onStart }: { opponent: OpponentDefinition; battleNumber: number; onStart: () => void }) {
-  return <main className="opponent-preview-screen"><section className="opponent-preview-panel"><span className="section-kicker">BATTLE {battleNumber} / 3</span><h1>つぎの相手</h1><div className="opponent-preview-card" style={{ "--rival-color": opponent.color } as CSSProperties}><span className="opponent-mark">{opponent.title.slice(0, 1)}</span><small>{opponent.title}</small><strong>{opponent.name}</strong><p>{opponent.trait}</p></div><button className="primary-action" onClick={onStart}>デッキを組む！<span>▶</span></button></section></main>;
+  return <main className="opponent-preview-screen"><section className="opponent-preview-panel"><span className="section-kicker">BATTLE {battleNumber} / 6</span><h1>つぎの相手</h1><div className="opponent-preview-card" style={{ "--rival-color": opponent.color } as CSSProperties}><span className="opponent-mark">{opponent.title.slice(0, 1)}</span><small>{opponent.title}</small><strong>{opponent.name}</strong><p>{opponent.trait}</p></div><button className="primary-action" onClick={onStart}>デッキを組む！<span>▶</span></button></section></main>;
 }
 
 function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNotice, onPick, onAuto, onAdvice }: {
@@ -261,7 +313,32 @@ function DeckScreen({ draft, cards, child, reaction, onBattle }: { draft: DraftS
   </main>;
 }
 
-function BoardCard({ instance, cards, ace = false }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; ace?: boolean }) {
+function eventDamageAmount(event: BattleEvent | null, cards: Card[], battle: BattleState): number | null {
+  if (!event) return null;
+  if (event.type === "attack") {
+    const instance = [...battle.brother.board, ...battle.opponent.board].find((item) => item.instanceId === event.instanceId);
+    return instance?.atk ?? (event.cardId ? cards.find((card) => card.id === event.cardId)?.atk ?? null : null);
+  }
+  if (event.type === "effect" && event.keyword === "damage" && event.cardId) {
+    return cards.find((card) => card.id === event.cardId)?.effects.find((effect) => effect.keyword === "damage")?.value ?? null;
+  }
+  return null;
+}
+
+function isDamageEvent(event: BattleEvent | null): boolean {
+  return Boolean(event && (event.type === "attack" || (event.type === "effect" && event.keyword === "damage")));
+}
+
+function eventCardClass(instance: BattleState["brother"]["board"][number], activeEvent: BattleEvent | null): string {
+  if (!activeEvent || activeEvent.instanceId !== instance.instanceId) return "";
+  if (activeEvent.type === "attack") return "event-attack " + (activeEvent.side === "brother" ? "attack-toward-opponent" : "attack-toward-brother");
+  if (activeEvent.type === "play") return "event-summon";
+  if (activeEvent.type === "sync_bonus") return "event-sync-flash";
+  if (activeEvent.type === "ace") return "event-ace-card";
+  return "";
+}
+
+function BoardCard({ instance, cards, ace = false, activeEvent = null }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null }) {
   const card = cards.find((item) => item.id === instance.cardId)!;
   const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
   return <div className={`board-card ${instance.intervention ? "intervened" : ""} ${syncBonus && !ace ? "sync-granted" : ""} ${ace ? "ace-granted" : ""}`} title={card.name}>{instance.intervention && <span className="intervention-mark">兄</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}<b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
@@ -273,6 +350,20 @@ function BattleHandCard({ instance, cards, ace }: { instance: BattleState["broth
   return <div className={`hand-card ${syncBonus && !ace ? "sync-granted" : ""} ${ace ? "ace-granted" : ""}`}><CardFace compact card={card} intervention={instance.intervention} />{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}</div>;
 }
 
+function AnimatedBoardCard({ instance, cards, ace = false, activeEvent = null }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null }) {
+  const card = cards.find((item) => item.id === instance.cardId)!;
+  const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
+  const className = "board-card " + (instance.intervention ? "intervened " : "") + (syncBonus && !ace ? "sync-granted " : "") + (ace ? "ace-granted " : "") + eventCardClass(instance, activeEvent);
+  return <div className={className} title={card.name} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}>{instance.intervention && <span className="intervention-mark">兄</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}<b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
+}
+
+function AnimatedBattleHandCard({ instance, cards, ace, activeEvent = null }: { instance: BattleState["brother"]["hand"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null }) {
+  const card = cards.find((item) => item.id === instance.cardId)!;
+  const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
+  const className = "hand-card " + (syncBonus && !ace ? "sync-granted " : "") + (ace ? "ace-granted " : "") + eventCardClass(instance, activeEvent);
+  return <div className={className} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}><CardFace compact card={card} intervention={instance.intervention} />{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}</div>;
+}
+
 function AceStatus({ battle, cards }: { battle: BattleState; cards: Card[] }) {
   if (!battle.brother.aceUsed && !battle.brother.aceCard) return null;
   const aceEvent = [...battle.events].reverse().find((item) => item.type === "ace");
@@ -281,7 +372,7 @@ function AceStatus({ battle, cards }: { battle: BattleState; cards: Card[] }) {
   return <div className={`ace-status ${battle.brother.aceUsed ? "used" : "ready"}`}><span>切り札</span>{battle.brother.aceUsed ? <strong>発動済み</strong> : <><strong>{card?.name ?? "指定札"}</strong><small>待機中</small></>}</div>;
 }
 
-function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish, finalBattle }: { battle: BattleState; cards: Card[]; opponent: OpponentDefinition; onNext: () => void; onAuto: () => void; auto: boolean; onFinish: () => void; finalBattle: boolean }) {
+function LegacyBattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish, finalBattle }: { battle: BattleState; cards: Card[]; opponent: OpponentDefinition; onNext: () => void; onAuto: () => void; auto: boolean; onFinish: () => void; finalBattle: boolean }) {
   const dialogueEvent = [...battle.events].reverse().find((item) => item.dialogue);
   const aceEvent = [...battle.events].reverse().find((item) => item.type === "ace");
   const syncEvent = [...battle.events].reverse().find((item) => item.type === "sync_bonus");
@@ -319,6 +410,101 @@ function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish,
   </main>;
 }
 
+function BattleSpeedControls({ speed, onChange }: { speed: PlaybackSpeed; onChange: (speed: PlaybackSpeed) => void }) {
+  return <div className="battle-speed-controls" aria-label="バトル演出速度"><span>演出</span>{(["normal", "fast", "skip"] as PlaybackSpeed[]).map((item) => <button key={item} type="button" className={speed === item ? "active" : ""} aria-pressed={speed === item} onClick={() => onChange(item)}>{PLAYBACK_SPEED_LABELS[item]}</button>)}</div>;
+}
+
+function BattleEffectLayer({ activeEvent, cards, battle }: { activeEvent: BattleEvent | null; cards: Card[]; battle: BattleState }) {
+  if (!activeEvent) return null;
+  const amount = eventDamageAmount(activeEvent, cards, battle);
+  const targetSide = activeEvent.side === "brother" ? "opponent" : "brother";
+  const destroyedCard = activeEvent.type === "destroyed" && activeEvent.cardId ? cards.find((card) => card.id === activeEvent.cardId) : undefined;
+  return <div className="battle-effect-layer" aria-live="polite">
+    {amount !== null && <span className={"damage-pop " + targetSide}>-{amount}</span>}
+    {activeEvent.type === "play" && <span className={"summon-pop " + activeEvent.side}>登場！</span>}
+    {destroyedCard && <div className="destruction-pop"><b>BREAK!</b><small>{destroyedCard.name}</small></div>}
+  </div>;
+}
+
+function BattleCutIn({ kind }: { kind: CutInKind }) {
+  return <div className={"battle-cut-in " + kind} role="status" aria-live="assertive"><div className="cut-in-rays" aria-hidden="true" /><div className="cut-in-art-layer" aria-hidden="true" /><div className="cut-in-band"><span>{kind === "ace" ? "DESTINY DRAW" : "FINISH"}</span><strong>{kind === "ace" ? "ディスティニードロー！！" : "勝負あり！！"}</strong></div></div>;
+}
+
+function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish, finalBattle, speed, onSpeedChange }: { battle: BattleState; cards: Card[]; opponent: OpponentDefinition; onNext: () => void; onAuto: () => void; auto: boolean; onFinish: () => void; finalBattle: boolean; speed: PlaybackSpeed; onSpeedChange: (speed: PlaybackSpeed) => void }) {
+  const [visibleEventCount, setVisibleEventCount] = useState(0);
+  const [activeEvent, setActiveEvent] = useState<BattleEvent | null>(null);
+  const [cutIn, setCutIn] = useState<{ kind: CutInKind; visible: boolean } | null>(null);
+  const [playbackBusy, setPlaybackBusy] = useState(false);
+
+  useEffect(() => {
+    if (visibleEventCount >= battle.events.length) {
+      setPlaybackBusy(false);
+      setActiveEvent(null);
+      setCutIn(null);
+      return;
+    }
+    const item = battle.events[visibleEventCount];
+    const timing = EVENT_PLAYBACK_TIMING[item.type];
+    const cutInKind: CutInKind | null = item.type === "ace" ? "ace" : item.type === "result" ? "finisher" : null;
+    const timers: number[] = [];
+    const finishEvent = () => {
+      setCutIn(null);
+      setActiveEvent(null);
+      setPlaybackBusy(false);
+      setVisibleEventCount((count) => count + 1);
+    };
+
+    setPlaybackBusy(true);
+    setActiveEvent(item);
+    if (cutInKind && timing.cutIn) {
+      const cutInTiming = timing.cutIn[speed];
+      setCutIn({ kind: cutInKind, visible: false });
+      timers.push(window.setTimeout(() => setCutIn({ kind: cutInKind, visible: true }), cutInTiming.before));
+      timers.push(window.setTimeout(finishEvent, cutInTiming.before + cutInTiming.hold + cutInTiming.after));
+    } else {
+      setCutIn(null);
+      timers.push(window.setTimeout(finishEvent, timing[speed]));
+    }
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [battle.events.length, speed, visibleEventCount]);
+
+  const playbackComplete = !playbackBusy && visibleEventCount >= battle.events.length;
+  const visibleEvents = battle.events.slice(0, Math.min(battle.events.length, visibleEventCount + (activeEvent ? 1 : 0)));
+  const dialogueEvent = [...visibleEvents].reverse().find((item) => item.dialogue);
+  const attributionEvent = [...visibleEvents].reverse().find((item) => item.type === "attribution" && item.dialogue);
+  const recent = visibleEvents.slice(-9).reverse();
+  const aceEvent = [...battle.events].reverse().find((item) => item.type === "ace");
+  const aceInstanceId = aceEvent?.instanceId;
+  const damageTargetSide = isDamageEvent(activeEvent) ? activeEvent!.side === "brother" ? "opponent" : "brother" : null;
+
+  useEffect(() => {
+    if (!auto || battle.winner || !playbackComplete) return;
+    const timer = window.setTimeout(onNext, 90);
+    return () => window.clearTimeout(timer);
+  }, [auto, battle.winner, onNext, playbackComplete]);
+
+  return <main className="battle-screen">
+    <header className="battle-header"><div><span>{opponent.title}</span><strong>{opponent.name}</strong></div><div className="battle-turn">TURN <b>{battle.turn}</b></div><div className="brother-name"><span>単純弟</span><strong>ユウタ</strong></div></header>
+    <BattleSpeedControls speed={speed} onChange={onSpeedChange} />
+    <AceStatus battle={battle} cards={cards} />
+    <section className="arena">
+      <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" ? "life-target" : "")}><div className="avatar" style={{ "--rival-color": opponent.color } as CSSProperties}>{opponent.name.slice(0, 1)}</div><div className="life"><span>LIFE</span><b>{battle.opponent.life}</b></div><div className="pp">PP {battle.opponent.pp}/{battle.opponent.maxPp}</div></div>
+      <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{battle.opponent.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} />)}{!battle.opponent.board.length && <span className="empty-board">相手の場は空</span>}</div>
+      <div className="board-line"><b>AUTO CARD BATTLE</b></div>
+      <div className={"board-zone brother-board " + (damageTargetSide === "brother" ? "battle-target" : "")}>{battle.brother.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} />)}{!battle.brother.board.length && <span className="empty-board">ユウタの場は空</span>}</div>
+      <div className={"fighter brother-fighter " + (damageTargetSide === "brother" ? "life-target" : "")}><div className="avatar kid">ユ</div><div className="life"><span>LIFE</span><b>{battle.brother.life}</b></div><div className="pp">PP {battle.brother.pp}/{battle.brother.maxPp}</div></div>
+      <div className="hand-zone">{battle.brother.hand.map((item) => <AnimatedBattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} />)}</div>
+      <BattleEffectLayer activeEvent={activeEvent} cards={cards} battle={battle} />
+    </section>
+    <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
+    {dialogueEvent && !battle.winner && <div className="battle-speech"><Speech speaker={dialogueEvent.side === "brother" ? "ユウタ" : opponent.name} text={dialogueEvent.dialogue!} tone={dialogueEvent.side === "brother" ? "kid" : "rival"} /></div>}
+    {!battle.winner && <div className="battle-controls"><button onClick={onNext} disabled={auto || playbackBusy}>1ターン進める</button><button className="primary-action" onClick={onAuto} disabled={auto || playbackBusy}>{auto ? "自動再生中…" : "最後まで見る"}<span>▶</span></button></div>}
+    {cutIn?.visible && <BattleCutIn kind={cutIn.kind} />}
+    {playbackComplete && battle.winner && attributionEvent?.dialogue && <div className="battle-finish-reaction"><ReactionBanner reaction={{ tone: "support", text: attributionEvent.dialogue }} speaker={attributionEvent.side === "brother" ? "ユウタ" : opponent.name} /></div>}
+    {playbackComplete && battle.winner && <div className="result-overlay"><div className={"result-burst " + (battle.winner === "brother" ? "win" : "lose")}><span>{battle.winner === "brother" ? "VICTORY!" : battle.winner === "draw" ? "DRAW" : "DEFEAT"}</span><h1>{battle.winner === "brother" ? "ユウタの勝利！" : battle.winner === "draw" ? "引き分け！" : opponent.name + "の勝利！"}</h1><p>{battle.winner === "brother" ? "デッキは狙い通りに仕事をしただろうか？" : "次の相手とのバトルへ進もう。"}</p><button className="primary-action" onClick={onFinish}>{finalBattle ? "結果を見る" : "次の相手へ"}<span>▶</span></button></div></div>}
+  </main>;
+}
+
 function ClearScreen({ run, cards, child, opponents, onTitle }: { run: RunState; cards: Card[]; child: ChildProfile; opponents: OpponentDefinition[]; onTitle: () => void }) {
   const opponentById = new Map(opponents.map((opponent) => [opponent.id, opponent]));
   return <main className="clear-screen"><section className="clear-panel"><span className="section-kicker">ARCADE CLEAR</span><h1>6戦完走！</h1><section className="run-results"><h2>バトルの記録</h2>{run.battleResults.map((result, index) => <div className="run-result-row" key={`${result.opponentId}-${index}`}><span>{index + 1}戦目</span><strong className={result.outcome}>{result.outcome === "win" ? "○" : result.outcome === "loss" ? "×" : "△"}</strong><b>{opponentById.get(result.opponentId)?.name ?? result.opponentId}</b></div>)}</section><section className="run-facts"><div className="run-fact"><span>受動介入</span><strong>{run.summary.passiveInterventions}回</strong><small>支持 {run.summary.passiveSupports} / 却下 {run.summary.passiveRejects}</small></div><div className="run-fact"><span>一目惚れで入った札</span>{run.summary.loveCardIds.length ? <ul>{run.summary.loveCardIds.map((cardId, index) => <li key={`${cardId}-${index}`}>{cards.find((card) => card.id === cardId)?.name ?? cardId}</li>)}</ul> : <strong>なし</strong>}</div><div className="run-fact"><span>最後のシンクロ状態</span><strong>{syncStageLabel(run.summary.finalSync, child)}</strong></div></section><button className="primary-action" onClick={onTitle}>タイトルへ<span>↻</span></button></section></main>;
@@ -331,6 +517,7 @@ export default function Home() {
   const [game, setGame] = useState<SavedGame>(defaultSave);
   const [hydrated, setHydrated] = useState(false);
   const [autoBattle, setAutoBattle] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(loadPlaybackSpeed);
   const [reaction, setReaction] = useState<KidReaction | null>(null);
   const [syncNotice, setSyncNotice] = useState<SyncNotice | null>(null);
 
@@ -342,15 +529,8 @@ export default function Home() {
   useEffect(() => { if (hydrated) localStorage.setItem(SAVE_KEY, JSON.stringify(game)); }, [game, hydrated]);
 
   useEffect(() => {
-    if (!autoBattle || !game.battle || game.battle.winner || !child) { if (game.battle?.winner) setAutoBattle(false); return; }
-    const timer = window.setTimeout(() => setGame((current) => {
-      if (!current.battle) return current;
-      const opponentId = getCurrentOpponentId(current.run);
-      const opponent = opponentId ? getOpponentById(opponents, opponentId) : undefined;
-      return opponent ? { ...current, battle: advanceBattle(current.battle, cards, child, opponent) } : current;
-    }), 520);
-    return () => window.clearTimeout(timer);
-  }, [autoBattle, game.battle, game.run, cards, child, opponents]);
+    if (game.battle?.winner) setAutoBattle(false);
+  }, [game.battle?.winner]);
 
   const byId = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
 
@@ -446,6 +626,22 @@ export default function Home() {
     setGame({ ...game, phase: isRunComplete(nextRun) ? "clear" : "opponent", draft: null, offer: null, adviceOpen: false, battle: null, run: nextRun, aceCardId: null });
   }
 
+  function advanceCurrentBattle() {
+    setGame((current) => {
+      if (!current.battle || !child) return current;
+      const opponentId = getCurrentOpponentId(current.run);
+      const opponent = opponentId ? getOpponentById(opponents, opponentId) : undefined;
+      return opponent ? { ...current, battle: advanceBattle(current.battle, cards, child, opponent) } : current;
+    });
+  }
+
+  function changePlaybackSpeed(next: PlaybackSpeed) {
+    setPlaybackSpeed(next);
+    localStorage.setItem(PLAYBACK_SPEED_KEY, next);
+    if (next === "skip") setAutoBattle(true);
+    else if (playbackSpeed === "skip") setAutoBattle(false);
+  }
+
   function returnToTitle() {
     if (!child) return;
     setAutoBattle(false);
@@ -464,7 +660,7 @@ export default function Home() {
   if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} onPick={takePick} onAuto={() => takePick()} onAdvice={chooseAdvice} />;
   if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} onBattle={prepareBattle} />;
   if (game.phase === "ace" && game.draft) return <AceSelectionScreen draft={game.draft} cards={cards} selectedCardId={game.aceCardId ?? null} onSelect={selectAceCard} onConfirm={() => startBattle()} onSkip={() => startBattle(null)} />;
-  if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} opponent={currentOpponent} onNext={() => setGame({ ...game, battle: advanceBattle(game.battle!, cards, child, currentOpponent) })} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} />;
+  if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} opponent={currentOpponent} onNext={advanceCurrentBattle} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={changePlaybackSpeed} />;
   if (game.phase === "clear") return <ClearScreen run={game.run} cards={cards} child={child} opponents={opponents} onTitle={returnToTitle} />;
   return <main className="boot-screen"><button className="primary-action" onClick={returnToTitle}>タイトルへ</button></main>;
 }

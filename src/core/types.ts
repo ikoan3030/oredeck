@@ -208,6 +208,7 @@ export interface OpponentDefinition {
   deck: string[];
   faceBias: number;
   color: string;
+  leaderLife?: number;
   intro: string;
   taunts: string[];
 }

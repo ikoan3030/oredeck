@@ -749,3 +749,241 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .ace-card-option .card-face h3 { font-size: 10px; }
   .ace-card-option .effect-line { font-size: 6px; }
 }
+
+/* Timed battle presentation */
+.battle-speed-controls {
+  position: absolute;
+  z-index: 15;
+  top: 82px;
+  right: 318px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  color: white;
+  background: #080d1de8;
+  border: 3px solid white;
+  box-shadow: 4px 4px 0 var(--ink);
+  font: 900 10px/1 "Yu Gothic", sans-serif;
+}
+.battle-speed-controls > span { color: var(--yellow); padding: 0 4px; }
+.battle-speed-controls button {
+  padding: 5px 7px;
+  color: white;
+  background: #29344b;
+  border: 2px solid #71809b;
+  cursor: pointer;
+  font: 900 10px/1 "Yu Gothic", sans-serif;
+}
+.battle-speed-controls button:hover,
+.battle-speed-controls button.active { color: var(--ink); background: var(--yellow); border-color: white; }
+.battle-speed-controls button.active { box-shadow: 0 0 8px var(--yellow); }
+
+.battle-target {
+  border-color: var(--yellow);
+  box-shadow: inset 0 0 0 3px #ffd92855, 0 0 15px #ffd92899;
+  animation: target-pulse .42s ease-out;
+}
+.life-target .life {
+  border-color: var(--yellow);
+  animation: life-shake .34s ease-out;
+}
+.board-card.event-attack.attack-toward-opponent { animation: attack-toward-opponent .72s cubic-bezier(.2,.8,.25,1); }
+.board-card.event-attack.attack-toward-brother { animation: attack-toward-brother .72s cubic-bezier(.2,.8,.25,1); }
+.board-card.event-summon { animation: summon-in .55s cubic-bezier(.2,1.4,.4,1); }
+.board-card.event-sync-flash,
+.hand-card.event-sync-flash { animation: sync-flash .8s ease-out; }
+.hand-card.event-ace-card { animation: ace-card-arrive .9s ease-out; }
+
+.battle-effect-layer {
+  position: absolute;
+  z-index: 13;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.damage-pop {
+  position: absolute;
+  color: white;
+  font-size: clamp(33px, 5vw, 64px);
+  line-height: 1;
+  text-shadow: 4px 4px 0 var(--ink), 0 0 14px var(--red);
+  animation: damage-pop .72s ease-out both;
+}
+.damage-pop.opponent { top: 22%; left: 55%; }
+.damage-pop.brother { bottom: 28%; left: 55%; }
+.summon-pop {
+  position: absolute;
+  left: 50%;
+  top: 43%;
+  padding: 5px 12px;
+  color: var(--ink);
+  background: var(--yellow);
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--pink);
+  font-size: 20px;
+  transform: translate(-50%, -50%) rotate(-5deg);
+  animation: summon-label .55s ease-out both;
+}
+.destruction-pop {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  gap: 2px;
+  min-width: 150px;
+  padding: 10px 16px;
+  color: white;
+  background: var(--red);
+  border: 5px solid white;
+  box-shadow: 7px 7px 0 var(--ink);
+  text-align: center;
+  transform: translate(-50%, -50%) rotate(-5deg);
+  animation: destruction-pop .72s ease-out both;
+}
+.destruction-pop b { font-size: 25px; text-shadow: 3px 3px 0 var(--ink); }
+.destruction-pop small { font: 900 10px/1.2 "Yu Gothic", sans-serif; }
+
+.battle-cut-in {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  isolation: isolate;
+}
+.cut-in-rays {
+  position: absolute;
+  z-index: -2;
+  inset: -55%;
+  opacity: .8;
+  background: repeating-conic-gradient(from 1deg at 50% 50%, transparent 0 7deg, #fff 8deg 9deg, transparent 10deg 16deg);
+  animation: cut-in-rays-spin 8s linear infinite;
+}
+.cut-in-art-layer {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, transparent 0 15%, #091020aa 56%, #091020ee 100%);
+}
+.cut-in-band {
+  width: 125%;
+  padding: 20px 10%;
+  color: white;
+  background: linear-gradient(100deg, transparent, var(--pink) 12%, var(--red) 50%, var(--pink) 88%, transparent);
+  border-top: 8px solid var(--yellow);
+  border-bottom: 8px solid var(--yellow);
+  box-shadow: 0 0 35px var(--pink), 0 12px 0 #17151acc;
+  text-align: center;
+  transform: rotate(-8deg);
+  animation: cut-in-slam .22s cubic-bezier(.1,1.5,.3,1) both;
+}
+.cut-in-band span { display: block; color: var(--yellow); font: 900 12px/1 Arial, sans-serif; letter-spacing: .25em; }
+.cut-in-band strong {
+  display: block;
+  margin-top: 5px;
+  font-size: clamp(34px, 7vw, 86px);
+  line-height: .95;
+  letter-spacing: -.08em;
+  text-shadow: 6px 6px 0 var(--ink), -2px -2px 0 white;
+}
+.battle-cut-in.finisher .cut-in-band {
+  background: linear-gradient(100deg, transparent, var(--blue) 12%, var(--cyan) 50%, var(--blue) 88%, transparent);
+  box-shadow: 0 0 35px var(--cyan), 0 12px 0 #17151acc;
+}
+.battle-cut-in.finisher .cut-in-band strong { color: var(--yellow); }
+
+.battle-finish-reaction { position: fixed; z-index: 45; inset: 0; pointer-events: none; }
+.battle-finish-reaction .kid-reaction { z-index: 46; top: 82px; }
+
+@keyframes attack-toward-opponent {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  42% { transform: translateY(-30px) rotate(-4deg) scale(1.08); filter: brightness(1.35) drop-shadow(0 0 13px var(--yellow)); }
+}
+@keyframes attack-toward-brother {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  42% { transform: translateY(30px) rotate(4deg) scale(1.08); filter: brightness(1.35) drop-shadow(0 0 13px var(--yellow)); }
+}
+@keyframes summon-in {
+  from { opacity: 0; transform: translateY(22px) scale(.6) rotate(-8deg); filter: brightness(2); }
+  68% { transform: translateY(-5px) scale(1.08) rotate(2deg); }
+}
+@keyframes sync-flash {
+  0%, 100% { filter: brightness(1); }
+  35% { filter: brightness(2.2) saturate(1.4); box-shadow: 0 0 0 7px var(--cyan), 0 0 35px var(--cyan); }
+}
+@keyframes ace-card-arrive {
+  0%, 100% { transform: translateY(0) scale(1); }
+  28% { transform: translateY(-28px) scale(1.12) rotate(-3deg); filter: brightness(1.8); }
+}
+@keyframes target-pulse {
+  0% { opacity: .65; }
+  45% { opacity: 1; }
+}
+@keyframes life-shake {
+  0%, 100% { transform: skew(-7deg) translateX(0); }
+  25% { transform: skew(-7deg) translateX(-8px); }
+  50% { transform: skew(-7deg) translateX(8px); }
+  75% { transform: skew(-7deg) translateX(-4px); }
+}
+@keyframes damage-pop {
+  from { opacity: 0; transform: translateY(15px) scale(.55) rotate(-8deg); }
+  35% { opacity: 1; transform: translateY(-8px) scale(1.15) rotate(4deg); }
+  to { opacity: 0; transform: translateY(-58px) scale(1) rotate(0); }
+}
+@keyframes summon-label {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(.4) rotate(-15deg); }
+  35% { opacity: 1; transform: translate(-50%, -50%) scale(1.12) rotate(-5deg); }
+  to { opacity: 0; transform: translate(-50%, -76%) scale(1) rotate(-5deg); }
+}
+@keyframes destruction-pop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.45) rotate(-14deg); filter: brightness(2); }
+  35% { opacity: 1; transform: translate(-50%, -50%) scale(1.05) rotate(-5deg); }
+  100% { opacity: 0; transform: translate(-50%, -58%) scale(1.15) rotate(4deg); filter: brightness(1); }
+}
+@keyframes cut-in-rays-spin { to { transform: rotate(20deg); } }
+@keyframes cut-in-slam { from { opacity: 0; transform: translateX(24%) rotate(-8deg) scale(.75); } }
+
+@media (max-width: 1050px) {
+  .battle-speed-controls { right: 24px; }
+}
+
+@media (max-width: 720px) {
+  .battle-speed-controls {
+    top: 76px;
+    right: 8px;
+    gap: 2px;
+    padding: 3px;
+    border-width: 2px;
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+  .battle-speed-controls > span { display: none; }
+  .battle-speed-controls button { padding: 4px 5px; font-size: 8px; border-width: 1px; }
+  .damage-pop.opponent { top: 21%; left: 64%; }
+  .damage-pop.brother { bottom: 29%; left: 64%; }
+  .summon-pop { font-size: 14px; }
+  .destruction-pop { min-width: 110px; padding: 7px 9px; border-width: 3px; }
+  .destruction-pop b { font-size: 18px; }
+  .destruction-pop small { font-size: 8px; }
+  .cut-in-band { padding-top: 15px; padding-bottom: 15px; border-width: 5px; }
+  .cut-in-band span { font-size: 9px; }
+  .cut-in-band strong { font-size: clamp(26px, 8vw, 42px); text-shadow: 3px 3px 0 var(--ink), -1px -1px 0 white; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .battle-speed-controls,
+  .board-card.event-attack,
+  .board-card.event-summon,
+  .board-card.event-sync-flash,
+  .hand-card.event-sync-flash,
+  .hand-card.event-ace-card,
+  .battle-target,
+  .life-target .life,
+  .damage-pop,
+  .summon-pop,
+  .destruction-pop,
+  .cut-in-rays,
+  .cut-in-band { animation: none; }
+}

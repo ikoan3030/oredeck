@@ -98,6 +98,11 @@ test("battle resolves within the turn limit without mutating the input state", (
   assert.ok(result.turn <= 30);
 });
 
+test("opponent leader life uses the data override and defaults to twenty", () => {
+  assert.equal(createBattle(battleDeck("grim"), getOpponent("wall"), cards, 1).opponent.life, 20);
+  assert.equal(createBattle(battleDeck("grim"), getOpponent("boss"), cards, 1).opponent.life, 25);
+});
+
 test("sync bonuses use the stage data and affect instance keyword checks", () => {
   const opponent = getOpponent("wall");
   const before = createBattle(battleDeck("noelka"), opponent, cards, 5, 20, null);
