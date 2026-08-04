@@ -63,6 +63,7 @@ interface EventPlaybackTiming {
   normal: number;
   fast: number;
   skip: number;
+  visual?: Record<PlaybackSpeed, number>;
   cutIn?: Record<PlaybackSpeed, { before: number; hold: number; after: number }>;
 }
 
@@ -71,10 +72,10 @@ const PLAYBACK_SPEED_LABELS: Record<PlaybackSpeed, string> = { normal: "等速",
 const EVENT_PLAYBACK_TIMING: Record<BattleEventType, EventPlaybackTiming> = {
   turn: { normal: 260, fast: 130, skip: 70 },
   draw: { normal: 420, fast: 210, skip: 70 },
-  play: { normal: 580, fast: 290, skip: 80 },
-  effect: { normal: 520, fast: 260, skip: 80 },
-  attack: { normal: 760, fast: 380, skip: 90 },
-  destroyed: { normal: 520, fast: 260, skip: 80 },
+  play: { normal: 580, fast: 290, skip: 80, visual: { normal: 580, fast: 290, skip: 120 } },
+  effect: { normal: 520, fast: 260, skip: 80, visual: { normal: 520, fast: 260, skip: 100 } },
+  attack: { normal: 760, fast: 380, skip: 90, visual: { normal: 760, fast: 380, skip: 140 } },
+  destroyed: { normal: 520, fast: 260, skip: 80, visual: { normal: 520, fast: 260, skip: 100 } },
   attribution: { normal: 1100, fast: 550, skip: 100 },
   taunt: { normal: 900, fast: 450, skip: 100 },
   result: {
@@ -87,11 +88,12 @@ const EVENT_PLAYBACK_TIMING: Record<BattleEventType, EventPlaybackTiming> = {
       skip: { before: 50, hold: 400, after: 50 },
     },
   },
-  sync_bonus: { normal: 900, fast: 450, skip: 100 },
+  sync_bonus: { normal: 900, fast: 450, skip: 100, visual: { normal: 800, fast: 400, skip: 140 } },
   ace: {
     normal: 1200,
     fast: 700,
     skip: 500,
+    visual: { normal: 900, fast: 600, skip: 260 },
     cutIn: {
       normal: { before: 100, hold: 1000, after: 300 },
       fast: { before: 100, hold: 650, after: 300 },
@@ -313,16 +315,9 @@ function DeckScreen({ draft, cards, child, reaction, onBattle }: { draft: DraftS
   </main>;
 }
 
-function eventDamageAmount(event: BattleEvent | null, cards: Card[], battle: BattleState): number | null {
-  if (!event) return null;
-  if (event.type === "attack") {
-    const instance = [...battle.brother.board, ...battle.opponent.board].find((item) => item.instanceId === event.instanceId);
-    return instance?.atk ?? (event.cardId ? cards.find((card) => card.id === event.cardId)?.atk ?? null : null);
-  }
-  if (event.type === "effect" && event.keyword === "damage" && event.cardId) {
-    return cards.find((card) => card.id === event.cardId)?.effects.find((effect) => effect.keyword === "damage")?.value ?? null;
-  }
-  return null;
+function eventDamageAmount(event: BattleEvent | null): number | null {
+  if (!event || (event.type !== "attack" && !(event.type === "effect" && event.keyword === "damage"))) return null;
+  return event.damage ?? null;
 }
 
 function isDamageEvent(event: BattleEvent | null): boolean {
@@ -330,12 +325,19 @@ function isDamageEvent(event: BattleEvent | null): boolean {
 }
 
 function eventCardClass(instance: BattleState["brother"]["board"][number], activeEvent: BattleEvent | null): string {
-  if (!activeEvent || activeEvent.instanceId !== instance.instanceId) return "";
-  if (activeEvent.type === "attack") return "event-attack " + (activeEvent.side === "brother" ? "attack-toward-opponent" : "attack-toward-brother");
-  if (activeEvent.type === "play") return "event-summon";
-  if (activeEvent.type === "sync_bonus") return "event-sync-flash";
-  if (activeEvent.type === "ace") return "event-ace-card";
-  return "";
+  if (!activeEvent) return "";
+  const sourceId = activeEvent.sourceInstanceId ?? activeEvent.instanceId;
+  const isSource = sourceId === instance.instanceId;
+  const isTarget = activeEvent.targetInstanceId === instance.instanceId || activeEvent.targetInstanceIds?.includes(instance.instanceId);
+  if (!isSource && !isTarget) return "";
+  if (activeEvent.type === "attack" && isSource) return "event-attack " + (activeEvent.side === "brother" ? "attack-toward-opponent" : "attack-toward-brother") + (activeEvent.targetLeader ? " attack-to-leader" : "");
+  if (activeEvent.type === "attack" && isTarget) return "attack-contact-target";
+  if (activeEvent.type === "play" && isSource) return "event-summon";
+  if (activeEvent.type === "effect" && isSource) return "effect-source-flash";
+  if ((activeEvent.type === "effect" || activeEvent.type === "destroyed") && isTarget) return "effect-target-flash";
+  if (activeEvent.type === "sync_bonus" && isTarget) return "event-sync-flash";
+  if (activeEvent.type === "ace" && isSource) return "event-ace-card";
+  return isSource && activeEvent.type === "sync_bonus" ? "event-sync-flash" : "";
 }
 
 function BoardCard({ instance, cards, ace = false, activeEvent = null }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null }) {
@@ -414,14 +416,24 @@ function BattleSpeedControls({ speed, onChange }: { speed: PlaybackSpeed; onChan
   return <div className="battle-speed-controls" aria-label="バトル演出速度"><span>演出</span>{(["normal", "fast", "skip"] as PlaybackSpeed[]).map((item) => <button key={item} type="button" className={speed === item ? "active" : ""} aria-pressed={speed === item} onClick={() => onChange(item)}>{PLAYBACK_SPEED_LABELS[item]}</button>)}</div>;
 }
 
-function BattleEffectLayer({ activeEvent, cards, battle }: { activeEvent: BattleEvent | null; cards: Card[]; battle: BattleState }) {
+function BattleEffectLayer({ activeEvent, cards }: { activeEvent: BattleEvent | null; cards: Card[] }) {
   if (!activeEvent) return null;
-  const amount = eventDamageAmount(activeEvent, cards, battle);
+  const amount = eventDamageAmount(activeEvent);
   const targetSide = activeEvent.side === "brother" ? "opponent" : "brother";
-  const destroyedCard = activeEvent.type === "destroyed" && activeEvent.cardId ? cards.find((card) => card.id === activeEvent.cardId) : undefined;
+  const sourcePlayer = activeEvent.side === "brother" ? activeEvent.snapshot?.brother : activeEvent.snapshot?.opponent;
+  const sourceVisible = Boolean(sourcePlayer && activeEvent.sourceInstanceId && [...sourcePlayer.board, ...sourcePlayer.hand].some((item) => item.instanceId === activeEvent.sourceInstanceId));
+  const sourceInstance = activeEvent.sourceInstance ?? (activeEvent.cardId ? { instanceId: activeEvent.sourceInstanceId ?? activeEvent.instanceId ?? "effect-source", cardId: activeEvent.cardId } : undefined);
+  const sourceCard = sourceInstance ? cards.find((card) => card.id === sourceInstance.cardId) : undefined;
+  const destroyedInstance = activeEvent.targetInstances?.[0];
+  const destroyedCard = destroyedInstance ? cards.find((card) => card.id === destroyedInstance.cardId) : undefined;
+  const isAttackOnCard = activeEvent.type === "attack" && Boolean(activeEvent.targetInstanceId);
+  const attackerSide = activeEvent.side;
   return <div className="battle-effect-layer" aria-live="polite">
-    {amount !== null && <span className={"damage-pop " + targetSide}>-{amount}</span>}
+    {isAttackOnCard && activeEvent.retaliationDamage !== undefined && <span className={`damage-pop attack-retaliation ${attackerSide}`}>-{activeEvent.retaliationDamage}</span>}
+    {amount !== null && <span className={`damage-pop ${targetSide} ${isAttackOnCard ? "attack-contact" : "effect-hit"}`}>-{amount}</span>}
     {activeEvent.type === "play" && <span className={"summon-pop " + activeEvent.side}>登場！</span>}
+    {activeEvent.type === "effect" && sourceCard && !sourceVisible && <div className={`effect-source-label ${activeEvent.side}`}><span>EFFECT</span><b>{sourceCard.name}</b></div>}
+    {activeEvent.type === "effect" && <span className={`effect-hit-label ${targetSide}`}>{activeEvent.keyword === "destroy" ? "BREAK!" : activeEvent.keyword === "damage" ? "HIT!" : "EFFECT!"}</span>}
     {destroyedCard && <div className="destruction-pop"><b>BREAK!</b><small>{destroyedCard.name}</small></div>}
   </div>;
 }
@@ -475,7 +487,16 @@ function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish,
   const recent = visibleEvents.slice(-9).reverse();
   const aceEvent = [...battle.events].reverse().find((item) => item.type === "ace");
   const aceInstanceId = aceEvent?.instanceId;
-  const damageTargetSide = isDamageEvent(activeEvent) ? activeEvent!.side === "brother" ? "opponent" : "brother" : null;
+  const damageTargetSide = isDamageEvent(activeEvent) && activeEvent?.targetLeader ? activeEvent.side === "brother" ? "opponent" : "brother" : null;
+  const impactEvent = activeEvent && (activeEvent.type === "attack" || activeEvent.type === "effect" || activeEvent.type === "destroyed") ? activeEvent : null;
+  const boardSnapshot = impactEvent?.beforeSnapshot ?? activeEvent?.snapshot;
+  const boardOpponent = boardSnapshot?.opponent ?? battle.opponent;
+  const boardBrother = boardSnapshot?.brother ?? battle.brother;
+  const lifeSnapshot = activeEvent?.snapshot;
+  const lifeOpponent = lifeSnapshot?.opponent ?? battle.opponent;
+  const lifeBrother = lifeSnapshot?.brother ?? battle.brother;
+  const leaderHitSide = activeEvent && isDamageEvent(activeEvent) && activeEvent.targetLeader ? activeEvent.side === "brother" ? "opponent" : "brother" : null;
+  const visualDuration = activeEvent ? `${EVENT_PLAYBACK_TIMING[activeEvent.type].visual?.[speed] ?? EVENT_PLAYBACK_TIMING[activeEvent.type][speed]}ms` : undefined;
 
   useEffect(() => {
     if (!auto || battle.winner || !playbackComplete) return;
@@ -487,14 +508,14 @@ function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish,
     <header className="battle-header"><div><span>{opponent.title}</span><strong>{opponent.name}</strong></div><div className="battle-turn">TURN <b>{battle.turn}</b></div><div className="brother-name"><span>単純弟</span><strong>ユウタ</strong></div></header>
     <BattleSpeedControls speed={speed} onChange={onSpeedChange} />
     <AceStatus battle={battle} cards={cards} />
-    <section className="arena">
-      <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" ? "life-target" : "")}><div className="avatar" style={{ "--rival-color": opponent.color } as CSSProperties}>{opponent.name.slice(0, 1)}</div><div className="life"><span>LIFE</span><b>{battle.opponent.life}</b></div><div className="pp">PP {battle.opponent.pp}/{battle.opponent.maxPp}</div></div>
-      <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{battle.opponent.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} />)}{!battle.opponent.board.length && <span className="empty-board">相手の場は空</span>}</div>
+    <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""}`} style={visualDuration ? { "--event-duration": visualDuration } as CSSProperties : undefined}>
+      <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" || leaderHitSide === "opponent" ? "life-target" : "")}><div className="avatar" style={{ "--rival-color": opponent.color } as CSSProperties}>{opponent.name.slice(0, 1)}</div><div className="life"><span>LIFE</span><b>{lifeOpponent.life}</b></div><div className="pp">PP {lifeOpponent.pp}/{lifeOpponent.maxPp}</div></div>
+      <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{boardOpponent.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} />)}{!boardOpponent.board.length && <span className="empty-board">相手の場は空</span>}</div>
       <div className="board-line"><b>AUTO CARD BATTLE</b></div>
-      <div className={"board-zone brother-board " + (damageTargetSide === "brother" ? "battle-target" : "")}>{battle.brother.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} />)}{!battle.brother.board.length && <span className="empty-board">ユウタの場は空</span>}</div>
-      <div className={"fighter brother-fighter " + (damageTargetSide === "brother" ? "life-target" : "")}><div className="avatar kid">ユ</div><div className="life"><span>LIFE</span><b>{battle.brother.life}</b></div><div className="pp">PP {battle.brother.pp}/{battle.brother.maxPp}</div></div>
-      <div className="hand-zone">{battle.brother.hand.map((item) => <AnimatedBattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} />)}</div>
-      <BattleEffectLayer activeEvent={activeEvent} cards={cards} battle={battle} />
+      <div className={"board-zone brother-board " + (damageTargetSide === "brother" ? "battle-target" : "")}>{boardBrother.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} />)}{!boardBrother.board.length && <span className="empty-board">ユウタの場は空</span>}</div>
+      <div className={"fighter brother-fighter " + (damageTargetSide === "brother" || leaderHitSide === "brother" ? "life-target" : "")}><div className="avatar kid">ユ</div><div className="life"><span>LIFE</span><b>{lifeBrother.life}</b></div><div className="pp">PP {lifeBrother.pp}/{lifeBrother.maxPp}</div></div>
+      <div className="hand-zone">{boardBrother.hand.map((item) => <AnimatedBattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} />)}</div>
+      <BattleEffectLayer activeEvent={activeEvent} cards={cards} />
     </section>
     <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
     {dialogueEvent && !battle.winner && <div className="battle-speech"><Speech speaker={dialogueEvent.side === "brother" ? "ユウタ" : opponent.name} text={dialogueEvent.dialogue!} tone={dialogueEvent.side === "brother" ? "kid" : "rival"} /></div>}

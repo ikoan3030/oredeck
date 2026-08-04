@@ -788,12 +788,18 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   border-color: var(--yellow);
   animation: life-shake .34s ease-out;
 }
-.board-card.event-attack.attack-toward-opponent { animation: attack-toward-opponent .72s cubic-bezier(.2,.8,.25,1); }
-.board-card.event-attack.attack-toward-brother { animation: attack-toward-brother .72s cubic-bezier(.2,.8,.25,1); }
-.board-card.event-summon { animation: summon-in .55s cubic-bezier(.2,1.4,.4,1); }
+.board-card.event-attack.attack-toward-opponent { animation: attack-toward-opponent var(--event-duration, .72s) cubic-bezier(.2,.8,.25,1); }
+.board-card.event-attack.attack-toward-brother { animation: attack-toward-brother var(--event-duration, .72s) cubic-bezier(.2,.8,.25,1); }
+.board-card.attack-contact-target { animation: attack-contact-target var(--event-duration, .72s) ease-out; }
+.board-card.effect-source-flash,
+.hand-card.effect-source-flash { animation: effect-source-flash var(--event-duration, .72s) ease-out; }
+.board-card.effect-target-flash { animation: effect-target-flash var(--event-duration, .72s) ease-out; }
+.arena.leader-hit-opponent,
+.arena.leader-hit-brother { animation: leader-hit-shake var(--event-duration, .72s) ease-out; }
+.board-card.event-summon { animation: summon-in var(--event-duration, .55s) cubic-bezier(.2,1.4,.4,1); }
 .board-card.event-sync-flash,
-.hand-card.event-sync-flash { animation: sync-flash .8s ease-out; }
-.hand-card.event-ace-card { animation: ace-card-arrive .9s ease-out; }
+.hand-card.event-sync-flash { animation: sync-flash var(--event-duration, .8s) ease-out; }
+.hand-card.event-ace-card { animation: ace-card-arrive var(--event-duration, .9s) ease-out; }
 
 .battle-effect-layer {
   position: absolute;
@@ -808,10 +814,46 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   font-size: clamp(33px, 5vw, 64px);
   line-height: 1;
   text-shadow: 4px 4px 0 var(--ink), 0 0 14px var(--red);
-  animation: damage-pop .72s ease-out both;
+  animation: damage-pop var(--event-duration, .72s) ease-out both;
 }
+.damage-pop.attack-contact,
+.damage-pop.attack-retaliation { animation-name: damage-pop-contact; }
+.damage-pop.effect-hit { animation-name: damage-pop-effect; }
 .damage-pop.opponent { top: 22%; left: 55%; }
 .damage-pop.brother { bottom: 28%; left: 55%; }
+.damage-pop.attack-retaliation.brother { left: 34%; bottom: 28%; }
+.damage-pop.attack-retaliation.opponent { left: 34%; top: 22%; }
+.effect-hit-label {
+  position: absolute;
+  z-index: 2;
+  padding: 4px 10px;
+  color: var(--ink);
+  background: var(--cyan);
+  border: 3px solid white;
+  box-shadow: 4px 4px 0 var(--ink);
+  font-size: 14px;
+  transform: translate(-50%, -50%) rotate(5deg);
+  animation: effect-label-pop var(--event-duration, .72s) ease-out both;
+}
+.effect-hit-label.opponent { top: 27%; left: 73%; }
+.effect-hit-label.brother { bottom: 27%; left: 73%; }
+.effect-source-label {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  gap: 2px;
+  max-width: 38%;
+  padding: 5px 9px;
+  color: white;
+  background: #0b1834e8;
+  border: 3px solid var(--cyan);
+  box-shadow: 0 0 18px var(--cyan), 4px 4px 0 var(--ink);
+  font: 900 10px/1.15 "Yu Gothic", sans-serif;
+  text-align: center;
+  animation: effect-source-label var(--event-duration, .72s) ease-out both;
+}
+.effect-source-label.opponent { top: 18%; left: 27%; }
+.effect-source-label.brother { bottom: 18%; left: 27%; }
 .summon-pop {
   position: absolute;
   left: 50%;
@@ -823,7 +865,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   box-shadow: 4px 4px 0 var(--pink);
   font-size: 20px;
   transform: translate(-50%, -50%) rotate(-5deg);
-  animation: summon-label .55s ease-out both;
+  animation: summon-label var(--event-duration, .55s) ease-out both;
 }
 .destruction-pop {
   position: absolute;
@@ -839,7 +881,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   box-shadow: 7px 7px 0 var(--ink);
   text-align: center;
   transform: translate(-50%, -50%) rotate(-5deg);
-  animation: destruction-pop .72s ease-out both;
+  animation: destruction-pop var(--event-duration, .72s) ease-out both;
 }
 .destruction-pop b { font-size: 25px; text-shadow: 3px 3px 0 var(--ink); }
 .destruction-pop small { font: 900 10px/1.2 "Yu Gothic", sans-serif; }
@@ -899,12 +941,62 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-finish-reaction .kid-reaction { z-index: 46; top: 82px; }
 
 @keyframes attack-toward-opponent {
-  0%, 100% { transform: translateY(0) rotate(0); }
-  42% { transform: translateY(-30px) rotate(-4deg) scale(1.08); filter: brightness(1.35) drop-shadow(0 0 13px var(--yellow)); }
+  0% { transform: translateY(0) rotate(0); }
+  34% { transform: translateY(-74px) rotate(-4deg) scale(1.1); filter: brightness(1.45) drop-shadow(0 0 16px var(--yellow)); }
+  52% { transform: translateY(-74px) rotate(2deg) scale(1.08); filter: brightness(1.8) drop-shadow(0 0 24px #fff); }
+  68% { transform: translateY(10px) rotate(4deg) scale(.98); filter: brightness(1.15); }
+  100% { transform: translateY(0) rotate(0); }
 }
 @keyframes attack-toward-brother {
-  0%, 100% { transform: translateY(0) rotate(0); }
-  42% { transform: translateY(30px) rotate(4deg) scale(1.08); filter: brightness(1.35) drop-shadow(0 0 13px var(--yellow)); }
+  0% { transform: translateY(0) rotate(0); }
+  34% { transform: translateY(74px) rotate(4deg) scale(1.1); filter: brightness(1.45) drop-shadow(0 0 16px var(--yellow)); }
+  52% { transform: translateY(74px) rotate(-2deg) scale(1.08); filter: brightness(1.8) drop-shadow(0 0 24px #fff); }
+  68% { transform: translateY(-10px) rotate(-4deg) scale(.98); filter: brightness(1.15); }
+  100% { transform: translateY(0) rotate(0); }
+}
+@keyframes attack-contact-target {
+  0%, 30%, 100% { transform: translate(0) rotate(0); }
+  42% { transform: translate(-7px, -3px) rotate(-4deg) scale(1.05); filter: brightness(1.5); }
+  51% { transform: translate(8px, 3px) rotate(4deg) scale(1.05); filter: brightness(2); }
+  61% { transform: translate(-4px, 1px) rotate(-2deg); }
+}
+@keyframes effect-source-flash {
+  0%, 100% { filter: brightness(1); }
+  38% { filter: brightness(1.5) saturate(1.3) drop-shadow(0 0 12px var(--cyan)); }
+  52% { filter: brightness(2.3) saturate(1.5) drop-shadow(0 0 24px var(--cyan)); box-shadow: 0 0 0 5px var(--cyan), 0 0 30px var(--cyan); }
+}
+@keyframes effect-target-flash {
+  0%, 100% { transform: translate(0); filter: brightness(1); }
+  38% { transform: translate(0); filter: brightness(2) saturate(.75); }
+  51% { transform: translate(-6px, 2px) rotate(-3deg); filter: brightness(2.2); }
+  61% { transform: translate(5px, -2px) rotate(3deg); }
+}
+@keyframes leader-hit-shake {
+  0%, 100% { transform: translate(0); }
+  42% { transform: translate(-5px, 1px); }
+  51% { transform: translate(7px, -1px); }
+  60% { transform: translate(-4px, 1px); }
+}
+@keyframes damage-pop-contact {
+  0%, 34% { opacity: 0; transform: translateY(16px) scale(.55) rotate(-8deg); }
+  46% { opacity: 1; transform: translateY(-4px) scale(1.15) rotate(4deg); }
+  67% { opacity: .95; transform: translateY(-16px) scale(1) rotate(0); }
+  100% { opacity: 0; transform: translateY(-62px) scale(.9) rotate(0); }
+}
+@keyframes damage-pop-effect {
+  0%, 26% { opacity: 0; transform: translateY(16px) scale(.55) rotate(-8deg); }
+  42% { opacity: 1; transform: translateY(-4px) scale(1.15) rotate(4deg); }
+  100% { opacity: 0; transform: translateY(-62px) scale(1) rotate(0); }
+}
+@keyframes effect-label-pop {
+  0%, 25% { opacity: 0; transform: translate(-50%, -50%) scale(.5) rotate(12deg); }
+  42% { opacity: 1; transform: translate(-50%, -50%) scale(1.1) rotate(5deg); }
+  100% { opacity: 0; transform: translate(-50%, -68%) scale(1) rotate(5deg); }
+}
+@keyframes effect-source-label {
+  0%, 28% { opacity: 0; transform: scale(.7) rotate(-5deg); }
+  48% { opacity: 1; transform: scale(1.08) rotate(-3deg); }
+  100% { opacity: 0; transform: scale(1) rotate(-3deg); }
 }
 @keyframes summon-in {
   from { opacity: 0; transform: translateY(22px) scale(.6) rotate(-8deg); filter: brightness(2); }
@@ -963,6 +1055,13 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .battle-speed-controls button { padding: 4px 5px; font-size: 8px; border-width: 1px; }
   .damage-pop.opponent { top: 21%; left: 64%; }
   .damage-pop.brother { bottom: 29%; left: 64%; }
+  .damage-pop.attack-retaliation.brother { left: 34%; bottom: 29%; }
+  .damage-pop.attack-retaliation.opponent { left: 34%; top: 21%; }
+  .effect-hit-label.opponent { top: 25%; left: 72%; }
+  .effect-hit-label.brother { bottom: 25%; left: 72%; }
+  .effect-source-label { max-width: 44%; font-size: 8px; }
+  .effect-source-label.opponent { top: 17%; left: 20%; }
+  .effect-source-label.brother { bottom: 17%; left: 20%; }
   .summon-pop { font-size: 14px; }
   .destruction-pop { min-width: 110px; padding: 7px 9px; border-width: 3px; }
   .destruction-pop b { font-size: 18px; }
@@ -975,6 +1074,12 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 @media (prefers-reduced-motion: reduce) {
   .battle-speed-controls,
   .board-card.event-attack,
+  .board-card.attack-contact-target,
+  .board-card.effect-source-flash,
+  .hand-card.effect-source-flash,
+  .board-card.effect-target-flash,
+  .arena.leader-hit-opponent,
+  .arena.leader-hit-brother,
   .board-card.event-summon,
   .board-card.event-sync-flash,
   .hand-card.event-sync-flash,
@@ -982,6 +1087,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .battle-target,
   .life-target .life,
   .damage-pop,
+  .effect-hit-label,
+  .effect-source-label,
   .summon-pop,
   .destruction-pop,
   .cut-in-rays,
