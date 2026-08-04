@@ -340,6 +340,22 @@ function eventCardClass(instance: BattleState["brother"]["board"][number], activ
   return isSource && activeEvent.type === "sync_bonus" ? "event-sync-flash" : "";
 }
 
+const BEFORE_RESOLUTION_BOARD_EVENTS = new Set<BattleEventType>(["attack", "effect", "destroyed"]);
+
+/**
+ * Select the board state for the event currently being presented.
+ *
+ * Impact events need their before-state so the source and target remain
+ * mounted for the animation. All other events use their after-state (notably
+ * play, whose after-state contains the newly summoned card). Keeping this
+ * selection tied to the playback cursor prevents the transient fallback to
+ * the final BattleState between two queued events.
+ */
+function boardSnapshotForPlayback(event: BattleEvent | undefined) {
+  if (!event) return undefined;
+  return (BEFORE_RESOLUTION_BOARD_EVENTS.has(event.type) ? event.beforeSnapshot ?? event.snapshot : event.snapshot ?? event.beforeSnapshot);
+}
+
 function BoardCard({ instance, cards, ace = false, activeEvent = null }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null }) {
   const card = cards.find((item) => item.id === instance.cardId)!;
   const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
@@ -488,12 +504,12 @@ function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish,
   const recent = visibleEvents.slice(-9).reverse();
   const aceEvent = [...battle.events].reverse().find((item) => item.type === "ace");
   const aceInstanceId = aceEvent?.instanceId;
+  const playbackEvent = activeEvent ?? battle.events[visibleEventCount];
   const damageTargetSide = isDamageEvent(activeEvent) && activeEvent?.targetLeader ? activeEvent.side === "brother" ? "opponent" : "brother" : null;
-  const impactEvent = activeEvent && (activeEvent.type === "attack" || activeEvent.type === "effect" || activeEvent.type === "destroyed") ? activeEvent : null;
-  const boardSnapshot = impactEvent?.beforeSnapshot ?? activeEvent?.snapshot;
+  const boardSnapshot = boardSnapshotForPlayback(playbackEvent);
   const boardOpponent = boardSnapshot?.opponent ?? battle.opponent;
   const boardBrother = boardSnapshot?.brother ?? battle.brother;
-  const lifeSnapshot = activeEvent?.snapshot;
+  const lifeSnapshot = playbackEvent?.snapshot;
   const lifeOpponent = lifeSnapshot?.opponent ?? battle.opponent;
   const lifeBrother = lifeSnapshot?.brother ?? battle.brother;
   const leaderHitSide = activeEvent && isDamageEvent(activeEvent) && activeEvent.targetLeader ? activeEvent.side === "brother" ? "opponent" : "brother" : null;
