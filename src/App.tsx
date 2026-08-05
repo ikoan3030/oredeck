@@ -46,10 +46,17 @@ interface KidReaction {
   text: string;
 }
 
-interface SyncStageLabel {
-  minimum: number;
-  label: string;
+/**
+ * Transient glow shown on the card the kid just took and on the sync meter.
+ * "soft" is the kid picking on his own, "burst" is the player reading him correctly.
+ * Deliberately independent of the battle playback speed setting.
+ */
+interface PickFlash {
+  strength: "soft" | "burst";
+  index: 0 | 1;
 }
+
+const PICK_FLASH_MS: Record<PickFlash["strength"], number> = { soft: 420, burst: 700 };
 
 interface SyncNotice {
   stage: number;
@@ -172,16 +179,16 @@ function CardFace({ card, selected, intervention, compact = false }: { card: Car
 }
 
 function syncStageLabel(sync: number, child: ChildProfile): string {
-  const labels = (child.sync as ChildProfile["sync"] & { stageLabels?: SyncStageLabel[] }).stageLabels ?? [];
+  const labels = child.sync.stageLabels ?? [];
   return [...labels].filter((item) => sync >= item.minimum).sort((a, b) => a.minimum - b.minimum).at(-1)?.label ?? "シンクロ";
 }
 
-function SyncMeter({ sync, child }: { sync: number; child: ChildProfile }) {
+function SyncMeter({ sync, child, flash = null }: { sync: number; child: ChildProfile; flash?: PickFlash | null }) {
   const stage = syncStage(sync, child);
   const stages = child.sync.stageMinimums.length;
   const label = syncStageLabel(sync, child);
   return (
-    <div className={`sync-box stage-${stage}`} aria-label={`シンクロ状態：${label}`}>
+    <div className={`sync-box stage-${stage} ${flash ? `sync-flash-${flash.strength}` : ""}`} aria-label={`シンクロ状態：${label}`}>
       <span>ユウタとカードのシンクロ</span>
       <div className="sync-meter" aria-hidden="true">{Array.from({ length: stages }, (_, index) => index + 1).map((item) => <i key={item} className={item <= stage ? "on" : ""} />)}</div>
       <strong>{label}</strong>
@@ -243,7 +250,7 @@ function OpponentPreviewScreen({ opponent, battleNumber, onStart }: { opponent: 
   return <main className="opponent-preview-screen"><section className="opponent-preview-panel"><span className="section-kicker">BATTLE {battleNumber} / 6</span><h1>つぎの相手</h1><div className="opponent-preview-card" style={{ "--rival-color": opponent.color } as CSSProperties}><span className="opponent-mark">{opponent.title.slice(0, 1)}</span><small>{opponent.title}</small><strong>{opponent.name}</strong><p>{opponent.trait}</p></div><button className="primary-action" onClick={onStart}>デッキを組む！<span>▶</span></button></section></main>;
 }
 
-function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNotice, onPick, onAuto, onAdvice }: {
+function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNotice, pickFlash, onPick, onAuto, onAdvice }: {
   draft: DraftState;
   offer: DraftOffer | null;
   cards: Card[];
@@ -251,6 +258,7 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
   adviceOpen: boolean;
   reaction: KidReaction | null;
   syncNotice: SyncNotice | null;
+  pickFlash: PickFlash | null;
   onPick: (index: 0 | 1) => void;
   onAuto: () => void;
   onAdvice: (category: AdviceCategory) => void;
@@ -258,7 +266,7 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
   const dialogue = !offer ? "次のカード、どんなのかな！" : offer.decision.love ? child.dialogue.love[draft.pick % child.dialogue.love.length] : offer.wantsIntervention ? child.dialogue.ask[draft.pick % child.dialogue.ask.length] : `${offer.cards[offer.decision.preferredIndex].name}にする！ ${reasonCopy[offer.decision.reason]}！`;
   return (
     <main className="game-shell draft-screen">
-      <header className="game-header"><div className="mini-logo">兄ちゃん！<b>俺のデッキ作って！</b></div><div className="pick-counter"><span>PICK</span><b>{String(draft.pick + 1).padStart(2, "0")}</b><em>/15</em></div><SyncMeter sync={draft.syncRate} child={child} /></header>
+      <header className="game-header"><div className="mini-logo">兄ちゃん！<b>俺のデッキ作って！</b></div><div className="pick-counter"><span>PICK</span><b>{String(draft.pick + 1).padStart(2, "0")}</b><em>/15</em></div><SyncMeter sync={draft.syncRate} child={child} flash={pickFlash} /></header>
       {reaction && <ReactionBanner reaction={reaction} speaker={child.displayName} />}
       <SyncStageBanner notice={syncNotice} />
       <div className="draft-layout">
@@ -267,9 +275,9 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
           {offer ? <div className="card-choice">
             {offer.cards.map((card, index) => (
               <button
-                className={`card-choice-button ${offer.decision.love && index === offer.decision.preferredIndex ? "love-lock" : ""}`}
+                className={`card-choice-button ${offer.decision.love && index === offer.decision.preferredIndex ? "love-lock" : ""} ${pickFlash?.index === index ? `pick-flash-${pickFlash.strength}` : ""}`}
                 key={`${card.id}-${index}`}
-                disabled={!offer.wantsIntervention || offer.decision.love}
+                disabled={!offer.wantsIntervention || offer.decision.love || Boolean(pickFlash)}
                 onClick={() => onPick(index as 0 | 1)}
                 aria-label={`${card.name}を選ぶ`}
               >
@@ -280,7 +288,7 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
             ))}
             <div className="vs-burst">VS</div>
           </div> : <div className="loading-card">カードをシャッフル中…</div>}
-          {offer && (!offer.wantsIntervention || offer.decision.love) && <button className="primary-action slam" onClick={onAuto}>{offer.decision.love ? "このカードで決定！" : "弟のピックを見届ける"}<span>▶</span></button>}
+          {offer && (!offer.wantsIntervention || offer.decision.love) && <button className="primary-action slam" disabled={Boolean(pickFlash)} onClick={onAuto}>{offer.decision.love ? "このカードで決定！" : "弟のピックを見届ける"}<span>▶</span></button>}
           <Speech speaker={child.displayName} text={dialogue} />
         </section>
         <aside><DeckMaterials draft={draft} cards={cards} /></aside>
@@ -290,7 +298,7 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
         <DeckMaterials draft={draft} cards={cards} small />
         <div className="advice-options">{child.advice.categories.map((category) => {
           const copy = categoryCopy[category];
-          return <button key={category} onClick={() => onAdvice(category)} className={category === "skip" ? "skip" : ""}><b>{copy.icon}</b><span><strong>{copy.label}</strong><small>{copy.detail}</small></span></button>;
+          return <button key={category} disabled={Boolean(pickFlash)} onClick={() => onAdvice(category)} className={category === "skip" ? "skip" : ""}><b>{copy.icon}</b><span><strong>{copy.label}</strong><small>{copy.detail}</small></span></button>;
         })}</div>
       </section></div>}
     </main>
@@ -302,11 +310,33 @@ function AceSelectionScreen({ draft, cards, selectedCardId, onSelect, onConfirm,
   return <main className="ace-selection-screen"><section className="ace-selection-panel"><span className="section-kicker">DESTINY DRAW / UNLOCKED</span><h1>切り札を選べ！！</h1><p className="ace-flavor">ここぞの一枚を、運命のドローに指定しろ！</p><div className="ace-deck-grid">{draft.deck.map((item) => { const card = byId.get(item.cardId)!; const selected = selectedCardId === item.cardId; return <button key={item.instanceId} className={`ace-card-option ${selected ? "selected" : ""}`} onClick={() => onSelect(item.cardId)} aria-pressed={selected}><CardFace card={card} selected={selected} /><span>{selected ? "切り札に指定中" : "この札を選ぶ"}</span></button>; })}</div><div className="ace-selection-actions"><button className="secondary-action" onClick={onSkip}>切り札なしで開始</button><button className="primary-action" onClick={onConfirm} disabled={!selectedCardId}>このカードで決定<span>▶</span></button></div></section></main>;
 }
 
+/** Picks the kid made on his own: no ruling was asked for, or love locked the card in. */
+function autoPickCount(draft: DraftState): number {
+  return draft.deck.filter((item) => item.source === "auto" || item.source === "love").length;
+}
+
+function BuildSummary({ draft, child }: { draft: DraftState; child: ChildProfile }) {
+  const copy = child.buildSummary;
+  if (!copy) return null;
+  const autoPicks = autoPickCount(draft);
+  const mood = [...copy.moodTiers].sort((a, b) => b.minimumAutoPicks - a.minimumAutoPicks).find((tier) => autoPicks >= tier.minimumAutoPicks);
+  const startedAt = draft.history[0]?.syncBefore ?? draft.syncRate;
+  const gained = syncStage(draft.syncRate, child) - syncStage(startedAt, child);
+  const stageNote = gained > 0 ? copy.stageUpText.replace("{count}", String(gained)) : copy.stageKeptText;
+  return (
+    <section className="build-summary">
+      <p className="build-mood">{mood?.text}</p>
+      <p className="build-stage"><span>シンクロ</span><strong>{syncStageLabel(draft.syncRate, child)}</strong><small>（{stageNote}）</small></p>
+    </section>
+  );
+}
+
 function DeckScreen({ draft, cards, child, reaction, onBattle }: { draft: DraftState; cards: Card[]; child: ChildProfile; reaction: KidReaction | null; onBattle: () => void }) {
   const byId = new Map(cards.map((card) => [card.id, card]));
   return <main className="game-shell deck-screen">
     <header className="game-header"><div className="mini-logo">デッキ完成！<b>答え合わせへ</b></div><div className="completion-stamp">15 CARDS</div></header>
     {reaction && <ReactionBanner reaction={reaction} speaker={child.displayName} />}
+    <BuildSummary draft={draft} child={child} />
     <div className="deck-review-grid">
       <section className="deck-list-panel"><div className="section-kicker">YOUR DECK</div><h1>ユウタのデッキ</h1><div className="deck-list">{draft.deck.map((item, index) => { const card = byId.get(item.cardId)!; return <div key={item.instanceId} className="deck-row"><span className="deck-number">{String(index + 1).padStart(2, "0")}</span><span className="mini-cost">{card.cost}</span><strong>{card.name}</strong><small>{effectText(card)}</small>{item.intervention && <b className="brother-tag">兄ちゃん</b>}</div>; })}</div></section>
       <aside><DeckMaterials draft={draft} cards={cards} /><div className="no-verdict"><b>勝てそう？</b><span>数字は材料。答えは対戦で確かめよう。</span></div></aside>
@@ -559,6 +589,8 @@ export default function Home() {
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(loadPlaybackSpeed);
   const [reaction, setReaction] = useState<KidReaction | null>(null);
   const [syncNotice, setSyncNotice] = useState<SyncNotice | null>(null);
+  const [pickFlash, setPickFlash] = useState<PickFlash | null>(null);
+  const [pendingGame, setPendingGame] = useState<SavedGame | null>(null);
 
   useEffect(() => {
     Promise.all([fetch("./data/cards.json").then((response) => response.json()), fetch("./data/children/tanjun.json").then((response) => response.json()), fetch("./data/opponents.json").then((response) => response.json())])
@@ -566,6 +598,17 @@ export default function Home() {
   }, []);
 
   useEffect(() => { if (hydrated) localStorage.setItem(SAVE_KEY, JSON.stringify(game)); }, [game, hydrated]);
+
+  // Hold the taken card on screen just long enough for its glow, then swap in the next offer.
+  useEffect(() => {
+    if (!pendingGame || !pickFlash) return;
+    const timer = window.setTimeout(() => {
+      setGame(pendingGame);
+      setPendingGame(null);
+      setPickFlash(null);
+    }, PICK_FLASH_MS[pickFlash.strength]);
+    return () => window.clearTimeout(timer);
+  }, [pendingGame, pickFlash]);
 
   useEffect(() => {
     if (game.battle?.winner) setAutoBattle(false);
@@ -581,11 +624,17 @@ export default function Home() {
     return { ...game, phase: "draft", draft: generated.state, offer: generated.offer, adviceOpen: false, battle: null };
   }
 
+  function clearPickFlash() {
+    setPickFlash(null);
+    setPendingGame(null);
+  }
+
   function beginArcade() {
     if (!child) return;
     setAutoBattle(false);
     setReaction(null);
     setSyncNotice(null);
+    clearPickFlash();
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
     setGame({ ...createDefaultSave(child.sync.initial, seed), phase: "mode" });
   }
@@ -602,6 +651,7 @@ export default function Home() {
     if (!child || !getCurrentOpponentId(game.run)) return;
     setReaction(null);
     setSyncNotice(null);
+    clearPickFlash();
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
     const draft = createDraft(seed, child, game.run.carrySync);
     const generated = generateOffer(draft, cards, child);
@@ -609,11 +659,11 @@ export default function Home() {
   }
 
   function takePick(index?: 0 | 1) {
-    if (!game.draft || !game.offer || !child) return;
+    if (!game.draft || !game.offer || !child || pickFlash) return;
     const offer = game.offer;
     const ruled = offer.source === "normal" && offer.wantsIntervention && !offer.decision.love && index !== undefined;
+    const supported = ruled && index === offer.decision.preferredIndex;
     if (ruled) {
-      const supported = index === offer.decision.preferredIndex;
       const lines = supported ? child.dialogue.support : child.dialogue.reject;
       setReaction({ tone: supported ? "support" : "reject", text: lines[game.draft.pick % lines.length] });
     } else {
@@ -623,7 +673,13 @@ export default function Home() {
     const next = resolveOffer(game.draft, game.offer, child, index);
     const nextStage = syncStage(next.syncRate, child);
     setSyncNotice(nextStage > beforeStage ? { stage: nextStage, label: syncStageLabel(next.syncRate, child) } : null);
-    setGame(nextNormalOffer(next));
+
+    const kidPicked = !offer.wantsIntervention || offer.decision.love;
+    const strength: PickFlash["strength"] | null = supported ? "burst" : kidPicked ? "soft" : null;
+    const committed = nextNormalOffer(next);
+    if (!strength) { setGame(committed); return; }
+    setPickFlash({ strength, index: ruled && index !== undefined ? index : offer.decision.preferredIndex });
+    setPendingGame(committed);
   }
 
   function chooseAdvice(category: AdviceCategory) {
@@ -651,6 +707,7 @@ export default function Home() {
     if (!game.draft || !child) return;
     setReaction(null);
     setSyncNotice(null);
+    clearPickFlash();
     const opponentId = getCurrentOpponentId(game.run);
     const opponent = opponentId ? getOpponentById(opponents, opponentId) : undefined;
     if (!opponent) return;
@@ -686,6 +743,7 @@ export default function Home() {
     setAutoBattle(false);
     setReaction(null);
     setSyncNotice(null);
+    clearPickFlash();
     setGame(createDefaultSave(child.sync.initial));
   }
 
@@ -696,7 +754,7 @@ export default function Home() {
   const currentOpponentId = getCurrentOpponentId(game.run);
   const currentOpponent = currentOpponentId ? getOpponentById(opponents, currentOpponentId) : undefined;
   if (game.phase === "opponent" && currentOpponent) return <OpponentPreviewScreen opponent={currentOpponent} battleNumber={game.run.currentBattle + 1} onStart={startDraft} />;
-  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} onPick={takePick} onAuto={() => takePick()} onAdvice={chooseAdvice} />;
+  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} pickFlash={pickFlash} onPick={takePick} onAuto={() => takePick()} onAdvice={chooseAdvice} />;
   if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} onBattle={prepareBattle} />;
   if (game.phase === "ace" && game.draft) return <AceSelectionScreen draft={game.draft} cards={cards} selectedCardId={game.aceCardId ?? null} onSelect={selectAceCard} onConfirm={() => startBattle()} onSkip={() => startBattle(null)} />;
   if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} opponent={currentOpponent} onNext={advanceCurrentBattle} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={changePlaybackSpeed} />;

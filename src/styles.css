@@ -605,11 +605,80 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 }
 .sync-box > span { font-size: 11px; font-weight: 900; color: #bbb; }
 .sync-box strong { grid-column: 1 / -1; color: var(--yellow); font-size: 13px; text-shadow: 2px 2px 0 var(--ink); }
-.sync-meter { display: flex; gap: 3px; }
-.sync-meter i { width: 28px; height: 9px; background: #454148; transform: skew(-12deg); }
-.sync-meter i.on { background: linear-gradient(90deg, var(--orange), var(--yellow)); box-shadow: 0 0 9px #ffd92888; }
+/* Five discrete stage lamps. Pick-level movement must never be readable here. */
+.sync-meter { display: flex; gap: 5px; }
+.sync-meter i { width: 26px; height: 16px; background: #35323a; border: 3px solid #121115; border-radius: 3px; transform: skew(-12deg); }
+.sync-meter i.on { background: linear-gradient(160deg, var(--yellow), var(--orange)); border-color: var(--ink); box-shadow: 0 0 10px #ffd92899, inset 0 0 0 2px #fff6; }
 .sync-box.stage-5 { filter: drop-shadow(0 0 7px var(--pink)); }
+.sync-box.stage-5 .sync-meter i.on { background: linear-gradient(160deg, var(--yellow), var(--pink)); }
 .sync-box.stage-5 strong { color: var(--pink); text-shadow: 2px 2px 0 var(--ink), 0 0 10px var(--pink); }
+
+/* Pick feedback: every pick is a sync act, told through light rather than numbers.
+   Durations are fixed and independent of the battle playback speed setting. */
+.card-choice-button.pick-flash-soft, .card-choice-button.pick-flash-burst { z-index: 4; }
+.card-choice-button.pick-flash-soft .card-face { animation: pick-glow-soft 420ms ease-out; }
+.card-choice-button.pick-flash-burst .card-face { animation: pick-glow-burst 700ms cubic-bezier(.2, .8, .3, 1); }
+.card-choice-button.pick-flash-burst::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -14px;
+  border-radius: 18px;
+  animation: pick-ring-burst 700ms ease-out;
+}
+.sync-box.sync-flash-soft .sync-meter i.on { animation: lamp-glow-soft 420ms ease-out; }
+.sync-box.sync-flash-burst .sync-meter i.on { animation: lamp-glow-burst 700ms ease-out; }
+.sync-box.sync-flash-burst strong { animation: lamp-label-burst 700ms ease-out; }
+
+@keyframes pick-glow-soft {
+  0% { filter: brightness(1); }
+  45% { filter: brightness(1.16) drop-shadow(0 0 12px #ffd92899); }
+  100% { filter: brightness(1); }
+}
+@keyframes pick-glow-burst {
+  0% { transform: scale(1); filter: brightness(1); }
+  22% { transform: scale(1.07); filter: brightness(1.9) drop-shadow(0 0 26px var(--yellow)) drop-shadow(0 0 44px var(--orange)); }
+  55% { transform: scale(1.01); filter: brightness(1.3) drop-shadow(0 0 18px var(--yellow)); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+@keyframes pick-ring-burst {
+  0% { box-shadow: 0 0 0 0 #ffd928cc, 0 0 0 0 #ff7a1888; opacity: 1; }
+  100% { box-shadow: 0 0 0 26px #ffd92800, 0 0 0 44px #ff7a1800; opacity: 0; }
+}
+@keyframes lamp-glow-soft {
+  0%, 100% { box-shadow: 0 0 10px #ffd92899, inset 0 0 0 2px #fff6; }
+  50% { box-shadow: 0 0 16px #ffd928dd, inset 0 0 0 2px #fff9; }
+}
+@keyframes lamp-glow-burst {
+  0% { transform: skew(-12deg) scale(1); }
+  25% { transform: skew(-12deg) scale(1.22); box-shadow: 0 0 24px var(--yellow), 0 0 40px var(--orange), inset 0 0 0 2px #fff; }
+  60% { transform: skew(-12deg) scale(1.06); }
+  100% { transform: skew(-12deg) scale(1); }
+}
+@keyframes lamp-label-burst {
+  0%, 100% { text-shadow: 2px 2px 0 var(--ink); }
+  30% { text-shadow: 2px 2px 0 var(--ink), 0 0 14px var(--yellow); }
+}
+
+/* Post-build recap: mood line + stage line, no numbers. */
+.build-summary {
+  max-width: 1180px;
+  margin: 22px auto 0;
+  padding: 14px clamp(14px, 3vw, 26px);
+  display: grid;
+  gap: 6px;
+  background: var(--ink);
+  border: 5px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 7px 7px 0 var(--yellow);
+  font-family: "Yu Gothic", sans-serif;
+  transform: rotate(-.4deg);
+}
+.build-mood { margin: 0; color: white; font-size: clamp(15px, 2.2vw, 21px); font-weight: 900; }
+.build-stage { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.build-stage span { color: var(--ink); background: var(--yellow); border: 3px solid var(--ink); padding: 3px 9px; font-size: 11px; font-weight: 900; }
+.build-stage strong { color: var(--yellow); font-size: clamp(14px, 2vw, 19px); }
+.build-stage small { color: #cfc9d6; font-size: 12px; font-weight: 700; }
 
 .sync-stage-banner {
   position: fixed;
@@ -710,8 +779,11 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 @media (max-width: 720px) {
   .sync-box { min-width: 130px; gap: 2px 6px; }
   .sync-box > span, .sync-box strong { font-size: 9px; }
-  .sync-meter { gap: 2px; }
-  .sync-meter i { width: 14px; height: 7px; }
+  .sync-meter { gap: 3px; }
+  .sync-meter i { width: 15px; height: 11px; border-width: 2px; }
+  .build-summary { margin-top: 14px; padding: 10px 12px; box-shadow: 5px 5px 0 var(--yellow); }
+  .build-mood { font-size: 14px; }
+  .build-stage small { font-size: 10px; }
   .sync-stage-banner { top: 88px; padding: 8px 12px 10px; }
   .ace-selection-screen { place-items: start center; padding: 22px 10px 36px; }
   .ace-selection-panel { padding: 24px 10px 18px; border-width: 4px; outline-width: 3px; box-shadow: 0 0 26px #ff2f8e99, 8px 9px 0 var(--pink); }
@@ -1135,5 +1207,11 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .summon-pop,
   .destruction-pop,
   .cut-in-rays,
-  .cut-in-band { animation: none; }
+  .cut-in-band,
+  .card-choice-button.pick-flash-soft .card-face,
+  .card-choice-button.pick-flash-burst .card-face,
+  .card-choice-button.pick-flash-burst::after,
+  .sync-box.sync-flash-soft .sync-meter i.on,
+  .sync-box.sync-flash-burst .sync-meter i.on,
+  .sync-box.sync-flash-burst strong { animation: none; }
 }

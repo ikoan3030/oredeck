@@ -45,6 +45,23 @@ export interface SyncStageBonus {
   activationRate: number;
 }
 
+export interface SyncStageLabel {
+  minimum: number;
+  label: string;
+}
+
+export interface BuildMoodTier {
+  minimumAutoPicks: number;
+  text: string;
+}
+
+/** Presentation copy for the post-build recap. Read by the UI only. */
+export interface BuildSummaryCopy {
+  moodTiers: BuildMoodTier[];
+  stageUpText: string;
+  stageKeptText: string;
+}
+
 export interface AceDefinition {
   unlockStage: number;
   lifeThreshold: number;
@@ -77,9 +94,11 @@ export interface ChildProfile {
     decayFloor: number;
     /** Lower bound of each stage, lowest first. */
     stageMinimums: number[];
+    stageLabels?: SyncStageLabel[];
     stageBonuses: SyncStageBonus[];
   };
   ace: AceDefinition;
+  buildSummary?: BuildSummaryCopy;
   advice: {
     checkpoints: number[];
     categories: AdviceCategory[];

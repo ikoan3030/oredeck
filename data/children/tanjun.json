@@ -111,6 +111,15 @@
       }
     }
   },
+  "buildSummary": {
+    "moodTiers": [
+      {"minimumAutoPicks": 9, "text": "ユウタはずっとゴキゲンだった！"},
+      {"minimumAutoPicks": 5, "text": "ユウタはのびのび選んでいた"},
+      {"minimumAutoPicks": 0, "text": "ユウタは兄ちゃんとたくさん相談した"}
+    ],
+    "stageUpText": "開始時から{count}段階アップ",
+    "stageKeptText": "開始時と同じ段階をキープ"
+  },
   "advice": {
     "checkpoints": [5, 10],
     "categories": ["removal", "guard", "low_cost", "skip"],
