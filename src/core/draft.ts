@@ -1,6 +1,6 @@
 import { decideOffer } from "./decision";
 import { hasKeyword, isRemoval } from "./evaluation";
-import { nextRandom } from "./random";
+import { nextRandom, randomIndex } from "./random";
 import { gainSync } from "./sync";
 import type { AdviceCategory, Card, ChildProfile, DraftOffer, DraftState, PickSource } from "./types";
 
@@ -42,27 +42,17 @@ function eligibleCards(state: DraftState, cards: readonly Card[], category?: Exc
   return filtered.length >= 2 ? filtered : underCap;
 }
 
-function weightedIndex(seed: number, pool: readonly Card[], child: ChildProfile): { index: number; seed: number } {
-  const total = pool.reduce((sum, card) => sum + (child.offerWeightsByCardId?.[card.id] ?? 1), 0);
-  const next = nextRandom(seed);
-  let cursor = next.value * total;
-  for (let index = 0; index < pool.length; index += 1) {
-    cursor -= child.offerWeightsByCardId?.[pool[index].id] ?? 1;
-    if (cursor <= 0) return { index, seed: next.seed };
-  }
-  return { index: pool.length - 1, seed: next.seed };
-}
-
 export function generateOffer(
   state: DraftState,
   cards: readonly Card[],
   child: ChildProfile,
   adviceCategory?: Exclude<AdviceCategory, "skip">,
 ): { state: DraftState; offer: DraftOffer } {
+  // Every card is offered at the same rate: the pool carries no per-card weighting.
   const pool = eligibleCards(state, cards, adviceCategory);
-  const first = weightedIndex(state.seed, pool, child);
+  const first = randomIndex(state.seed, pool.length);
   const secondPool = pool.filter((_, index) => index !== first.index);
-  const second = weightedIndex(first.seed, secondPool, child);
+  const second = randomIndex(first.seed, secondPool.length);
   const offered: [Card, Card] = [pool[first.index], secondPool[second.index]];
   const decision = decideOffer(offered, child);
   let seed = second.seed;

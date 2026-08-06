@@ -116,7 +116,6 @@ export interface ChildProfile {
   decisionOrder: string[];
   /** Fixed per character. Deliberately not tied to the sync rate. */
   passiveInterventionRate: number;
-  offerWeightsByCardId?: Record<string, number>;
   sync: {
     initial: number;
     maximum: number;

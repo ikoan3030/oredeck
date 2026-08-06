@@ -6,19 +6,6 @@
   "loveThreshold": 2.4,
   "decisionOrder": ["monster", "lower_cost", "higher_attack", "aesthetic", "first"],
   "passiveInterventionRate": 0.5,
-  "offerWeightsByCardId": {
-    "gorganos": 1.9,
-    "inferdos": 1.9,
-    "drakevine": 1.9,
-    "holyblade": 1.08,
-    "judgment": 1.08,
-    "dragonseal": 1.08,
-    "vanishflash": 1.08,
-    "followarrow": 1.08,
-    "thunder": 1.08,
-    "gravewald": 1.1,
-    "nemesion": 1.1
-  },
   "sync": {
     "initial": 0,
     "maximum": 100,
