@@ -14,6 +14,7 @@ import type {
   Card,
   ChildProfile,
   DraftCard,
+  ActiveSpeciesSynergy,
   Keyword,
   OpponentDefinition,
 } from "./types";
@@ -88,6 +89,21 @@ function cardById(cards: readonly Card[], id: string): Card {
   const card = cards.find((item) => item.id === id);
   if (!card) throw new Error(`Unknown card: ${id}`);
   return card;
+}
+
+function applySpeciesGrants(
+  instances: BattleCardInstance[],
+  synergies: readonly ActiveSpeciesSynergy[],
+  cards: readonly Card[],
+  config: SpeciesSynergyConfig,
+): BattleCardInstance[] {
+  return instances.map((instance) => {
+    const species = cardById(cards, instance.cardId).species;
+    const synergy = species ? synergies.find((item) => item.species === species) : undefined;
+    if (!synergy) return instance;
+    const grant = speciesGrant(synergy.species, synergy.stage, config);
+    return grant ? grantToInstance(instance, cards, grant) : instance;
+  });
 }
 
 export function instanceHasKeyword(instance: BattleCardInstance, cards: readonly Card[], keyword: Keyword): boolean {
@@ -669,13 +685,7 @@ export function createBattle(
   const synergies = synergyConfig ? activeSpeciesSynergies(deck, cards, synergyConfig) : [];
   let brotherInstances = deck.map((item, index) => makeInstance(byId.get(item.cardId)!, `b-${index}-${item.instanceId}`, item));
   if (synergyConfig) {
-    brotherInstances = brotherInstances.map((instance) => {
-      const species = byId.get(instance.cardId)?.species;
-      const synergy = species ? synergies.find((item) => item.species === species) : undefined;
-      if (!synergy) return instance;
-      const grant = speciesGrant(synergy.species, synergy.stage, synergyConfig);
-      return grant ? grantToInstance(instance, cards, grant) : instance;
-    });
+    brotherInstances = applySpeciesGrants(brotherInstances, synergies, cards, synergyConfig);
   }
   let aceCard: BattleCardInstance | null = null;
   if (aceCardId !== null) {
@@ -684,7 +694,12 @@ export function createBattle(
     aceCard = brotherInstances[aceIndex];
     brotherInstances = brotherInstances.filter((_, index) => index !== aceIndex);
   }
-  const opponentInstances = opponent.deck.map((id, index) => makeInstance(byId.get(id)!, `o-${index}-${id}`));
+  let opponentInstances = opponent.deck.map((id, index) => makeInstance(byId.get(id)!, `o-${index}-${id}`));
+  if (opponent.speciesSynergy && synergyConfig) {
+    const opponentDeck: DraftCard[] = opponent.deck.map((cardId, index) => ({ instanceId: `opponent-${index}-${cardId}`, cardId, intervention: false, source: "auto" }));
+    const opponentSynergies = activeSpeciesSynergies(opponentDeck, cards, synergyConfig);
+    opponentInstances = applySpeciesGrants(opponentInstances, opponentSynergies, cards, synergyConfig);
+  }
   const shuffledBrother = shuffle(seed, brotherInstances);
   const shuffledOpponent = shuffle(shuffledBrother.seed, opponentInstances);
   const brotherHand = shuffledBrother.values.slice(0, 3);

@@ -4,6 +4,7 @@
     "name": "ゴウダ",
     "title": "鉄壁番長",
     "trait": "組織の壁役。守護で受けて切り返す",
+    "speciesSynergy": true,
     "color": "#3867d6",
     "faceBias": 0.22,
     "intro": "組織の壁役をなめるなよ。オレの鉄壁陣を抜けるかな！",
@@ -13,21 +14,21 @@
       "どうした？ 手札の切り札は飾りかよ！"
     ],
     "deck": [
-      "dolguard",
-      "dolguard",
-      "gaiorg",
-      "gaiorg",
-      "volganid",
-      "volganid",
-      "gorganos",
-      "dragonseal",
-      "drakevine",
+      "serafinale",
+      "noelka",
+      "pyriel",
+      "pyriel",
+      "lilibel",
+      "lilibel",
+      "holio",
+      "holio",
       "alvine",
+      "astrael",
+      "astrael",
+      "canon",
       "holyblade",
-      "judgment",
-      "vanishflash",
-      "phoenixeed",
-      "thunder"
+      "followarrow",
+      "judgment"
     ]
   },
   {
@@ -44,21 +45,21 @@
       "守りが薄い！ そのまま押し切る！"
     ],
     "deck": [
+      "geminai",
+      "geminai",
+      "fenrirca",
+      "sylphy",
+      "homurabi",
+      "homurabi",
+      "lunaria",
+      "lunaria",
+      "grim",
       "noelka",
       "noelka",
-      "grim",
-      "grim",
-      "valzeid",
-      "valzeid",
-      "gaiorg",
-      "gaiorg",
-      "mewrin",
-      "mewrin",
-      "gaiorg",
-      "gaiorg",
-      "valzeid",
-      "valzeid",
-      "lilibel"
+      "followarrow",
+      "followarrow",
+      "wisdom",
+      "steel-blessing"
     ]
   },
   {
@@ -75,21 +76,21 @@
       "こわいけど、みんなが残ってくれれば勝てるよ……！"
     ],
     "deck": [
-      "dolguard",
-      "dolguard",
-      "gaiorg",
-      "gaiorg",
-      "lilibel",
-      "lilibel",
-      "noelka",
-      "noelka",
-      "mewrin",
-      "mewrin",
-      "fiorina",
+      "rockbison",
+      "rockbison",
+      "astrael",
+      "astrael",
+      "serafinale",
+      "serafinale",
       "phoenixeed",
-      "steel-blessing",
-      "drakevine",
-      "gorganos"
+      "phoenixeed",
+      "judgment",
+      "judgment",
+      "dragonseal",
+      "dragonseal",
+      "scorchroar",
+      "scorchroar",
+      "finaldecree"
     ]
   },
   {
@@ -106,21 +107,21 @@
       "計算どおり。次の一手で盤面を空にする。"
     ],
     "deck": [
-      "holyblade",
-      "judgment",
-      "judgment",
-      "dragonseal",
-      "dragonseal",
-      "vanishflash",
       "flamebullet",
       "flamebullet",
-      "followarrow",
-      "followarrow",
       "thunder",
-      "blastwave",
-      "volganid",
-      "gaiorg",
-      "noelka"
+      "thunder",
+      "scorchroar",
+      "scorchroar",
+      "judgment",
+      "judgment",
+      "dragonseal",
+      "dragonseal",
+      "infernoblaze",
+      "infernoblaze",
+      "valzeid",
+      "valzeid",
+      "selva"
     ]
   },
   {
@@ -137,21 +138,21 @@
       "重さが違うんだよ。受け切れるかな？"
     ],
     "deck": [
-      "inferdos",
-      "inferdos",
-      "gorganos",
-      "gorganos",
-      "baldrogia",
-      "baldrogia",
-      "drakevine",
-      "drakevine",
-      "zamud",
-      "zamud",
+      "valgu",
+      "valgu",
+      "lindvurm",
+      "lindvurm",
       "volganid",
       "volganid",
-      "judgment",
-      "judgment",
-      "followarrow"
+      "gorganos",
+      "gorganos",
+      "drakevine",
+      "drakevine",
+      "inferdos",
+      "inferdos",
+      "baldrogia",
+      "baldrogia",
+      "judgment"
     ]
   },
   {
@@ -159,6 +160,7 @@
     "name": "幹部",
     "title": "組織幹部",
     "trait": "守りから攻めへ均衡を崩す",
+    "speciesSynergy": true,
     "color": "#8854d0",
     "faceBias": 0.38,
     "intro": "組織の中枢まで来たか。ここからは均衡を崩していく。",
@@ -168,21 +170,21 @@
       "ここから先は、組織の本気を見せよう。"
     ],
     "deck": [
+      "geminai",
+      "geminai",
+      "mentena",
+      "mentena",
+      "raidenvolg",
+      "noelka",
+      "gearload",
+      "gearload",
+      "gaileworker",
+      "gaileworker",
       "dolguard",
-      "valgu",
-      "gaiorg",
-      "gaiorg",
-      "kagerou",
-      "gorganos",
-      "dragonseal",
-      "alvine",
-      "thunder",
-      "volganid",
-      "thunder",
-      "judgment",
-      "judgment",
-      "dragonseal",
-      "baldrogia"
+      "sealward",
+      "sealward",
+      "noelka",
+      "fighting-spirit"
     ]
   },
   {
@@ -190,6 +192,7 @@
     "name": "ボス",
     "title": "攻守均衡",
     "trait": "攻めも守りも隙がない",
+    "speciesSynergy": true,
     "color": "#7f5af0",
     "faceBias": 0.57,
     "leaderLife": 25,
@@ -200,21 +203,21 @@
       "切り札はまだ温存している。ここからが本番だ！"
     ],
     "deck": [
-      "volganid",
-      "baldrogia",
-      "gaiorg",
-      "gaiorg",
+      "imprit",
+      "imprit",
+      "gremlion",
+      "gremlion",
+      "selva",
+      "selva",
+      "valzeid",
+      "valzeid",
+      "nemesion",
+      "zexvain",
       "judgment",
       "judgment",
       "dragonseal",
-      "vanishflash",
-      "volganid",
-      "drakevine",
-      "thunder",
-      "thunder",
-      "followarrow",
-      "followarrow",
-      "flamebullet"
+      "scorchroar",
+      "infernoblaze"
     ]
   }
 ]

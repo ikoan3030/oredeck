@@ -262,6 +262,8 @@ export interface OpponentDefinition {
   faceBias: number;
   color: string;
   leaderLife?: number;
+  /** Organization opponents may resolve their deck's species grants at battle start. */
+  speciesSynergy?: boolean;
   intro: string;
   taunts: string[];
 }

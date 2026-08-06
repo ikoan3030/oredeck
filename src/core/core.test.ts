@@ -117,6 +117,16 @@ test("stage one grants +1 attack to that species only", () => {
   assert.equal(all.filter((item) => item.cardId === "judgment").every((item) => item.grantedAtk === 0), true);
 });
 
+test("organization opponents opt into their deck species synergy at battle setup", () => {
+  const opponent = getOpponent("wall");
+  assert.equal(opponent.speciesSynergy, true);
+  const battle = createBattle([], opponent, cards, 7, 0, null, synergy);
+  const all = [...battle.opponent.deck, ...battle.opponent.hand];
+  const noelka = all.find((item) => item.cardId === "noelka")!;
+  assert.deepEqual(noelka.grantedKeywords, ["guard"]);
+  assert.equal(all.filter((item) => get(item.cardId).species === "天使").every((item) => instanceHasKeyword(item, cards, "guard")), true);
+});
+
 test("stage two hands the beast keyword out and converts the same keyword to +1", () => {
   const deck = speciesDeck(["grim", "gorganos", "balga", "dolga", "zahhak", "mewrin"]);
   const battle = createBattle(deck, getOpponent("wall"), cards, 7, 0, null, synergy);
