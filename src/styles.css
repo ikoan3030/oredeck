@@ -680,6 +680,52 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .build-stage strong { color: var(--yellow); font-size: clamp(14px, 2vw, 19px); }
 .build-stage small { color: #cfc9d6; font-size: 12px; font-weight: 700; }
 
+/* Species synergy: build counter, card tags, opening declaration. */
+.species-tag {
+  position: absolute;
+  z-index: 7;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  color: var(--ink);
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  font: 900 10px/1 "Yu Gothic", sans-serif;
+  letter-spacing: -.03em;
+}
+.card-choice-button .species-tag { top: 54px; right: 8px; font-size: 12px; padding: 3px 8px; }
+.card-face.compact .species-tag { top: 3px; left: 3px; right: auto; font-size: 8px; padding: 1px 3px; border-width: 2px; }
+.board-card .species-tag { top: -6px; left: -6px; right: auto; font-size: 8px; padding: 1px 4px; border-width: 2px; }
+
+.species-counter { margin-top: 18px; padding: 12px; background: white; border: 5px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); font-family: "Yu Gothic", sans-serif; }
+.species-grid { margin-top: 9px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.species-cell { display: grid; gap: 1px; padding: 6px 4px; text-align: center; background: #f1ecf5; border: 3px solid var(--ink); }
+.species-cell span { font-size: 10px; font-weight: 900; }
+.species-cell strong { font-size: 19px; line-height: 1; }
+.species-cell.stage-1 { background: var(--yellow); }
+.species-cell.stage-2 { background: var(--orange); color: white; box-shadow: inset 0 0 0 2px #fff; }
+
+.synergy-declaration {
+  position: relative;
+  z-index: 9;
+  margin: 0 auto;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  padding: 7px 12px;
+  background: var(--ink);
+  border: 4px solid var(--yellow);
+  border-radius: 8px;
+  font-family: "Yu Gothic", sans-serif;
+}
+.synergy-declaration span { color: var(--yellow); font: 900 10px/1 Arial, sans-serif; letter-spacing: .18em; }
+.synergy-declaration b { color: var(--ink); background: var(--yellow); border: 2px solid var(--ink); padding: 3px 8px; font-size: 12px; }
+.synergy-declaration b.stage-2 { background: var(--orange); color: white; }
+
 .sync-stage-banner {
   position: fixed;
   z-index: 25;
@@ -782,6 +828,13 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .sync-meter { gap: 3px; }
   .sync-meter i { width: 15px; height: 11px; border-width: 2px; }
   .build-summary { margin-top: 14px; padding: 10px 12px; box-shadow: 5px 5px 0 var(--yellow); }
+  .species-counter { margin-top: 12px; padding: 8px; border-width: 4px; box-shadow: 4px 4px 0 var(--ink); }
+  .species-grid { grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .species-cell span { font-size: 8px; }
+  .species-cell strong { font-size: 15px; }
+  .card-choice-button .species-tag { top: 40px; font-size: 9px; padding: 2px 5px; }
+  .synergy-declaration { padding: 5px 8px; gap: 4px; }
+  .synergy-declaration b { font-size: 10px; padding: 2px 5px; }
   .build-mood { font-size: 14px; }
   .build-stage small { font-size: 10px; }
   .sync-stage-banner { top: 88px; padding: 8px 12px 10px; }

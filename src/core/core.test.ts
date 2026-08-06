@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
-import { advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createLadderRun, createRun, decaySync, decideOffer, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, instanceHasKeyword, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition } from "./index";
+import { activeSpeciesSynergies, advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createLadderRun, createRun, decaySync, decideOffer, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, countSpeciesTypes, instanceHasKeyword, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition, type SpeciesSynergyConfig } from "./index";
 
 const cards = JSON.parse(readFileSync(resolve("data/cards.json"), "utf8")) as Card[];
 const child = JSON.parse(readFileSync(resolve("data/children/tanjun.json"), "utf8")) as ChildProfile;
 const opponents = JSON.parse(readFileSync(resolve("data/opponents.json"), "utf8")) as OpponentDefinition[];
+const synergy = JSON.parse(readFileSync(resolve("data/species.json"), "utf8")) as SpeciesSynergyConfig;
 const get = (id: string) => cards.find((card) => card.id === id)!;
 const getOpponent = (id: string) => getOpponentById(opponents, id)!;
 const battleDeck = (cardId: string): DraftCard[] => Array.from({ length: 15 }, (_, index) => ({ instanceId: `battle-${index}`, cardId, intervention: false, source: "auto" }));
@@ -75,6 +76,100 @@ test("love suppresses passive intervention and advice picks always ask, whatever
   const lowSyncDraft = createDraft(13579, child, child.sync.initial);
   assert.equal(generateOffer(lowSyncDraft, cards, child, "removal").offer.wantsIntervention, true);
   assert.equal(generateOffer(lowSyncDraft, cards, child, "guard").offer.wantsIntervention, true);
+});
+
+const speciesDeck = (cardIds: readonly string[]): DraftCard[] =>
+  cardIds.map((cardId, index) => ({ instanceId: `sp-${index}`, cardId, intervention: false, source: "auto" as const }));
+
+test("species types count distinct cards, so a second copy adds nothing", () => {
+  const counts = countSpeciesTypes(speciesDeck(["grim", "grim", "gorganos", "balga"]), cards);
+  assert.equal(counts["けもの"], 3);
+  const doubled = countSpeciesTypes(speciesDeck(["grim", "grim", "grim", "grim"]), cards);
+  assert.equal(doubled["けもの"], 1);
+});
+
+test("spells never count toward a species", () => {
+  const counts = countSpeciesTypes(speciesDeck(["judgment", "thunder", "wisdom", "prophecy", "holyblade", "blastwave"]), cards);
+  assert.deepEqual(Object.values(counts), [0, 0, 0, 0, 0, 0]);
+  assert.equal(cards.filter((card) => card.type === "spell").every((card) => card.species === null), true);
+});
+
+test("three types reach stage one and six types reach stage two", () => {
+  const three = activeSpeciesSynergies(speciesDeck(["grim", "gorganos", "balga", "grim"]), cards, synergy);
+  assert.deepEqual(three.map((item) => [item.species, item.stage]), [["けもの", 1]]);
+  assert.equal(three[0].label, "けもの結束・小");
+
+  const two = activeSpeciesSynergies(speciesDeck(["grim", "gorganos", "grim"]), cards, synergy);
+  assert.equal(two.length, 0);
+
+  const six = activeSpeciesSynergies(speciesDeck(["grim", "gorganos", "balga", "dolga", "zahhak", "mewrin"]), cards, synergy);
+  assert.deepEqual(six.map((item) => [item.species, item.stage]), [["けもの", 2]]);
+  assert.equal(six[0].label, "けもの結束・大");
+});
+
+test("stage one grants +1 attack to that species only", () => {
+  const deck = speciesDeck(["grim", "gorganos", "balga", "judgment"]);
+  const battle = createBattle(deck, getOpponent("wall"), cards, 7, 0, null, synergy);
+  const all = [...battle.brother.deck, ...battle.brother.hand];
+  const grim = all.find((item) => item.cardId === "grim")!;
+  assert.equal(grim.atk, get("grim").atk + 1);
+  assert.equal(grim.grantedAtk, 1);
+  assert.equal(all.filter((item) => item.cardId === "judgment").every((item) => item.grantedAtk === 0), true);
+});
+
+test("stage two hands the beast keyword out and converts the same keyword to +1", () => {
+  const deck = speciesDeck(["grim", "gorganos", "balga", "dolga", "zahhak", "mewrin"]);
+  const battle = createBattle(deck, getOpponent("wall"), cards, 7, 0, null, synergy);
+  const all = [...battle.brother.deck, ...battle.brother.hand];
+  const grim = all.find((item) => item.cardId === "grim")!;
+  assert.deepEqual(grim.grantedKeywords, ["rush"]);
+  assert.equal(grim.grantedAtk, 0);
+
+  // balga already has rush natively: the duplicate becomes 強化+1 instead of a whiff
+  const balga = all.find((item) => item.cardId === "balga")!;
+  assert.deepEqual(balga.grantedKeywords, []);
+  assert.equal(balga.grantedAtk, 1);
+  assert.equal(balga.atk, get("balga").atk + 1);
+});
+
+test("a different keyword stacks on top of the card's own", () => {
+  // phoenixeed revives natively; the beast stage two adds rush without dropping revive
+  const deck = speciesDeck(["grim", "gorganos", "balga", "dolga", "zahhak", "phoenixeed"]);
+  const battle = createBattle(deck, getOpponent("wall"), cards, 3, 0, null, synergy);
+  const phoenix = [...battle.brother.deck, ...battle.brother.hand].find((item) => item.cardId === "phoenixeed")!;
+  assert.equal(instanceHasKeyword(phoenix, cards, "revive"), true);
+  assert.equal(instanceHasKeyword(phoenix, cards, "rush"), true);
+  assert.deepEqual(phoenix.grantedKeywords, ["rush"]);
+  assert.equal(phoenix.grantedAtk, 0);
+});
+
+test("the mech stage two adds a destroy trigger that damages an enemy", () => {
+  const deck = speciesDeck(["gaiorg", "zamud", "gearload", "metalgain", "dolguard", "drakevine"]);
+  const opponent = getOpponent("wall");
+  const battle = createBattle(deck, opponent, cards, 11, 0, null, synergy);
+  const mech = [...battle.brother.deck, ...battle.brother.hand].find((item) => item.cardId === "zamud")!;
+  assert.deepEqual(mech.grantedEffects.map((effect) => [effect.trigger, effect.keyword, effect.value]), [["on_destroyed", "damage", 2]]);
+
+  const enemyCard = { ...battle.opponent.hand[0], cardId: "gaiorg", atk: 3, hp: 5, maxHp: 5, summonedTurn: 0, attacked: false };
+  const staged = {
+    ...battle,
+    turn: 2,
+    activeSide: "opponent" as const,
+    brother: { ...battle.brother, maxPp: 0, pp: 0, hand: [], deck: [], board: [{ ...mech, atk: 0, hp: 1, maxHp: 1, summonedTurn: 0 }] },
+    opponent: { ...battle.opponent, maxPp: 0, pp: 0, hand: [], deck: [], board: [enemyCard] },
+  };
+  const result = advanceBattle(staged, cards, child, opponent);
+  const triggered = result.events.find((item) => item.type === "effect" && item.sourceInstanceId === mech.instanceId && item.keyword === "damage");
+  assert.ok(triggered, "the destroyed mech should damage the enemy");
+  assert.equal(triggered.damage, 2);
+  assert.equal(result.opponent.board[0]?.hp ?? 0, enemyCard.hp - 2);
+});
+
+test("without a synergy config no grant is handed out", () => {
+  const deck = speciesDeck(["grim", "gorganos", "balga", "dolga", "zahhak", "mewrin"]);
+  const battle = createBattle(deck, getOpponent("wall"), cards, 7);
+  assert.deepEqual(battle.synergies, []);
+  assert.equal([...battle.brother.deck, ...battle.brother.hand].every((item) => item.grantedAtk === 0 && item.grantedKeywords.length === 0), true);
 });
 
 test("deck evaluation returns materials, not a win recommendation", () => {

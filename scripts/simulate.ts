@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   advanceBattle,
   advanceRun,
+  activeSpeciesSynergies,
   createBattle,
   createDraft,
   createLadderRun,
@@ -22,12 +23,14 @@ import {
   type ChildProfile,
   type DraftState,
   type OpponentDefinition,
+  type SpeciesSynergyConfig,
   type RunState,
 } from "../src/core/index";
 
 const cards = JSON.parse(readFileSync(resolve("data/cards.json"), "utf8")) as Card[];
 const child = JSON.parse(readFileSync(resolve("data/children/tanjun.json"), "utf8")) as ChildProfile;
 const opponents = JSON.parse(readFileSync(resolve("data/opponents.json"), "utf8")) as OpponentDefinition[];
+const synergyConfig = JSON.parse(readFileSync(resolve("data/species.json"), "utf8")) as SpeciesSynergyConfig;
 
 type LadderMode = "six" | "three";
 type PolicyKind = "always-match" | "never-match" | "random" | "match-rate";
@@ -197,6 +200,10 @@ function nearStageBoundary(value: number): boolean {
   return [20, 40, 60, 80].some((boundary) => Math.abs(value - boundary) <= 0.5);
 }
 
+function round(value: number): number {
+  return Number(value.toFixed(3));
+}
+
 function percentile(values: number[], ratio: number): number {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -227,6 +234,8 @@ const battleCount = mode === "six" ? 6 : 3;
 const aggregates = Array.from({ length: battleCount }, createAggregate);
 const interventionHistogram = new Map<number, number>();
 const variablePairCounts = new Map<string, number>();
+const synergyStats = { builds: 0, stageOneBuilds: 0, stageTwoBuilds: 0, stageOneLines: 0, stageTwoLines: 0, winsWithSynergy: 0, buildsWithSynergy: 0, winsWithout: 0, buildsWithout: 0 };
+const synergyBySpecies = new Map<string, number>();
 const allBuildValues: number[] = [];
 const allCarryValues: number[] = [];
 const stage5ByBattle = Array.from({ length: battleCount }, () => 0);
@@ -254,12 +263,22 @@ for (let runIndex = 0; runIndex < runs; runIndex += 1) {
     const aceEligible = isAceUnlocked(draft.syncRate, simulationChild);
     const aceCardId = aceEligible ? draft.deck[0]?.cardId ?? null : null;
     const battleSeed = (draft.seed ^ 0xa5a5a5a5) >>> 0;
-    const withAce = runBattleWithMetrics(createBattle(draft.deck, opponent, cards, battleSeed, draft.syncRate, aceCardId), opponent);
+    const withAce = runBattleWithMetrics(createBattle(draft.deck, opponent, cards, battleSeed, draft.syncRate, aceCardId, synergyConfig), opponent);
     let withoutAce: ReturnType<typeof runBattleWithMetrics> | undefined;
-    if (aceEligible) withoutAce = runBattleWithMetrics(createBattle(draft.deck, opponent, cards, battleSeed, draft.syncRate, null), opponent);
+    if (aceEligible) withoutAce = runBattleWithMetrics(createBattle(draft.deck, opponent, cards, battleSeed, draft.syncRate, null, synergyConfig), opponent);
+
+    const synergies = activeSpeciesSynergies(draft.deck, cards, synergyConfig);
+    synergyStats.builds += 1;
+    synergyStats.stageOneLines += synergies.filter((item) => item.stage === 1).length;
+    synergyStats.stageTwoLines += synergies.filter((item) => item.stage === 2).length;
+    synergyStats.stageOneBuilds += Number(synergies.some((item) => item.stage === 1));
+    synergyStats.stageTwoBuilds += Number(synergies.some((item) => item.stage === 2));
+    synergies.forEach((item) => synergyBySpecies.set(`${item.species}|${item.stage}`, (synergyBySpecies.get(`${item.species}|${item.stage}`) ?? 0) + 1));
 
     run = advanceRun(run, draft, withAce.battle.winner!, simulationChild);
     const result = run.battleResults.at(-1)!;
+    if (synergies.length) { synergyStats.buildsWithSynergy += 1; synergyStats.winsWithSynergy += Number(result.winner === "brother"); }
+    else { synergyStats.buildsWithout += 1; synergyStats.winsWithout += Number(result.winner === "brother"); }
     const aggregate = aggregates[battleIndex];
     aggregate.battles += 1;
     aggregate.wins += Number(result.winner === "brother");
@@ -349,5 +368,13 @@ console.log(JSON.stringify({
   allCarrySync: summarize(allCarryValues),
   deckExhaustionRate: formatRate(totalDeckExhaustions, totalBattles),
   runWinHistogram: Object.fromEntries([...runWinHistogram.entries()].sort((a, b) => a[0] - b[0])),
+  speciesSynergy: {
+    buildsWithStageOne: `${round(synergyStats.stageOneBuilds / synergyStats.builds * 100)}%`,
+    buildsWithStageTwo: `${round(synergyStats.stageTwoBuilds / synergyStats.builds * 100)}%`,
+    linesPerBuild: round(synergyStats.stageOneLines / synergyStats.builds),
+    winRateWithSynergy: synergyStats.buildsWithSynergy ? round(synergyStats.winsWithSynergy / synergyStats.buildsWithSynergy * 100) : null,
+    winRateWithoutSynergy: synergyStats.buildsWithout ? round(synergyStats.winsWithout / synergyStats.buildsWithout * 100) : null,
+    bySpecies: Object.fromEntries([...synergyBySpecies.entries()].sort((a, b) => b[1] - a[1])),
+  },
   variablePairCounts: Object.fromEntries([...variablePairCounts.entries()].sort()),
 }, null, 2));

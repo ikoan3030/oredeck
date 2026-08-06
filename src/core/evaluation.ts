@@ -1,3 +1,4 @@
+import { countSpeciesTypes } from "./species";
 import type { Card, DeckEvaluation, DraftCard } from "./types";
 
 export function isRemoval(card: Card): boolean {
@@ -18,14 +19,15 @@ export function evaluateDeck(deck: readonly DraftCard[], cards: readonly Card[])
   const guards = resolved.filter((card) => hasKeyword(card, "guard")).length;
   const lowCost = resolved.filter((card) => card.cost <= 2).length;
   const heavy = resolved.filter((card) => card.cost >= 6).length;
-  const tribeCounts = new Map<string, number>();
-  resolved.forEach((card) => card.tribes.forEach((tribe) => tribeCounts.set(tribe, (tribeCounts.get(tribe) ?? 0) + 1)));
+  const speciesCounts = new Map<string, number>();
+  resolved.forEach((card) => { if (card.species) speciesCounts.set(card.species, (speciesCounts.get(card.species) ?? 0) + 1); });
   const synergyActive = resolved.filter((card) =>
     card.effects.some((effect) => {
       const condition = effect.condition;
-      return condition?.kind === "allied_tribe_at_least" && Boolean(condition.tribe) && (tribeCounts.get(condition.tribe!) ?? 0) >= condition.value;
+      return condition?.kind === "allied_species_at_least" && Boolean(condition.species) && (speciesCounts.get(condition.species!) ?? 0) >= condition.value;
     }),
   ).length;
+  const speciesTypes = countSpeciesTypes(deck, cards);
   const metrics = {
     removalMissing: removal < 2,
     durabilityMissing: guards < 2,
@@ -44,6 +46,7 @@ export function evaluateDeck(deck: readonly DraftCard[], cards: readonly Card[])
     lowCost,
     heavy,
     synergyActive,
+    speciesTypes,
     metrics,
     missingCount: Object.values(metrics).filter(Boolean).length,
     curve,

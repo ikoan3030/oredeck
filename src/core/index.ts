@@ -2,6 +2,7 @@ export * from "./types";
 export * from "./random";
 export * from "./decision";
 export * from "./sync";
+export * from "./species";
 export * from "./draft";
 export * from "./run";
 export * from "./evaluation";

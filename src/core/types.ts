@@ -6,9 +6,9 @@ export type Trigger = "on_play" | "on_destroyed" | "passive" | "aura";
 export type Target = "self" | "ally" | "enemy" | "all_enemies" | "enemy_low_atk";
 
 export interface EffectCondition {
-  kind: "leader_life_at_most" | "allied_tribe_at_least" | "target_attack_at_most";
+  kind: "leader_life_at_most" | "allied_species_at_least" | "target_attack_at_most";
   value: number;
-  tribe?: string;
+  species?: Species;
 }
 
 export interface CardEffect {
@@ -29,12 +29,41 @@ export interface Card {
   aesthetic: Record<AestheticKey, number>;
   /** Monsters carry one species; spells are null and never counted by synergy. */
   species: Species | null;
-  tribes: string[];
   effects: CardEffect[];
   rarity: "common" | "rare" | "legend";
 }
 
 export type AdviceCategory = "removal" | "guard" | "low_cost" | "skip";
+
+/**
+ * One grant applied to a card. The same shape backs species synergy, the sync stage bonus
+ * and the ace card, so the duplicate ruling below is shared by all three.
+ */
+export interface SpeciesGrant {
+  keywords: Keyword[];
+  effects: CardEffect[];
+  attack: number;
+}
+
+export interface SpeciesDefinition {
+  id: Species;
+  stageOne: SpeciesGrant;
+  stageTwo: SpeciesGrant;
+}
+
+export interface SpeciesSynergyConfig {
+  thresholds: { stageOne: number; stageTwo: number };
+  bondSuffix: string;
+  stageLabels: string[];
+  species: SpeciesDefinition[];
+}
+
+export interface ActiveSpeciesSynergy {
+  species: Species;
+  stage: 1 | 2;
+  types: number;
+  label: string;
+}
 
 export interface SyncStageBonus {
   stage: number;
@@ -212,6 +241,7 @@ export interface DeckEvaluation {
   lowCost: number;
   heavy: number;
   synergyActive: number;
+  speciesTypes: Record<Species, number>;
   metrics: {
     removalMissing: boolean;
     durabilityMissing: boolean;
@@ -246,6 +276,8 @@ export interface BattleCardInstance {
   hp: number;
   maxHp: number;
   grantedKeywords: Keyword[];
+  /** Triggered effects handed out by a synergy, resolved alongside the card's own effects. */
+  grantedEffects: CardEffect[];
   grantedAtk: number;
   summonedTurn: number;
   attacked: boolean;
@@ -314,6 +346,8 @@ export interface BattleEvent {
 
 export interface BattleState {
   seed: number;
+  /** Species synergies resolved at build completion. Constant for the whole battle. */
+  synergies: ActiveSpeciesSynergy[];
   syncRate: number;
   turn: number;
   activeSide: BattleSide;

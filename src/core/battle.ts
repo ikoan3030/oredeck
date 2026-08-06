@@ -1,7 +1,10 @@
-import { nextRandom, shuffle } from "./random";
+import { nextRandom, randomIndex, shuffle } from "./random";
+import { activeSpeciesSynergies, speciesGrant } from "./species";
 import { syncStage } from "./sync";
 import type {
   BattleCardInstance,
+  CardEffect,
+  SpeciesSynergyConfig,
   BattleEvent,
   BattleEventSnapshot,
   BattleEventSnapshotPlayer,
@@ -32,6 +35,7 @@ function makeInstance(card: Card, instanceId: string, draft?: DraftCard): Battle
     hp: card.hp,
     maxHp: card.hp,
     grantedKeywords: [],
+    grantedEffects: [],
     grantedAtk: 0,
     summonedTurn: -1,
     attacked: false,
@@ -86,15 +90,41 @@ function cardById(cards: readonly Card[], id: string): Card {
 }
 
 export function instanceHasKeyword(instance: BattleCardInstance, cards: readonly Card[], keyword: Keyword): boolean {
-  return instance.grantedKeywords.includes(keyword) || cardById(cards, instance.cardId).effects.some((effect) => effect.keyword === keyword);
+  return instance.grantedKeywords.includes(keyword)
+    || instance.grantedEffects.some((effect) => effect.keyword === keyword)
+    || cardById(cards, instance.cardId).effects.some((effect) => effect.keyword === keyword);
 }
 
-function grantToInstance(instance: BattleCardInstance, keywords: readonly Keyword[], atk: number): BattleCardInstance {
+function instanceEffects(instance: BattleCardInstance, cards: readonly Card[]): CardEffect[] {
+  return [...cardById(cards, instance.cardId).effects, ...instance.grantedEffects];
+}
+
+/**
+ * The shared duplicate ruling for every grant (species synergy, sync stage bonus, ace card):
+ * a different keyword stacks, the same keyword becomes 強化+1 instead so nothing whiffs.
+ */
+function grantToInstance(
+  instance: BattleCardInstance,
+  cards: readonly Card[],
+  grant: { keywords?: readonly Keyword[]; effects?: readonly CardEffect[]; attack?: number },
+): BattleCardInstance {
+  let attack = grant.attack ?? 0;
+  const keywords: Keyword[] = [];
+  const effects: CardEffect[] = [];
+  for (const keyword of grant.keywords ?? []) {
+    if (instanceHasKeyword(instance, cards, keyword)) attack += 1;
+    else keywords.push(keyword);
+  }
+  for (const effect of grant.effects ?? []) {
+    if (instanceHasKeyword(instance, cards, effect.keyword)) attack += 1;
+    else effects.push(effect);
+  }
   return {
     ...instance,
-    grantedKeywords: [...new Set([...instance.grantedKeywords, ...keywords])],
-    grantedAtk: instance.grantedAtk + atk,
-    atk: instance.atk + atk,
+    grantedKeywords: [...instance.grantedKeywords, ...keywords],
+    grantedEffects: [...instance.grantedEffects, ...effects],
+    grantedAtk: instance.grantedAtk + attack,
+    atk: instance.atk + attack,
   };
 }
 
@@ -108,6 +138,7 @@ function drawAtTurnStart(
   state: BattleState,
   player: BattlePlayer,
   child: ChildProfile,
+  cards: readonly Card[],
 ): { player: BattlePlayer; drawn?: BattleCardInstance; ace: boolean; aceCard?: BattleCardInstance } {
   const ace = child.ace;
   const stage = syncStage(state.syncRate, child);
@@ -115,7 +146,7 @@ function drawAtTurnStart(
     const drawn = drawOne(player);
     return { ...drawn, ace: false };
   }
-  const drawn = grantToInstance(player.aceCard, ace.grant.keywords, ace.grant.statModifiers.attack);
+  const drawn = grantToInstance(player.aceCard, cards, { keywords: ace.grant.keywords, attack: ace.grant.statModifiers.attack });
   return {
     player: { ...player, aceCard: null, aceUsed: true, hand: [...player.hand, drawn] },
     ace: true,
@@ -189,7 +220,7 @@ function destroyAtIndex(
     targetInstances: [target],
     destroyed: true,
   });
-  const hasRevive = cardById(cards, target.cardId).effects.some((effect) => effect.keyword === "revive");
+  const hasRevive = instanceHasKeyword(target, cards, "revive");
   if (hasRevive && !target.revived) {
     const revived = { ...target, hp: target.maxHp, attacked: false, revived: true, buffSources: [] };
     nextPlayer = { ...nextPlayer, hand: [...nextPlayer.hand, revived] };
@@ -209,12 +240,76 @@ function destroyAtIndex(
   return { state: nextState, player: nextPlayer, destroyed: target };
 }
 
+/**
+ * Resolves granted "destroyed" triggers, currently only the mech stage-two damage.
+ * Read the state fresh at the call site so the owner and enemy are both current.
+ * No chaining: only the player's own cards ever carry a trigger, so a kill made here
+ * cannot fire another one.
+ */
+function applyDestroyTriggers(
+  state: BattleState,
+  destroyed: BattleCardInstance,
+  ownerSide: BattleSide,
+  cards: readonly Card[],
+): BattleState {
+  const triggers = destroyed.grantedEffects.filter((effect) => effect.trigger === "on_destroyed" && effect.keyword === "damage");
+  if (!triggers.length) return state;
+  const sourceCard = cardById(cards, destroyed.cardId);
+  let next = state;
+  for (const trigger of triggers) {
+    const enemySide = other(ownerSide);
+    let enemy = next[enemySide];
+    if (enemy.board.length) {
+      const pick = randomIndex(next.seed, enemy.board.length);
+      next = { ...next, seed: pick.seed };
+      const target = enemy.board[pick.index];
+      const damaged = { ...target, hp: target.hp - trigger.value };
+      enemy = { ...enemy, board: enemy.board.map((item, index) => index === pick.index ? damaged : item) };
+      next = updatePlayers(next, enemy, next[ownerSide]);
+      next = event(next, {
+        type: "effect",
+        side: ownerSide,
+        text: `${sourceCard.name}の破壊時ダメージ`,
+        cardId: destroyed.cardId,
+        keyword: "damage",
+        sourceInstanceId: destroyed.instanceId,
+        targetInstanceId: target.instanceId,
+        targetInstanceIds: [target.instanceId],
+        sourceInstance: destroyed,
+        targetInstances: [damaged],
+        damage: trigger.value,
+        effective: true,
+      });
+      if (damaged.hp <= 0) {
+        const result = destroyAtIndex(next, next[enemySide], pick.index, cards);
+        next = updatePlayers(result.state, result.player, next[ownerSide]);
+      }
+      continue;
+    }
+    enemy = { ...enemy, life: Math.max(0, enemy.life - trigger.value) };
+    next = updatePlayers(next, enemy, next[ownerSide]);
+    next = event(next, {
+      type: "effect",
+      side: ownerSide,
+      text: `${sourceCard.name}の破壊時ダメージがリーダーへ`,
+      cardId: destroyed.cardId,
+      keyword: "damage",
+      sourceInstanceId: destroyed.instanceId,
+      targetLeader: true,
+      sourceInstance: destroyed,
+      damage: trigger.value,
+      effective: true,
+    });
+  }
+  return next;
+}
+
 function conditionMet(card: Card, player: BattlePlayer, cards: readonly Card[]): boolean {
   const condition = card.effects.find((effect) => effect.trigger === "aura")?.condition;
   if (!condition) return true;
   if (condition.kind === "leader_life_at_most") return player.life <= condition.value;
-  if (condition.kind === "allied_tribe_at_least" && condition.tribe) {
-    return player.board.filter((item) => cardById(cards, item.cardId).tribes.includes(condition.tribe!)).length >= condition.value;
+  if (condition.kind === "allied_species_at_least" && condition.species) {
+    return player.board.filter((item) => cardById(cards, item.cardId).species === condition.species).length >= condition.value;
   }
   return true;
 }
@@ -225,6 +320,7 @@ function applySyncBonus(
   summoned: BattleCardInstance,
   card: Card,
   child: ChildProfile,
+  cards: readonly Card[],
 ): { state: BattleState; instance: BattleCardInstance } {
   if (side !== "brother") return { state, instance: summoned };
 
@@ -239,7 +335,7 @@ function applySyncBonus(
   let next = { ...state, seed: random.seed };
   if (random.value >= bonus.activationRate) return { state: next, instance: summoned };
 
-  const granted = grantToInstance(summoned, bonus.keywords, bonus.statModifiers.attack);
+  const granted = grantToInstance(summoned, cards, { keywords: bonus.keywords, attack: bonus.statModifiers.attack });
   const active = next[side];
   next = updatePlayers(next, {
     ...active,
@@ -286,7 +382,7 @@ function resolvePlay(
     active = { ...active, board: [...active.board, summoned] };
     next = updatePlayers(next, active, next[other(side)]);
     next = event(next, { type: "play", side, text: `${active.name}は${card.name}を使った`, cardId: card.id, instanceId: instance.instanceId });
-    const syncBonus = applySyncBonus(next, side, summoned, card, child);
+    const syncBonus = applySyncBonus(next, side, summoned, card, child, cards);
     next = syncBonus.state;
     summoned = syncBonus.instance;
     const aura = card.effects.find((effect) => effect.trigger === "aura" && effect.keyword === "buff");
@@ -310,10 +406,10 @@ function resolvePlay(
     next = event(next, { type: "play", side, text: `${active.name}は${card.name}を使った`, cardId: card.id, instanceId: instance.instanceId });
   }
 
-  for (const effect of card.effects.filter((item) => item.trigger === "on_play")) {
+  for (const effect of instanceEffects(instance, cards).filter((item) => item.trigger === "on_play")) {
     active = next[side]; enemy = next[other(side)];
-    if (effect.condition?.kind === "allied_tribe_at_least" && effect.condition.tribe) {
-      const count = active.board.filter((item) => cardById(cards, item.cardId).tribes.includes(effect.condition!.tribe!)).length;
+    if (effect.condition?.kind === "allied_species_at_least" && effect.condition.species) {
+      const count = active.board.filter((item) => cardById(cards, item.cardId).species === effect.condition!.species).length;
       if (count < effect.condition.value) continue;
     }
     if (effect.keyword === "draw") {
@@ -383,6 +479,7 @@ function resolvePlay(
           next = updatePlayers(next, next[side], enemy);
           if (damaged.hp <= 0) {
             const result = destroyAtIndex(next, enemy, targetIndex, cards); next = updatePlayers(result.state, next[side], result.player); worked = true;
+            if (result.destroyed) next = applyDestroyTriggers(next, result.destroyed, other(side), cards);
             destroyed = true;
           }
         }
@@ -411,6 +508,7 @@ function resolvePlay(
         const selected = valid.sort((a, b) => b.target.atk - a.target.atk)[0];
         const targetIndex = selected.index;
         const result = destroyAtIndex(next, enemy, targetIndex, cards); next = updatePlayers(result.state, next[side], result.player);
+        if (result.destroyed) next = applyDestroyTriggers(next, result.destroyed, other(side), cards);
         next = markAttribution(next, instance, "destroy", child, false);
         next = event(next, {
           type: "effect",
@@ -487,6 +585,7 @@ function resolveAttack(state: BattleState, side: BattleSide, attackerIndex: numb
   });
   if (damagedTarget.hp <= 0) {
     const result = destroyAtIndex(next, next[other(side)], targetIndex, cards); next = updatePlayers(result.state, next[side], result.player);
+    if (result.destroyed) next = applyDestroyTriggers(next, result.destroyed, other(side), cards);
     next = markAttribution(next, attacker, "damage", child, false);
     const baseAttack = attacker.atk - attacker.grantedAtk - attacker.buffSources.reduce((sum, source) => sum + source.amount, 0);
     const usefulBuff = attacker.buffSources.find((source) => source.intervention && target.hp > baseAttack && target.hp <= attacker.atk);
@@ -496,6 +595,7 @@ function resolveAttack(state: BattleState, side: BattleSide, attackerIndex: numb
   const currentAttackerIndex = updatedActive.board.findIndex((item) => item.instanceId === attacker.instanceId);
   if (currentAttackerIndex >= 0 && updatedActive.board[currentAttackerIndex].hp <= 0) {
     const result = destroyAtIndex(next, updatedActive, currentAttackerIndex, cards); next = updatePlayers(result.state, result.player, next[other(side)]);
+    if (result.destroyed) next = applyDestroyTriggers(next, result.destroyed, side, cards);
   }
   return next;
 }
@@ -505,39 +605,22 @@ export function createBattle(
   opponent: OpponentDefinition,
   cards: readonly Card[],
   seed: number,
-  aceCardId?: string | null,
-): BattleState;
-
-export function createBattle(
-  deck: readonly DraftCard[],
-  opponent: OpponentDefinition,
-  cards: readonly Card[],
-  seed: number,
-  syncRate: number,
-  aceCardId?: string | null,
-): BattleState;
-
-export function createBattle(
-  deck: readonly DraftCard[],
-  opponent: OpponentDefinition,
-  cards: readonly Card[],
-  seed: number,
-  aceCardId: string | null,
-  syncRate: number,
-): BattleState;
-
-export function createBattle(
-  deck: readonly DraftCard[],
-  opponent: OpponentDefinition,
-  cards: readonly Card[],
-  seed: number,
-  syncRateOrAceCardId: number | string | null = 0,
-  maybeAceCardId: number | string | null = null,
+  syncRate: number = 0,
+  aceCardId: string | null = null,
+  synergyConfig: SpeciesSynergyConfig | null = null,
 ): BattleState {
-  const syncRate = typeof syncRateOrAceCardId === "number" ? syncRateOrAceCardId : typeof maybeAceCardId === "number" ? maybeAceCardId : 0;
-  const aceCardId = typeof syncRateOrAceCardId === "number" ? typeof maybeAceCardId === "string" ? maybeAceCardId : null : syncRateOrAceCardId;
   const byId = new Map(cards.map((card) => [card.id, card]));
+  const synergies = synergyConfig ? activeSpeciesSynergies(deck, cards, synergyConfig) : [];
   let brotherInstances = deck.map((item, index) => makeInstance(byId.get(item.cardId)!, `b-${index}-${item.instanceId}`, item));
+  if (synergyConfig) {
+    brotherInstances = brotherInstances.map((instance) => {
+      const species = byId.get(instance.cardId)?.species;
+      const synergy = species ? synergies.find((item) => item.species === species) : undefined;
+      if (!synergy) return instance;
+      const grant = speciesGrant(synergy.species, synergy.stage, synergyConfig);
+      return grant ? grantToInstance(instance, cards, { keywords: grant.keywords, effects: grant.effects, attack: grant.attack }) : instance;
+    });
+  }
   let aceCard: BattleCardInstance | null = null;
   if (aceCardId !== null) {
     const aceIndex = brotherInstances.findIndex((item) => item.cardId === aceCardId);
@@ -553,6 +636,7 @@ export function createBattle(
   const result = {
     seed: shuffledOpponent.seed,
     syncRate,
+    synergies,
     turn: 0,
     activeSide: "brother" as const,
     brother: { side: "brother", name: "ユウタ", life: 20, maxPp: 0, pp: 0, deck: shuffledBrother.values.slice(3), hand: brotherHand, board: [], graveyard: [] },
@@ -580,7 +664,7 @@ export function advanceBattle(
   let active = state[side]; let enemy = state[other(side)];
   const turn = state.turn + 1;
   active = { ...active, maxPp: Math.min(10, active.maxPp + 1), pp: Math.min(10, active.maxPp + 1), board: active.board.map((item) => ({ ...item, attacked: false })) };
-  const draw = drawAtTurnStart(state, active, child); active = draw.player;
+  const draw = drawAtTurnStart(state, active, child, cards); active = draw.player;
   let next = updatePlayers({ ...state, turn }, active, enemy);
   if (draw.aceCard) {
     next = event(next, { type: "ace", side, text: `ディスティニードロー！ ${cardById(cards, draw.aceCard.cardId).name}に切り札効果`, cardId: draw.aceCard.cardId, instanceId: draw.aceCard.instanceId, keyword: "buff", effective: true });

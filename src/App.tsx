@@ -15,6 +15,10 @@ import {
   markAdviceSkipped,
   resolveOffer,
   syncStage,
+  SPECIES_ORDER,
+  countSpeciesTypes,
+  synergyStageFor,
+  type ActiveSpeciesSynergy,
   type AdviceCategory,
   type BattleEvent,
   type BattleEventType,
@@ -25,6 +29,7 @@ import {
   type DraftState,
   type OpponentDefinition,
   type RunState,
+  type SpeciesSynergyConfig,
 } from "@/src/core";
 
 type Phase = "title" | "mode" | "character" | "opponent" | "draft" | "deck" | "ace" | "battle" | "clear";
@@ -169,6 +174,7 @@ function CardFace({ card, selected, intervention, compact = false }: { card: Car
   return (
     <article className={`card-face ${aesthetic} ${selected ? "selected" : ""} ${compact ? "compact" : ""}`}>
       {intervention && <span className="intervention-mark" title="兄ちゃんが選んだカード">兄</span>}
+      {card.species && <span className="species-tag" title={`種族：${card.species}`}>{card.species}</span>}
       <div className="card-topline"><span className="cost-gem">{card.cost}</span><span className="card-kind">{card.type === "monster" ? "MONSTER" : "SPELL"}</span></div>
       <div className="card-art" aria-hidden="true"><span>{card.name.slice(0, 1)}</span><i /></div>
       <h3>{card.name}</h3>
@@ -223,6 +229,26 @@ function DeckMaterials({ draft, cards, small = false }: { draft: DraftState; car
   );
 }
 
+function SpeciesCounter({ draft, cards, config }: { draft: DraftState; cards: Card[]; config: SpeciesSynergyConfig }) {
+  const counts = countSpeciesTypes(draft.deck, cards);
+  return (
+    <section className="species-counter" aria-label="種族の種類数">
+      <div className="panel-heading"><span>SPECIES</span><b>{config.thresholds.stageOne} / {config.thresholds.stageTwo}</b></div>
+      <div className="species-grid">
+        {SPECIES_ORDER.map((species) => {
+          const stage = synergyStageFor(counts[species], config);
+          return <div key={species} className={`species-cell stage-${stage}`}><span>{species}</span><strong>{counts[species]}</strong></div>;
+        })}
+      </div>
+    </section>
+  );
+}
+
+function SynergyDeclaration({ synergies }: { synergies: ActiveSpeciesSynergy[] }) {
+  if (!synergies.length) return null;
+  return <div className="synergy-declaration" role="status"><span>SYNERGY</span>{synergies.map((item) => <b key={item.species} className={`stage-${item.stage}`}>{item.label} 発動中</b>)}</div>;
+}
+
 function Speech({ speaker, text, tone = "kid" }: { speaker: string; text: string; tone?: "kid" | "rival" | "system" }) {
   return <div className={`speech ${tone}`}><span>{speaker}</span><p>{text}</p></div>;
 }
@@ -250,7 +276,7 @@ function OpponentPreviewScreen({ opponent, battleNumber, onStart }: { opponent: 
   return <main className="opponent-preview-screen"><section className="opponent-preview-panel"><span className="section-kicker">BATTLE {battleNumber} / 6</span><h1>つぎの相手</h1><div className="opponent-preview-card" style={{ "--rival-color": opponent.color } as CSSProperties}><span className="opponent-mark">{opponent.title.slice(0, 1)}</span><small>{opponent.title}</small><strong>{opponent.name}</strong><p>{opponent.trait}</p></div><button className="primary-action" onClick={onStart}>デッキを組む！<span>▶</span></button></section></main>;
 }
 
-function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNotice, pickFlash, onPick, onAuto, onAdvice }: {
+function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNotice, pickFlash, synergyConfig, onPick, onAuto, onAdvice }: {
   draft: DraftState;
   offer: DraftOffer | null;
   cards: Card[];
@@ -259,6 +285,7 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
   reaction: KidReaction | null;
   syncNotice: SyncNotice | null;
   pickFlash: PickFlash | null;
+  synergyConfig: SpeciesSynergyConfig;
   onPick: (index: 0 | 1) => void;
   onAuto: () => void;
   onAdvice: (category: AdviceCategory) => void;
@@ -291,7 +318,7 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
           {offer && (!offer.wantsIntervention || offer.decision.love) && <button className="primary-action slam" disabled={Boolean(pickFlash)} onClick={onAuto}>{offer.decision.love ? "このカードで決定！" : "弟のピックを見届ける"}<span>▶</span></button>}
           <Speech speaker={child.displayName} text={dialogue} />
         </section>
-        <aside><DeckMaterials draft={draft} cards={cards} /></aside>
+        <aside><DeckMaterials draft={draft} cards={cards} /><SpeciesCounter draft={draft} cards={cards} config={synergyConfig} /></aside>
       </div>
       {adviceOpen && <div className="modal-backdrop"><section className="advice-modal">
         <div className="advice-title"><span>兄ちゃん会議！</span><h2>デッキを見て、ひとこと注文しよう</h2><p>注文したカードも、このまま通常の1枠として入る。</p></div>
@@ -331,7 +358,7 @@ function BuildSummary({ draft, child }: { draft: DraftState; child: ChildProfile
   );
 }
 
-function DeckScreen({ draft, cards, child, reaction, onBattle }: { draft: DraftState; cards: Card[]; child: ChildProfile; reaction: KidReaction | null; onBattle: () => void }) {
+function DeckScreen({ draft, cards, child, reaction, synergyConfig, onBattle }: { draft: DraftState; cards: Card[]; child: ChildProfile; reaction: KidReaction | null; synergyConfig: SpeciesSynergyConfig; onBattle: () => void }) {
   const byId = new Map(cards.map((card) => [card.id, card]));
   return <main className="game-shell deck-screen">
     <header className="game-header"><div className="mini-logo">デッキ完成！<b>答え合わせへ</b></div><div className="completion-stamp">15 CARDS</div></header>
@@ -339,7 +366,7 @@ function DeckScreen({ draft, cards, child, reaction, onBattle }: { draft: DraftS
     <BuildSummary draft={draft} child={child} />
     <div className="deck-review-grid">
       <section className="deck-list-panel"><div className="section-kicker">YOUR DECK</div><h1>ユウタのデッキ</h1><div className="deck-list">{draft.deck.map((item, index) => { const card = byId.get(item.cardId)!; return <div key={item.instanceId} className="deck-row"><span className="deck-number">{String(index + 1).padStart(2, "0")}</span><span className="mini-cost">{card.cost}</span><strong>{card.name}</strong><small>{effectText(card)}</small>{item.intervention && <b className="brother-tag">兄ちゃん</b>}</div>; })}</div></section>
-      <aside><DeckMaterials draft={draft} cards={cards} /><div className="no-verdict"><b>勝てそう？</b><span>数字は材料。答えは対戦で確かめよう。</span></div></aside>
+      <aside><DeckMaterials draft={draft} cards={cards} /><SpeciesCounter draft={draft} cards={cards} config={synergyConfig} /><div className="no-verdict"><b>勝てそう？</b><span>数字は材料。答えは対戦で確かめよう。</span></div></aside>
     </div>
     <section className="deck-action"><button className="primary-action battle-start" onClick={onBattle}>この相手とバトル！<span>▶</span></button></section>
   </main>;
@@ -389,7 +416,7 @@ function boardSnapshotForPlayback(event: BattleEvent | undefined) {
 function BoardCard({ instance, cards, ace = false, activeEvent = null }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null }) {
   const card = cards.find((item) => item.id === instance.cardId)!;
   const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
-  return <div className={`board-card ${instance.intervention ? "intervened" : ""} ${syncBonus && !ace ? "sync-granted" : ""} ${ace ? "ace-granted" : ""}`} title={card.name}>{instance.intervention && <span className="intervention-mark">兄</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}<b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
+  return <div className={`board-card ${instance.intervention ? "intervened" : ""} ${syncBonus && !ace ? "sync-granted" : ""} ${ace ? "ace-granted" : ""}`} title={card.name}>{instance.intervention && <span className="intervention-mark">兄</span>}{card.species && <span className="species-tag">{card.species}</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}<b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
 }
 
 function BattleHandCard({ instance, cards, ace }: { instance: BattleState["brother"]["hand"][number]; cards: Card[]; ace?: boolean }) {
@@ -402,7 +429,7 @@ function AnimatedBoardCard({ instance, cards, ace = false, activeEvent = null }:
   const card = cards.find((item) => item.id === instance.cardId)!;
   const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
   const className = "board-card " + (instance.intervention ? "intervened " : "") + (syncBonus && !ace ? "sync-granted " : "") + (ace ? "ace-granted " : "") + eventCardClass(instance, activeEvent);
-  return <div className={className} title={card.name} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}>{instance.intervention && <span className="intervention-mark">兄</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}<b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
+  return <div className={className} title={card.name} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}>{instance.intervention && <span className="intervention-mark">兄</span>}{card.species && <span className="species-tag">{card.species}</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}<b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
 }
 
 function AnimatedBattleHandCard({ instance, cards, ace, activeEvent = null }: { instance: BattleState["brother"]["hand"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null }) {
@@ -556,6 +583,7 @@ function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish,
     <header className="battle-header"><div><span>{opponent.title}</span><strong>{opponent.name}</strong></div><div className="battle-turn">TURN <b>{battle.turn}</b></div><div className="brother-name"><span>単純弟</span><strong>ユウタ</strong></div></header>
     <BattleSpeedControls speed={speed} onChange={onSpeedChange} />
     <AceStatus battle={battle} cards={cards} />
+    <SynergyDeclaration synergies={battle.synergies} />
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""}`} style={visualDuration ? { "--event-duration": visualDuration } as CSSProperties : undefined}>
       <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" || leaderHitSide === "opponent" ? "life-target" : "")}><div className="avatar" style={{ "--rival-color": opponent.color } as CSSProperties}>{opponent.name.slice(0, 1)}</div><div className="life"><span>LIFE</span><b>{lifeOpponent.life}</b></div><div className="pp">PP {lifeOpponent.pp}/{lifeOpponent.maxPp}</div></div>
       <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{boardOpponent.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} />)}{!boardOpponent.board.length && <span className="empty-board">相手の場は空</span>}</div>
@@ -583,6 +611,7 @@ export default function Home() {
   const [cards, setCards] = useState<Card[]>([]);
   const [child, setChild] = useState<ChildProfile | null>(null);
   const [opponents, setOpponents] = useState<OpponentDefinition[]>([]);
+  const [synergyConfig, setSynergyConfig] = useState<SpeciesSynergyConfig | null>(null);
   const [game, setGame] = useState<SavedGame>(defaultSave);
   const [hydrated, setHydrated] = useState(false);
   const [autoBattle, setAutoBattle] = useState(false);
@@ -593,8 +622,13 @@ export default function Home() {
   const [pendingGame, setPendingGame] = useState<SavedGame | null>(null);
 
   useEffect(() => {
-    Promise.all([fetch("./data/cards.json").then((response) => response.json()), fetch("./data/children/tanjun.json").then((response) => response.json()), fetch("./data/opponents.json").then((response) => response.json())])
-      .then(([cardData, childData, opponentData]) => { setCards(cardData); setChild(childData); setOpponents(opponentData); setGame(loadSavedGame(localStorage.getItem(SAVE_KEY)) ?? createDefaultSave(childData.sync.initial)); setHydrated(true); });
+    Promise.all([
+      fetch("./data/cards.json").then((response) => response.json()),
+      fetch("./data/children/tanjun.json").then((response) => response.json()),
+      fetch("./data/opponents.json").then((response) => response.json()),
+      fetch("./data/species.json").then((response) => response.json()),
+    ])
+      .then(([cardData, childData, opponentData, speciesData]) => { setCards(cardData); setChild(childData); setOpponents(opponentData); setSynergyConfig(speciesData); setGame(loadSavedGame(localStorage.getItem(SAVE_KEY)) ?? createDefaultSave(childData.sync.initial)); setHydrated(true); });
   }, []);
 
   useEffect(() => { if (hydrated) localStorage.setItem(SAVE_KEY, JSON.stringify(game)); }, [game, hydrated]);
@@ -711,7 +745,7 @@ export default function Home() {
     const opponentId = getCurrentOpponentId(game.run);
     const opponent = opponentId ? getOpponentById(opponents, opponentId) : undefined;
     if (!opponent) return;
-    const battle = createBattle(game.draft.deck, opponent, cards, game.draft.seed ^ 0xa5a5a5a5, game.draft.syncRate, aceCardId);
+    const battle = createBattle(game.draft.deck, opponent, cards, game.draft.seed ^ 0xa5a5a5a5, game.draft.syncRate, aceCardId, synergyConfig);
     setGame({ ...game, phase: "battle", battle, aceCardId });
   }
 
@@ -747,15 +781,15 @@ export default function Home() {
     setGame(createDefaultSave(child.sync.initial));
   }
 
-  if (!hydrated || !child || cards.length !== 40 || opponents.length === 0) return <main className="boot-screen"><div className="logo-burst"><span>NOW LOADING</span><b>カードをまぜてるぞ！</b></div></main>;
+  if (!hydrated || !child || !synergyConfig || cards.length !== 40 || opponents.length === 0) return <main className="boot-screen"><div className="logo-burst"><span>NOW LOADING</span><b>カードをまぜてるぞ！</b></div></main>;
   if (game.phase === "title") return <main className="title-screen"><div className="halftone" /><section className="title-copy"><span className="prototype-label">DECK BUILD SUPPORT GAME / PROTOTYPE</span><h1><small>兄ちゃん！</small>俺のデッキ<br />作って！</h1><p>好きなカードは、変えたくない。<br /><b>だから兄ちゃん、勝てる形にしてくれよ！</b></p><button className="primary-action title-start" onClick={beginArcade}>ゲームを始める！<span>▶</span></button><div className="save-note">途中経過はこのブラウザに自動保存</div></section><section className="title-cards"><div className="tilted-card one"><CardFace card={byId.get("zexvain")!} /></div><div className="tilted-card two"><CardFace card={byId.get("dolguard")!} intervention /></div><div className="title-shout">「カッコいい」で<br />勝ちたいんだ！</div></section><footer>15 PICKS · 2 ADVICES · 1 AUTO BATTLE</footer></main>;
   if (game.phase === "mode") return <ModeSelectScreen onSelect={selectMode} />;
   if (game.phase === "character") return <CharacterSelectScreen onSelect={selectCharacter} />;
   const currentOpponentId = getCurrentOpponentId(game.run);
   const currentOpponent = currentOpponentId ? getOpponentById(opponents, currentOpponentId) : undefined;
   if (game.phase === "opponent" && currentOpponent) return <OpponentPreviewScreen opponent={currentOpponent} battleNumber={game.run.currentBattle + 1} onStart={startDraft} />;
-  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} pickFlash={pickFlash} onPick={takePick} onAuto={() => takePick()} onAdvice={chooseAdvice} />;
-  if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} onBattle={prepareBattle} />;
+  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} pickFlash={pickFlash} synergyConfig={synergyConfig} onPick={takePick} onAuto={() => takePick()} onAdvice={chooseAdvice} />;
+  if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} synergyConfig={synergyConfig} onBattle={prepareBattle} />;
   if (game.phase === "ace" && game.draft) return <AceSelectionScreen draft={game.draft} cards={cards} selectedCardId={game.aceCardId ?? null} onSelect={selectAceCard} onConfirm={() => startBattle()} onSkip={() => startBattle(null)} />;
   if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} opponent={currentOpponent} onNext={advanceCurrentBattle} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={changePlaybackSpeed} />;
   if (game.phase === "clear") return <ClearScreen run={game.run} cards={cards} child={child} opponents={opponents} onTitle={returnToTitle} />;
