@@ -327,7 +327,7 @@ test("battle resolves within the turn limit without mutating the input state", (
 
 test("opponent leader life uses the data override and defaults to twenty", () => {
   assert.equal(createBattle(battleDeck("grim"), getOpponent("wall"), cards, 1).opponent.life, 20);
-  assert.equal(createBattle(battleDeck("grim"), getOpponent("boss"), cards, 1).opponent.life, 25);
+  assert.equal(createBattle(battleDeck("grim"), getOpponent("boss"), cards, 1).opponent.life, 28);
 });
 
 test("monster play events snapshot the summoned card on the board", () => {

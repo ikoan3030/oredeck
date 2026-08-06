@@ -24,7 +24,7 @@
       "holio",
       "alvine",
       "astrael",
-      "astrael",
+      "lumina",
       "canon",
       "holyblade",
       "followarrow",
@@ -45,8 +45,8 @@
       "守りが薄い！ そのまま押し切る！"
     ],
     "deck": [
-      "geminai",
-      "geminai",
+      "holio",
+      "holio",
       "fenrirca",
       "sylphy",
       "homurabi",
@@ -76,8 +76,8 @@
       "こわいけど、みんなが残ってくれれば勝てるよ……！"
     ],
     "deck": [
-      "rockbison",
-      "rockbison",
+      "mewrin",
+      "mewrin",
       "astrael",
       "astrael",
       "serafinale",
@@ -107,8 +107,8 @@
       "計算どおり。次の一手で盤面を空にする。"
     ],
     "deck": [
-      "flamebullet",
-      "flamebullet",
+      "gremlion",
+      "gremlion",
       "thunder",
       "thunder",
       "scorchroar",
@@ -119,9 +119,9 @@
       "dragonseal",
       "infernoblaze",
       "infernoblaze",
-      "valzeid",
-      "valzeid",
-      "selva"
+      "selva",
+      "selva",
+      "valzeid"
     ]
   },
   {
@@ -195,7 +195,7 @@
     "speciesSynergy": true,
     "color": "#7f5af0",
     "faceBias": 0.57,
-    "leaderLife": 25,
+    "leaderLife": 28,
     "intro": "攻めるだけでも、守るだけでも勝てないぞ！",
     "taunts": [
       "攻め時も守り時も、見誤るなよ！",
@@ -211,12 +211,12 @@
       "selva",
       "valzeid",
       "valzeid",
+      "inferdos",
       "nemesion",
-      "zexvain",
       "judgment",
       "judgment",
       "dragonseal",
-      "scorchroar",
+      "dragonseal",
       "infernoblaze"
     ]
   }
