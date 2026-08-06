@@ -11,7 +11,7 @@ const get = (id: string) => cards.find((card) => card.id === id)!;
 const getOpponent = (id: string) => getOpponentById(opponents, id)!;
 const battleDeck = (cardId: string): DraftCard[] => Array.from({ length: 15 }, (_, index) => ({ instanceId: `battle-${index}`, cardId, intervention: false, source: "auto" }));
 
-test("aesthetic score follows the fixed C/H/B/K weights", () => {
+test("aesthetic score follows the fixed C/H/cool/K weights", () => {
   assert.equal(aestheticScore(get("gravewald"), child), 2.7);
   assert.equal(aestheticScore(get("phoenixeed"), child), 2.3);
 });

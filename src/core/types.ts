@@ -1,4 +1,5 @@
-export type AestheticKey = "C" | "K" | "B" | "H";
+export type AestheticKey = "C" | "K" | "cool" | "H";
+export type Species = "ドラゴン" | "メカ" | "けもの" | "天使" | "悪魔" | "精霊";
 export type CardType = "monster" | "spell";
 export type Keyword = "rush" | "guard" | "damage" | "destroy" | "buff" | "draw" | "revive";
 export type Trigger = "on_play" | "on_destroyed" | "passive" | "aura";
@@ -26,6 +27,8 @@ export interface Card {
   atk: number;
   hp: number;
   aesthetic: Record<AestheticKey, number>;
+  /** Monsters carry one species; spells are null and never counted by synergy. */
+  species: Species | null;
   tribes: string[];
   effects: CardEffect[];
   rarity: "common" | "rare" | "legend";

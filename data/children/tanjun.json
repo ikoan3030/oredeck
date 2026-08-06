@@ -2,7 +2,7 @@
   "id": "tanjun",
   "name": "単純弟",
   "displayName": "ユウタ",
-  "aestheticWeights": {"C": 1.0, "K": 0.0, "B": 0.3, "H": 0.7},
+  "aestheticWeights": {"C": 1.0, "K": 0.0, "cool": 0.3, "H": 0.7},
   "loveThreshold": 2.4,
   "decisionOrder": ["monster", "lower_cost", "higher_attack", "aesthetic", "first"],
   "passiveInterventionRate": 0.5,
