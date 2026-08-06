@@ -4,6 +4,7 @@ import {
   advanceBattle,
   advanceRun,
   activeSpeciesSynergies,
+  countSpeciesTypes,
   createBattle,
   createDraft,
   createLadderRun,
@@ -16,14 +17,17 @@ import {
   markAdviceSkipped,
   nextRandom,
   resolveOffer,
+  SPECIES_ORDER,
   syncStage,
   type AdviceCategory,
   type BattleState,
   type Card,
   type ChildProfile,
   type DraftState,
+  type DraftOffer,
   type OpponentDefinition,
   type SpeciesSynergyConfig,
+  type Species,
   type RunState,
 } from "../src/core/index";
 
@@ -33,11 +37,24 @@ const opponents = JSON.parse(readFileSync(resolve("data/opponents.json"), "utf8"
 const synergyConfig = JSON.parse(readFileSync(resolve("data/species.json"), "utf8")) as SpeciesSynergyConfig;
 
 type LadderMode = "six" | "three";
-type PolicyKind = "always-match" | "never-match" | "random" | "match-rate";
+type PolicyKind = "always-match" | "never-match" | "random" | "match-rate" | "bundle";
+type AdviceMode = "normal" | "skip";
 
 interface AdjudicationPolicy {
   kind: PolicyKind;
   matchRate?: number;
+}
+
+interface DraftSimulationResult {
+  draft: DraftState;
+  policySeed: number;
+  adviceOpportunities: number;
+  adviceSkipped: number;
+}
+
+interface AdviceDraftChoice {
+  generated: ReturnType<typeof generateOffer>;
+  selectedIndex: 0 | 1;
 }
 
 interface BattleAggregate {
@@ -62,6 +79,16 @@ interface BattleAggregate {
   passiveInterventions: number;
 }
 
+interface BundleSpeciesAggregate {
+  runs: number;
+  stageOneRuns: number;
+  stageTwoRuns: number;
+  stageOneBuilds: number;
+  stageTwoBuilds: number;
+  stageOneWins: number;
+  stageTwoWins: number;
+}
+
 const args = process.argv.slice(2);
 const optionValue = (name: string): string | undefined => {
   const index = args.indexOf(name);
@@ -76,9 +103,12 @@ const mode = (optionValue("--mode") ?? "six") as LadderMode;
 const rawPolicy = optionValue("--policy") ?? "always-match";
 const rawMatchRate = optionValue("--match-rate");
 const rawAceThreshold = optionValue("--ace-threshold");
+const rawAdvice = optionValue("--advice") ?? "normal";
 
 if (!Number.isInteger(runs) || runs < 1) throw new Error("runs must be a positive integer");
 if (mode !== "six" && mode !== "three") throw new Error("--mode must be six or three");
+if (rawAdvice !== "normal" && rawAdvice !== "skip") throw new Error("--advice must be normal or skip");
+const adviceMode = rawAdvice as AdviceMode;
 
 const aceThreshold = rawAceThreshold === undefined ? child.ace.lifeThreshold : Number(rawAceThreshold);
 if (!Number.isInteger(aceThreshold) || aceThreshold < 0) throw new Error("--ace-threshold must be a non-negative integer");
@@ -94,11 +124,14 @@ function parseRate(value: string): number {
 }
 
 function parsePolicy(): AdjudicationPolicy {
-  if (rawMatchRate !== undefined) return { kind: "match-rate", matchRate: parseRate(rawMatchRate) };
+  if (rawMatchRate !== undefined) {
+    return { kind: rawPolicy === "bundle" ? "bundle" : "match-rate", matchRate: parseRate(rawMatchRate) };
+  }
   if (rawPolicy === "always-match" || rawPolicy === "never-match" || rawPolicy === "random") return { kind: rawPolicy };
+  if (rawPolicy === "bundle") return { kind: "bundle", matchRate: 0.8 };
   if (rawPolicy.startsWith("rate:")) return { kind: "match-rate", matchRate: parseRate(rawPolicy.slice(5)) };
   if (/^\d*\.?\d+$/.test(rawPolicy)) return { kind: "match-rate", matchRate: parseRate(rawPolicy) };
-  throw new Error("--policy must be always-match, never-match, random, or a 0.0-1.0 match rate");
+  throw new Error("--policy must be always-match, never-match, random, bundle, or a 0.0-1.0 match rate");
 }
 
 const policy = parsePolicy();
@@ -113,6 +146,23 @@ function chooseAdviceCategory(): Exclude<AdviceCategory, "skip"> | undefined {
   return simulationChild.advice.categories.find((category): category is Exclude<AdviceCategory, "skip"> => category !== "skip");
 }
 
+function offerContainsSpecies(offer: DraftOffer, species: Species): boolean {
+  return offer.cards.some((card) => card.species === species);
+}
+
+function chooseBundleTargetSpecies(seed: number): Species {
+  let probe = createDraft(seed, simulationChild, simulationChild.sync.initial);
+  for (let pick = 0; pick < 3; pick += 1) {
+    const generated = generateOffer(probe, cards, simulationChild);
+    probe = resolveOffer(generated.state, generated.offer, simulationChild, generated.offer.decision.preferredIndex);
+  }
+  const counts = countSpeciesTypes(probe.deck, cards);
+  const highest = Math.max(...SPECIES_ORDER.map((species) => counts[species]));
+  const candidates = SPECIES_ORDER.filter((species) => counts[species] === highest);
+  const tieBreak = nextRandom(probe.seed);
+  return candidates[Math.min(candidates.length - 1, Math.floor(tieBreak.value * candidates.length))];
+}
+
 function policyMatches(policyValue: AdjudicationPolicy, seed: number): { matches: boolean; seed: number } {
   if (policyValue.kind === "always-match") return { matches: true, seed };
   if (policyValue.kind === "never-match") return { matches: false, seed };
@@ -121,31 +171,62 @@ function policyMatches(policyValue: AdjudicationPolicy, seed: number): { matches
   return { matches: random.value < rate, seed: random.seed };
 }
 
-function simulateDraft(seed: number, initialSync: number, policyValue: AdjudicationPolicy, initialPolicySeed: number): { draft: DraftState; policySeed: number } {
+function bundleAdviceOffer(state: DraftState, targetSpecies: Species): AdviceDraftChoice | undefined {
+  for (const category of simulationChild.advice.categories) {
+    if (category === "skip") continue;
+    const generated = generateOffer(state, cards, simulationChild, category);
+    if (offerContainsSpecies(generated.offer, targetSpecies)) {
+      const targetIndexes = generated.offer.cards.flatMap((card, index) => card.species === targetSpecies ? [index as 0 | 1] : []);
+      const selectedIndex = targetIndexes.length === 1 ? targetIndexes[0] : generated.offer.decision.preferredIndex;
+      return { generated, selectedIndex };
+    }
+  }
+  return undefined;
+}
+
+function simulateDraft(seed: number, initialSync: number, policyValue: AdjudicationPolicy, initialPolicySeed: number, targetSpecies?: Species): DraftSimulationResult {
   let state = createDraft(seed, simulationChild, initialSync);
   let policySeed = initialPolicySeed >>> 0;
+  let adviceOpportunities = 0;
+  let adviceSkipped = 0;
   while (state.pick < 15) {
     if (isAdviceDue(state, simulationChild)) {
-      const category = chooseAdviceCategory();
-      if (!category) {
+      adviceOpportunities += 1;
+      const adviceChoice = adviceMode === "skip"
+        ? undefined
+        : targetSpecies
+          ? bundleAdviceOffer(state, targetSpecies)
+          : (() => {
+              const category = chooseAdviceCategory();
+              const generated = category ? generateOffer(state, cards, simulationChild, category) : undefined;
+              return generated ? { generated, selectedIndex: generated.offer.decision.preferredIndex } : undefined;
+            })();
+      if (!adviceChoice) {
         state = markAdviceSkipped(state);
+        adviceSkipped += 1;
         continue;
       }
-      const generated = generateOffer(state, cards, simulationChild, category);
-      state = resolveOffer(generated.state, generated.offer, simulationChild, generated.offer.decision.preferredIndex);
+      state = resolveOffer(adviceChoice.generated.state, adviceChoice.generated.offer, simulationChild, adviceChoice.selectedIndex);
       continue;
     }
 
     const generated = generateOffer(state, cards, simulationChild);
     let selectedIndex: 0 | 1 | undefined;
     if (generated.offer.wantsIntervention) {
-      const result = policyMatches(policyValue, policySeed);
-      policySeed = result.seed;
-      selectedIndex = result.matches ? generated.offer.decision.preferredIndex : generated.offer.decision.preferredIndex === 0 ? 1 : 0;
+      const targetIndexes = targetSpecies === undefined
+        ? []
+        : generated.offer.cards.flatMap((card, index) => card.species === targetSpecies ? [index as 0 | 1] : []);
+      if (policyValue.kind === "bundle" && targetIndexes.length === 1) {
+        selectedIndex = targetIndexes[0];
+      } else {
+        const result = policyMatches(policyValue, policySeed);
+        policySeed = result.seed;
+        selectedIndex = result.matches ? generated.offer.decision.preferredIndex : generated.offer.decision.preferredIndex === 0 ? 1 : 0;
+      }
     }
     state = resolveOffer(generated.state, generated.offer, simulationChild, selectedIndex);
   }
-  return { draft: state, policySeed };
+  return { draft: state, policySeed, adviceOpportunities, adviceSkipped };
 }
 
 function runBattleWithMetrics(initial: BattleState, opponent: OpponentDefinition): { battle: BattleState; lifeThresholdReached: boolean; deckExhausted: boolean; aceActivated: boolean; comebackWin: boolean } {
@@ -234,9 +315,13 @@ const battleCount = mode === "six" ? 6 : 3;
 const aggregates = Array.from({ length: battleCount }, createAggregate);
 const interventionHistogram = new Map<number, number>();
 const variablePairCounts = new Map<string, number>();
-const synergyStats = { builds: 0, stageOneBuilds: 0, stageTwoBuilds: 0, stageOneLines: 0, stageTwoLines: 0, winsWithSynergy: 0, buildsWithSynergy: 0, winsWithout: 0, buildsWithout: 0 };
+const synergyStats = { builds: 0, stageOneBuilds: 0, stageTwoBuilds: 0, stageOneLines: 0, stageTwoLines: 0, stageOneWins: 0, stageTwoWins: 0, winsWithSynergy: 0, buildsWithSynergy: 0, winsWithout: 0, buildsWithout: 0 };
 const synergyBySpecies = new Map<string, number>();
+const bundleSpeciesStats = new Map<Species, BundleSpeciesAggregate>();
+SPECIES_ORDER.forEach((species) => bundleSpeciesStats.set(species, { runs: 0, stageOneRuns: 0, stageTwoRuns: 0, stageOneBuilds: 0, stageTwoBuilds: 0, stageOneWins: 0, stageTwoWins: 0 }));
+const bundleFirstStageTwoBattle = new Map<string, number>();
 const buildQuality = { builds: 0, love: 0, missing: 0, removalMissing: 0, durabilityMissing: 0, heavyCongestion: 0, lowCostMissing: 0 };
+const adviceStats = { opportunities: 0, skipped: 0 };
 const allBuildValues: number[] = [];
 const allCarryValues: number[] = [];
 const stage5ByBattle = Array.from({ length: battleCount }, () => 0);
@@ -249,6 +334,10 @@ for (let runIndex = 0; runIndex < runs; runIndex += 1) {
   const runSeed = Math.imul(runIndex + 1, 0x9e3779b1) >>> 0;
   let run = ladderFor(mode, runSeed);
   let policySeed = (runSeed ^ 0xa5a5a5a5) >>> 0;
+  const bundleTargetSpecies = policy.kind === "bundle" ? chooseBundleTargetSpecies((runSeed ^ 0x27d4eb2d) >>> 0) : undefined;
+  let bundleStageOneInRun = false;
+  let bundleStageTwoInRun = false;
+  let firstBundleStageTwoBattle: number | undefined;
   if (mode === "six") {
     const pair = run.opponentIds.slice(1, 3).join("+");
     variablePairCounts.set(pair, (variablePairCounts.get(pair) ?? 0) + 1);
@@ -256,8 +345,10 @@ for (let runIndex = 0; runIndex < runs; runIndex += 1) {
 
   for (let battleIndex = 0; battleIndex < battleCount; battleIndex += 1) {
     const draftSeed = (runSeed ^ Math.imul(battleIndex + 1, 0x85ebca6b)) >>> 0;
-    const drafted = simulateDraft(draftSeed, run.carrySync, policy, policySeed);
+    const drafted = simulateDraft(draftSeed, run.carrySync, policy, policySeed, bundleTargetSpecies);
     policySeed = drafted.policySeed;
+    adviceStats.opportunities += drafted.adviceOpportunities;
+    adviceStats.skipped += drafted.adviceSkipped;
     const draft = drafted.draft;
     const opponent = opponentById(run.opponentIds[battleIndex]);
     const buildStage = syncStage(draft.syncRate, simulationChild);
@@ -278,15 +369,33 @@ for (let runIndex = 0; runIndex < runs; runIndex += 1) {
     buildQuality.lowCostMissing += Number(evaluation.metrics.lowCostMissing);
 
     const synergies = activeSpeciesSynergies(draft.deck, cards, synergyConfig);
+    const targetSynergy = bundleTargetSpecies === undefined ? undefined : synergies.find((item) => item.species === bundleTargetSpecies);
+    const targetStage = targetSynergy?.stage ?? 0;
+    const hasStageOne = synergies.some((item) => item.stage >= 1);
+    const hasStageTwo = synergies.some((item) => item.stage >= 2);
+    if (targetStage >= 1) bundleStageOneInRun = true;
+    if (targetStage >= 2) {
+      bundleStageTwoInRun = true;
+      firstBundleStageTwoBattle ??= battleIndex + 1;
+    }
     synergyStats.builds += 1;
     synergyStats.stageOneLines += synergies.filter((item) => item.stage === 1).length;
     synergyStats.stageTwoLines += synergies.filter((item) => item.stage === 2).length;
-    synergyStats.stageOneBuilds += Number(synergies.some((item) => item.stage === 1));
-    synergyStats.stageTwoBuilds += Number(synergies.some((item) => item.stage === 2));
+    synergyStats.stageOneBuilds += Number(hasStageOne);
+    synergyStats.stageTwoBuilds += Number(hasStageTwo);
     synergies.forEach((item) => synergyBySpecies.set(`${item.species}|${item.stage}`, (synergyBySpecies.get(`${item.species}|${item.stage}`) ?? 0) + 1));
 
     run = advanceRun(run, draft, withAce.battle.winner!, simulationChild);
     const result = run.battleResults.at(-1)!;
+    synergyStats.stageOneWins += Number(hasStageOne && result.winner === "brother");
+    synergyStats.stageTwoWins += Number(hasStageTwo && result.winner === "brother");
+    if (bundleTargetSpecies !== undefined) {
+      const targetStats = bundleSpeciesStats.get(bundleTargetSpecies)!;
+      targetStats.stageOneBuilds += Number(targetStage >= 1);
+      targetStats.stageTwoBuilds += Number(targetStage >= 2);
+      targetStats.stageOneWins += Number(targetStage >= 1 && result.winner === "brother");
+      targetStats.stageTwoWins += Number(targetStage >= 2 && result.winner === "brother");
+    }
     if (synergies.length) { synergyStats.buildsWithSynergy += 1; synergyStats.winsWithSynergy += Number(result.winner === "brother"); }
     else { synergyStats.buildsWithout += 1; synergyStats.winsWithout += Number(result.winner === "brother"); }
     const aggregate = aggregates[battleIndex];
@@ -320,6 +429,14 @@ for (let runIndex = 0; runIndex < runs; runIndex += 1) {
     totalWins += Number(result.winner === "brother");
     totalBattles += 1;
     totalDeckExhaustions += Number(withAce.deckExhausted);
+  }
+  if (bundleTargetSpecies !== undefined) {
+    const targetStats = bundleSpeciesStats.get(bundleTargetSpecies)!;
+    targetStats.runs += 1;
+    targetStats.stageOneRuns += Number(bundleStageOneInRun);
+    targetStats.stageTwoRuns += Number(bundleStageTwoInRun);
+    const firstStageTwoKey = firstBundleStageTwoBattle === undefined ? "never" : String(firstBundleStageTwoBattle);
+    bundleFirstStageTwoBattle.set(firstStageTwoKey, (bundleFirstStageTwoBattle.get(firstStageTwoKey) ?? 0) + 1);
   }
   runWinHistogram.set(run.summary.wins, (runWinHistogram.get(run.summary.wins) ?? 0) + 1);
 }
@@ -358,6 +475,58 @@ const formatAggregate = (aggregate: BattleAggregate, battleIndex: number) => ({
   },
 });
 
+const bundleTargetTotals = [...bundleSpeciesStats.values()].reduce((totals, item) => ({
+  runs: totals.runs + item.runs,
+  stageOneRuns: totals.stageOneRuns + item.stageOneRuns,
+  stageTwoRuns: totals.stageTwoRuns + item.stageTwoRuns,
+  stageOneBuilds: totals.stageOneBuilds + item.stageOneBuilds,
+  stageTwoBuilds: totals.stageTwoBuilds + item.stageTwoBuilds,
+  stageOneWins: totals.stageOneWins + item.stageOneWins,
+  stageTwoWins: totals.stageTwoWins + item.stageTwoWins,
+}), { runs: 0, stageOneRuns: 0, stageTwoRuns: 0, stageOneBuilds: 0, stageTwoBuilds: 0, stageOneWins: 0, stageTwoWins: 0 });
+
+const bundleReport = policy.kind === "bundle" ? {
+  baseMatchRate: policy.matchRate,
+  targetSelection: {
+    initialProbePicks: 3,
+    tieBreak: "seeded-random",
+  },
+  stageOne: {
+    buildRate: formatRate(bundleTargetTotals.stageOneBuilds, bundleTargetTotals.runs * battleCount),
+    runRate: formatRate(bundleTargetTotals.stageOneRuns, bundleTargetTotals.runs),
+    winRate: formatRate(bundleTargetTotals.stageOneWins, bundleTargetTotals.stageOneBuilds),
+  },
+  stageTwo: {
+    buildRate: formatRate(bundleTargetTotals.stageTwoBuilds, bundleTargetTotals.runs * battleCount),
+    runRate: formatRate(bundleTargetTotals.stageTwoRuns, bundleTargetTotals.runs),
+    winRate: formatRate(bundleTargetTotals.stageTwoWins, bundleTargetTotals.stageTwoBuilds),
+  },
+  anySpecies: {
+    stageOneBuildRate: formatRate(synergyStats.stageOneBuilds, synergyStats.builds),
+    stageTwoBuildRate: formatRate(synergyStats.stageTwoBuilds, synergyStats.builds),
+    stageOneWinRate: formatRate(synergyStats.stageOneWins, synergyStats.stageOneBuilds),
+    stageTwoWinRate: formatRate(synergyStats.stageTwoWins, synergyStats.stageTwoBuilds),
+  },
+  firstStageTwoBattle: Object.fromEntries([...bundleFirstStageTwoBattle.entries()].sort((a, b) => a[0] === "never" ? 1 : b[0] === "never" ? -1 : Number(a[0]) - Number(b[0]))),
+  syncProgressByBattle: aggregates.map((aggregate, battleIndex) => ({
+    battle: battleIndex + 1,
+    buildSync: summarize(aggregate.buildSync),
+    carrySync: summarize(aggregate.carrySync),
+  })),
+  byTargetSpecies: Object.fromEntries(SPECIES_ORDER.map((species) => {
+    const item = bundleSpeciesStats.get(species)!;
+    return [species, {
+      runs: item.runs,
+      stageOneBuildRate: formatRate(item.stageOneBuilds, item.runs * battleCount),
+      stageTwoBuildRate: formatRate(item.stageTwoBuilds, item.runs * battleCount),
+      stageOneRunRate: formatRate(item.stageOneRuns, item.runs),
+      stageTwoRunRate: formatRate(item.stageTwoRuns, item.runs),
+      stageOneWinRate: formatRate(item.stageOneWins, item.stageOneBuilds),
+      stageTwoWinRate: formatRate(item.stageTwoWins, item.stageTwoBuilds),
+    }];
+  })),
+} : null;
+
 for (const id of ["rush", "wall", "boss", "sister", "smart-brother", "cousin", "executive"]) opponentById(id);
 
 console.log(JSON.stringify({
@@ -391,9 +560,21 @@ console.log(JSON.stringify({
     buildsWithStageOne: `${round(synergyStats.stageOneBuilds / synergyStats.builds * 100)}%`,
     buildsWithStageTwo: `${round(synergyStats.stageTwoBuilds / synergyStats.builds * 100)}%`,
     linesPerBuild: round(synergyStats.stageOneLines / synergyStats.builds),
+    winRateWithStageOne: formatRate(synergyStats.stageOneWins, synergyStats.stageOneBuilds),
+    winRateWithStageTwo: formatRate(synergyStats.stageTwoWins, synergyStats.stageTwoBuilds),
     winRateWithSynergy: synergyStats.buildsWithSynergy ? round(synergyStats.winsWithSynergy / synergyStats.buildsWithSynergy * 100) : null,
     winRateWithoutSynergy: synergyStats.buildsWithout ? round(synergyStats.winsWithout / synergyStats.buildsWithout * 100) : null,
     bySpecies: Object.fromEntries([...synergyBySpecies.entries()].sort((a, b) => b[1] - a[1])),
+  },
+  bundle: bundleReport,
+  gapMeasurement: {
+    adviceMode,
+    adviceOpportunities: adviceStats.opportunities,
+    adviceSkipped: adviceStats.skipped,
+    adviceSkipRate: formatRate(adviceStats.skipped, adviceStats.opportunities),
+    missingCardsPerBuild: round(buildQuality.missing / buildQuality.builds),
+    removalMissingRate: round(buildQuality.removalMissing / buildQuality.builds * 100),
+    durabilityMissingRate: round(buildQuality.durabilityMissing / buildQuality.builds * 100),
   },
   variablePairCounts: Object.fromEntries([...variablePairCounts.entries()].sort()),
 }, null, 2));

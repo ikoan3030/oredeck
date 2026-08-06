@@ -104,6 +104,7 @@ Node.js 22以上が必要です。
 npm test              # src/core/ のユニットテスト（21件）
 npm run build         # tsc --noEmit のあと vite build
 npm run simulate -- 10000 --mode six --policy 0.8
+npm run simulate -- 10000 --mode six --policy 0.8 --advice skip # formal advice-gap measurement
 ```
 
 `npm run simulate -- 10000 --mode six --policy 0.8` をシンクロ率・梯子構成の基準コマンドとする。現状の実測記録（10000ラン・mode six・policy 0.8）は、受動介入5.27回/戦、6戦目ビルド末の段階5到達率83.89%、boss勝率（全体）約44.4%、boss勝率（段階5）47.06%（切り札閾値9）である。boss勝率は「全体」と「段階5」を区別して記録する。
