@@ -38,10 +38,23 @@ export function synergyStageFor(types: number, config: SpeciesSynergyConfig): 0 
   return 0;
 }
 
+/**
+ * Stage two keeps the stage-one stat unless it moves the same stat, in which case it replaces it.
+ * Only the dragon shares a stat across both stages (attack), so it reads +2 rather than +3;
+ * the other five carry their stage-one stat under the stage-two grant.
+ */
 export function speciesGrant(species: Species, stage: 1 | 2, config: SpeciesSynergyConfig): SpeciesGrant | undefined {
   const definition = config.species.find((item) => item.id === species);
   if (!definition) return undefined;
-  return stage === 2 ? definition.stageTwo : definition.stageOne;
+  if (stage === 1) return definition.stageOne;
+  const one = definition.stageOne;
+  const two = definition.stageTwo;
+  return {
+    keywords: [...one.keywords, ...two.keywords],
+    effects: [...one.effects, ...two.effects],
+    attack: two.attack || one.attack,
+    hp: two.hp || one.hp,
+  };
 }
 
 export function synergyLabel(species: Species, stage: 1 | 2, config: SpeciesSynergyConfig): string {

@@ -37,6 +37,7 @@ function makeInstance(card: Card, instanceId: string, draft?: DraftCard): Battle
     grantedKeywords: [],
     grantedEffects: [],
     grantedAtk: 0,
+    grantedHp: 0,
     summonedTurn: -1,
     attacked: false,
     revived: false,
@@ -106,9 +107,10 @@ function instanceEffects(instance: BattleCardInstance, cards: readonly Card[]): 
 function grantToInstance(
   instance: BattleCardInstance,
   cards: readonly Card[],
-  grant: { keywords?: readonly Keyword[]; effects?: readonly CardEffect[]; attack?: number },
+  grant: { keywords?: readonly Keyword[]; effects?: readonly CardEffect[]; attack?: number; hp?: number },
 ): BattleCardInstance {
   let attack = grant.attack ?? 0;
+  const hp = grant.hp ?? 0;
   const keywords: Keyword[] = [];
   const effects: CardEffect[] = [];
   for (const keyword of grant.keywords ?? []) {
@@ -125,6 +127,11 @@ function grantToInstance(
     grantedEffects: [...instance.grantedEffects, ...effects],
     grantedAtk: instance.grantedAtk + attack,
     atk: instance.atk + attack,
+    // Folding the hp grant into hp and maxHp keeps every combat, destruction and display
+    // path working unchanged, and makes maxHp the healing ceiling the spec asks for.
+    grantedHp: instance.grantedHp + hp,
+    hp: instance.hp + hp,
+    maxHp: instance.maxHp + hp,
   };
 }
 
@@ -412,6 +419,55 @@ function resolvePlay(
       const count = active.board.filter((item) => cardById(cards, item.cardId).species === effect.condition!.species).length;
       if (count < effect.condition.value) continue;
     }
+    if (effect.keyword === "heal") {
+      // Stage-two spirit grant: top every friendly monster back up, never past its ceiling.
+      const healed: BattleCardInstance[] = [];
+      const board = active.board.map((item) => {
+        const restored = Math.min(item.maxHp, item.hp + effect.value);
+        if (restored === item.hp) return item;
+        const next = { ...item, hp: restored };
+        healed.push(next);
+        return next;
+      });
+      if (healed.length) {
+        active = { ...active, board };
+        next = updatePlayers(next, active, enemy);
+        next = event(next, {
+          type: "heal",
+          side,
+          text: `${card.name}の登場で味方が${effect.value}回復`,
+          cardId: card.id,
+          keyword: "heal",
+          sourceInstanceId: instance.instanceId,
+          targetInstanceIds: healed.map((item) => item.instanceId),
+          sourceInstance: instance,
+          targetInstances: healed,
+          value: effect.value,
+          effective: true,
+        });
+      }
+      continue;
+    }
+    if (effect.keyword === "damage" && effect.target === "enemy_leader") {
+      // Stage-two demon grant: straight to the enemy leader, never at the board.
+      const before = enemy.life;
+      enemy = { ...enemy, life: Math.max(0, enemy.life - effect.value) };
+      next = updatePlayers(next, active, enemy);
+      next = event(next, {
+        type: "effect",
+        side,
+        text: `${card.name}の登場で相手リーダーに${effect.value}ダメージ`,
+        cardId: card.id,
+        keyword: "damage",
+        sourceInstanceId: instance.instanceId,
+        targetLeader: true,
+        sourceInstance: instance,
+        damage: effect.value,
+        effective: enemy.life < before,
+      });
+      if (enemy.life < before) next = markAttribution(next, instance, "damage", child, enemy.life === 0);
+      continue;
+    }
     if (effect.keyword === "draw") {
       let drawn = 0;
       const drawnInstanceIds: string[] = [];
@@ -618,7 +674,7 @@ export function createBattle(
       const synergy = species ? synergies.find((item) => item.species === species) : undefined;
       if (!synergy) return instance;
       const grant = speciesGrant(synergy.species, synergy.stage, synergyConfig);
-      return grant ? grantToInstance(instance, cards, { keywords: grant.keywords, effects: grant.effects, attack: grant.attack }) : instance;
+      return grant ? grantToInstance(instance, cards, grant) : instance;
     });
   }
   let aceCard: BattleCardInstance | null = null;

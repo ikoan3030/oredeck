@@ -5,33 +5,33 @@
   "species": [
     {
       "id": "ドラゴン",
-      "stageOne": {"keywords": [], "effects": [], "attack": 1},
-      "stageTwo": {"keywords": [], "effects": [], "attack": 2}
+      "stageOne": {"keywords": [], "effects": [], "attack": 1, "hp": 0},
+      "stageTwo": {"keywords": [], "effects": [], "attack": 2, "hp": 0}
     },
     {
       "id": "メカ",
-      "stageOne": {"keywords": [], "effects": [], "attack": 1},
-      "stageTwo": {"keywords": [], "effects": [{"trigger": "on_destroyed", "keyword": "damage", "value": 2, "target": "enemy"}], "attack": 0}
+      "stageOne": {"keywords": [], "effects": [], "attack": 0, "hp": 1},
+      "stageTwo": {"keywords": [], "effects": [{"trigger": "on_destroyed", "keyword": "damage", "value": 2, "target": "enemy"}], "attack": 0, "hp": 0}
     },
     {
       "id": "けもの",
-      "stageOne": {"keywords": [], "effects": [], "attack": 1},
-      "stageTwo": {"keywords": ["rush"], "effects": [], "attack": 0}
+      "stageOne": {"keywords": [], "effects": [], "attack": 1, "hp": 0},
+      "stageTwo": {"keywords": ["rush"], "effects": [], "attack": 0, "hp": 0}
     },
     {
       "id": "天使",
-      "stageOne": {"keywords": [], "effects": [], "attack": 1},
-      "stageTwo": {"keywords": ["guard"], "effects": [], "attack": 0}
+      "stageOne": {"keywords": [], "effects": [], "attack": 0, "hp": 1},
+      "stageTwo": {"keywords": ["guard"], "effects": [], "attack": 0, "hp": 0}
     },
     {
       "id": "悪魔",
-      "stageOne": {"keywords": [], "effects": [], "attack": 1},
-      "stageTwo": {"keywords": ["revive"], "effects": [], "attack": 0}
+      "stageOne": {"keywords": [], "effects": [], "attack": 1, "hp": 0},
+      "stageTwo": {"keywords": [], "effects": [{"trigger": "on_play", "keyword": "damage", "value": 1, "target": "enemy_leader"}], "attack": 0, "hp": 0}
     },
     {
       "id": "精霊",
-      "stageOne": {"keywords": [], "effects": [], "attack": 1},
-      "stageTwo": {"keywords": [], "effects": [{"trigger": "on_play", "keyword": "draw", "value": 1, "target": "self"}], "attack": 0}
+      "stageOne": {"keywords": [], "effects": [], "attack": 0, "hp": 1},
+      "stageTwo": {"keywords": [], "effects": [{"trigger": "on_play", "keyword": "heal", "value": 1, "target": "all_allies"}], "attack": 0, "hp": 0}
     }
   ]
 }

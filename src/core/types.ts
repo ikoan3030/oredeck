@@ -1,9 +1,10 @@
 export type AestheticKey = "C" | "K" | "cool" | "H";
 export type Species = "ドラゴン" | "メカ" | "けもの" | "天使" | "悪魔" | "精霊";
 export type CardType = "monster" | "spell";
-export type Keyword = "rush" | "guard" | "damage" | "destroy" | "buff" | "draw" | "revive";
+/** "heal" is a stage-two synergy word only: plain cards and spells never carry it. */
+export type Keyword = "rush" | "guard" | "damage" | "destroy" | "buff" | "draw" | "revive" | "heal";
 export type Trigger = "on_play" | "on_destroyed" | "passive" | "aura";
-export type Target = "self" | "ally" | "enemy" | "all_enemies" | "enemy_low_atk";
+export type Target = "self" | "ally" | "all_allies" | "enemy" | "enemy_leader" | "all_enemies" | "enemy_low_atk";
 
 export interface EffectCondition {
   kind: "leader_life_at_most" | "allied_species_at_least" | "target_attack_at_most";
@@ -43,6 +44,7 @@ export interface SpeciesGrant {
   keywords: Keyword[];
   effects: CardEffect[];
   attack: number;
+  hp: number;
 }
 
 export interface SpeciesDefinition {
@@ -279,6 +281,7 @@ export interface BattleCardInstance {
   /** Triggered effects handed out by a synergy, resolved alongside the card's own effects. */
   grantedEffects: CardEffect[];
   grantedAtk: number;
+  grantedHp: number;
   summonedTurn: number;
   attacked: boolean;
   revived: boolean;
@@ -299,7 +302,7 @@ export interface BattlePlayer {
   aceUsed: boolean;
 }
 
-export type BattleEventType = "turn" | "draw" | "play" | "effect" | "attack" | "destroyed" | "attribution" | "taunt" | "result" | "sync_bonus" | "ace";
+export type BattleEventType = "turn" | "draw" | "play" | "effect" | "attack" | "destroyed" | "attribution" | "taunt" | "result" | "sync_bonus" | "ace" | "heal";
 
 export interface BattleEventSnapshotPlayer {
   side: BattleSide;

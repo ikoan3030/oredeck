@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
-import { activeSpeciesSynergies, advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createLadderRun, createRun, decaySync, decideOffer, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, countSpeciesTypes, instanceHasKeyword, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition, type SpeciesSynergyConfig } from "./index";
+import { activeSpeciesSynergies, advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createLadderRun, createRun, decaySync, decideOffer, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, countSpeciesTypes, instanceHasKeyword, speciesGrant, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition, type SpeciesSynergyConfig } from "./index";
 
 const cards = JSON.parse(readFileSync(resolve("data/cards.json"), "utf8")) as Card[];
 const child = JSON.parse(readFileSync(resolve("data/children/tanjun.json"), "utf8")) as ChildProfile;
@@ -123,13 +123,13 @@ test("stage two hands the beast keyword out and converts the same keyword to +1"
   const all = [...battle.brother.deck, ...battle.brother.hand];
   const grim = all.find((item) => item.cardId === "grim")!;
   assert.deepEqual(grim.grantedKeywords, ["rush"]);
-  assert.equal(grim.grantedAtk, 0);
+  assert.equal(grim.grantedAtk, 1, "the stage-one attack carries under the stage-two grant");
 
-  // balga already has rush natively: the duplicate becomes 強化+1 instead of a whiff
+  // balga already has rush natively: the duplicate becomes 強化+1 on top of the stage-one +1
   const balga = all.find((item) => item.cardId === "balga")!;
   assert.deepEqual(balga.grantedKeywords, []);
-  assert.equal(balga.grantedAtk, 1);
-  assert.equal(balga.atk, get("balga").atk + 1);
+  assert.equal(balga.grantedAtk, 2);
+  assert.equal(balga.atk, get("balga").atk + 2);
 });
 
 test("a different keyword stacks on top of the card's own", () => {
@@ -140,7 +140,7 @@ test("a different keyword stacks on top of the card's own", () => {
   assert.equal(instanceHasKeyword(phoenix, cards, "revive"), true);
   assert.equal(instanceHasKeyword(phoenix, cards, "rush"), true);
   assert.deepEqual(phoenix.grantedKeywords, ["rush"]);
-  assert.equal(phoenix.grantedAtk, 0);
+  assert.equal(phoenix.grantedAtk, 1);
 });
 
 test("the mech stage two adds a destroy trigger that damages an enemy", () => {
@@ -163,6 +163,128 @@ test("the mech stage two adds a destroy trigger that damages an enemy", () => {
   assert.ok(triggered, "the destroyed mech should damage the enemy");
   assert.equal(triggered.damage, 2);
   assert.equal(result.opponent.board[0]?.hp ?? 0, enemyCard.hp - 2);
+});
+
+test("stage one splits into attack species and health species", () => {
+  const beasts = createBattle(speciesDeck(["grim", "gorganos", "balga"]), getOpponent("wall"), cards, 7, 0, null, synergy);
+  const grim = [...beasts.brother.deck, ...beasts.brother.hand].find((item) => item.cardId === "grim")!;
+  assert.equal(grim.grantedAtk, 1);
+  assert.equal(grim.grantedHp, 0);
+  assert.equal(grim.atk, get("grim").atk + 1);
+  assert.equal(grim.hp, get("grim").hp);
+
+  const mechs = createBattle(speciesDeck(["gaiorg", "zamud", "gearload"]), getOpponent("wall"), cards, 7, 0, null, synergy);
+  const gaiorg = [...mechs.brother.deck, ...mechs.brother.hand].find((item) => item.cardId === "gaiorg")!;
+  assert.equal(gaiorg.grantedAtk, 0);
+  assert.equal(gaiorg.grantedHp, 1);
+  assert.equal(gaiorg.hp, get("gaiorg").hp + 1);
+  assert.equal(gaiorg.maxHp, get("gaiorg").hp + 1, "the ceiling rises with the grant so healing can reach it");
+  assert.equal(gaiorg.atk, get("gaiorg").atk);
+});
+
+test("granted health survives combat that would otherwise kill the card", () => {
+  const opponent = getOpponent("wall");
+  const battle = createBattle(speciesDeck(["gaiorg", "zamud", "gearload"]), opponent, cards, 7, 0, null, synergy);
+  const mech = [...battle.brother.deck, ...battle.brother.hand].find((item) => item.cardId === "gaiorg")!;
+  const attacker = { ...battle.opponent.hand[0], cardId: "gorganos", atk: 5, hp: 6, maxHp: 6, summonedTurn: 0, attacked: false };
+  const staged = {
+    ...battle,
+    turn: 2,
+    activeSide: "opponent" as const,
+    brother: { ...battle.brother, maxPp: 0, pp: 0, hand: [], deck: [], board: [{ ...mech, summonedTurn: 0 }] },
+    opponent: { ...battle.opponent, maxPp: 0, pp: 0, hand: [], deck: [], board: [attacker] },
+  };
+  const result = advanceBattle(staged, cards, child, opponent);
+  // gaiorg is 3/5 natively: 5 damage kills it, 5 damage against 5+1 leaves it standing on 1
+  assert.equal(result.brother.board.length, 1);
+  assert.equal(result.brother.board[0].hp, 1);
+});
+
+test("the dragon replaces its own stat at stage two while the others accumulate", () => {
+  const dragons = speciesDeck(["baldrogia", "volganid", "valgu", "dragbalt", "baldrogia", "volganid"]);
+  assert.deepEqual(activeSpeciesSynergies(dragons, cards, synergy).map((item) => item.stage), [1], "only four dragon types exist in the current pool");
+  const four = createBattle(speciesDeck(["baldrogia", "volganid", "valgu", "dragbalt"]), getOpponent("wall"), cards, 7, 0, null, synergy);
+  const valgu = [...four.brother.deck, ...four.brother.hand].find((item) => item.cardId === "valgu")!;
+  assert.equal(valgu.grantedAtk, 1);
+
+  // the stage-two grant is read straight from the table so the rule holds without six dragon types
+  const dragonGrant = speciesGrant("ドラゴン", 2, synergy)!;
+  assert.equal(dragonGrant.attack, 2, "same stat: replaced, not +3");
+  assert.equal(dragonGrant.hp, 0);
+
+  const angelGrant = speciesGrant("天使", 2, synergy)!;
+  assert.equal(angelGrant.hp, 1, "different words: the stage-one health carries");
+  assert.deepEqual(angelGrant.keywords, ["guard"]);
+
+  const beastGrant = speciesGrant("けもの", 2, synergy)!;
+  assert.equal(beastGrant.attack, 1);
+  assert.deepEqual(beastGrant.keywords, ["rush"]);
+});
+
+test("the demon stage two hits the enemy leader when a demon lands", () => {
+  const demonGrant = speciesGrant("悪魔", 2, synergy)!;
+  assert.equal(demonGrant.attack, 1, "the stage-one attack carries under the leader chip");
+  assert.deepEqual(demonGrant.effects.map((effect) => [effect.trigger, effect.keyword, effect.value, effect.target]), [["on_play", "damage", 1, "enemy_leader"]]);
+
+  // only five demon types exist in the current pool, so stage two is staged by hand
+  const deck = speciesDeck(["valzeid", "nemesion", "zexvain", "inferdos", "shadowkite"]);
+  const opponent = getOpponent("wall");
+  const battle = createBattle(deck, opponent, cards, 5, 0, null, synergy);
+  const demon = { ...[...battle.brother.deck, ...battle.brother.hand].find((item) => item.cardId === "shadowkite")!, grantedEffects: demonGrant.effects };
+  const staged = {
+    ...battle,
+    turn: 2,
+    activeSide: "brother" as const,
+    brother: { ...battle.brother, maxPp: 9, pp: 9, hand: [demon], deck: [], board: [] },
+    opponent: { ...battle.opponent, maxPp: 0, pp: 0, hand: [], deck: [], board: [] },
+  };
+  const lifeBefore = staged.opponent.life;
+  const result = advanceBattle(staged, cards, child, opponent);
+  const hit = result.events.find((item) => item.type === "effect" && item.targetLeader && item.sourceInstanceId === demon.instanceId);
+  assert.ok(hit, "landing a demon should chip the enemy leader");
+  assert.equal(hit.damage, 1);
+  // one point from the grant plus the attack itself
+  assert.ok(result.opponent.life < lifeBefore);
+});
+
+test("the spirit stage two heals allies without passing their ceiling", () => {
+  const deck = speciesDeck(["fiorina", "gravewald", "kagerou", "fiorina", "gravewald", "kagerou"]);
+  assert.deepEqual(activeSpeciesSynergies(deck, cards, synergy).map((item) => item.stage), [1], "only three spirit types exist in the current pool");
+
+  const spiritGrant = speciesGrant("精霊", 2, synergy)!;
+  assert.equal(spiritGrant.hp, 1, "the stage-one health carries under the heal");
+  assert.deepEqual(spiritGrant.effects.map((effect) => [effect.trigger, effect.keyword, effect.value, effect.target]), [["on_play", "heal", 1, "all_allies"]]);
+
+  const opponent = getOpponent("wall");
+  const battle = createBattle(speciesDeck(["gravewald", "kagerou", "fiorina"]), opponent, cards, 5, 0, null, synergy);
+  const all = [...battle.brother.deck, ...battle.brother.hand];
+  const played = { ...all.find((item) => item.cardId === "kagerou")!, grantedEffects: [{ trigger: "on_play" as const, keyword: "heal" as const, value: 1, target: "all_allies" as const }] };
+  const hurt = { ...all.find((item) => item.cardId === "gravewald")!, summonedTurn: 0, attacked: true };
+  const full = { ...all.find((item) => item.cardId === "fiorina")!, summonedTurn: 0, attacked: true };
+  const staged = {
+    ...battle,
+    turn: 3,
+    activeSide: "brother" as const,
+    brother: {
+      ...battle.brother,
+      maxPp: 9,
+      pp: 9,
+      hand: [played],
+      deck: [],
+      board: [{ ...hurt, hp: 1 }, full],
+    },
+    opponent: { ...battle.opponent, maxPp: 0, pp: 0, hand: [], deck: [], board: [] },
+  };
+  const result = advanceBattle(staged, cards, child, opponent);
+  const heal = result.events.find((item) => item.type === "heal");
+  assert.ok(heal, "playing the spirit should heal the board");
+  assert.equal(heal.keyword, "heal");
+  assert.ok((heal.targetInstanceIds ?? []).includes(hurt.instanceId));
+  assert.equal((heal.targetInstanceIds ?? []).includes(full.instanceId), false, "a card already at its ceiling is not a heal target");
+  const healed = result.brother.board.find((item) => item.instanceId === hurt.instanceId)!;
+  assert.equal(healed.hp, 2);
+  const untouched = result.brother.board.find((item) => item.instanceId === full.instanceId)!;
+  assert.equal(untouched.hp, untouched.maxHp, "healing never passes the ceiling");
 });
 
 test("without a synergy config no grant is handed out", () => {

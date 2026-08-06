@@ -101,6 +101,7 @@ const EVENT_PLAYBACK_TIMING: Record<BattleEventType, EventPlaybackTiming> = {
     },
   },
   sync_bonus: { normal: 900, fast: 450, skip: 100, visual: { normal: 800, fast: 400, skip: 140 } },
+  heal: { normal: 520, fast: 260, skip: 80, visual: { normal: 520, fast: 260, skip: 100 } },
   ace: {
     normal: 1200,
     fast: 700,
@@ -163,7 +164,7 @@ const reasonCopy: Record<DraftOffer["decision"]["reason"], string> = {
 function effectText(card: Card): string {
   if (!card.effects.length) return "効果なし";
   return card.effects.map((effect) => {
-    const words: Record<string, string> = { rush: "速攻", guard: "守護", damage: `ダメージ${effect.value}`, destroy: "破壊", buff: `強化+${effect.value}`, draw: `ドロー${effect.value}`, revive: "復活" };
+    const words: Record<string, string> = { rush: "速攻", guard: "守護", damage: `ダメージ${effect.value}`, destroy: "破壊", buff: `強化+${effect.value}`, draw: `ドロー${effect.value}`, revive: "復活", heal: `回復${effect.value}` };
     const triggers: Record<string, string> = { on_play: "登場時", on_destroyed: "破壊時", passive: "", aura: "常時" };
     return [triggers[effect.trigger], words[effect.keyword]].filter(Boolean).join("：");
   }).join(" / ");
