@@ -782,7 +782,7 @@ export default function Home() {
     setGame(createDefaultSave(child.sync.initial));
   }
 
-  if (!hydrated || !child || !synergyConfig || cards.length !== 40 || opponents.length === 0) return <main className="boot-screen"><div className="logo-burst"><span>NOW LOADING</span><b>カードをまぜてるぞ！</b></div></main>;
+  if (!hydrated || !child || !synergyConfig || cards.length !== 96 || opponents.length === 0) return <main className="boot-screen"><div className="logo-burst"><span>NOW LOADING</span><b>カードをまぜてるぞ！</b></div></main>;
   if (game.phase === "title") return <main className="title-screen"><div className="halftone" /><section className="title-copy"><span className="prototype-label">DECK BUILD SUPPORT GAME / PROTOTYPE</span><h1><small>兄ちゃん！</small>俺のデッキ<br />作って！</h1><p>好きなカードは、変えたくない。<br /><b>だから兄ちゃん、勝てる形にしてくれよ！</b></p><button className="primary-action title-start" onClick={beginArcade}>ゲームを始める！<span>▶</span></button><div className="save-note">途中経過はこのブラウザに自動保存</div></section><section className="title-cards"><div className="tilted-card one"><CardFace card={byId.get("zexvain")!} /></div><div className="tilted-card two"><CardFace card={byId.get("dolguard")!} intervention /></div><div className="title-shout">「カッコいい」で<br />勝ちたいんだ！</div></section><footer>15 PICKS · 2 ADVICES · 1 AUTO BATTLE</footer></main>;
   if (game.phase === "mode") return <ModeSelectScreen onSelect={selectMode} />;
   if (game.phase === "character") return <CharacterSelectScreen onSelect={selectCharacter} />;

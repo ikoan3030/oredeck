@@ -236,6 +236,7 @@ const interventionHistogram = new Map<number, number>();
 const variablePairCounts = new Map<string, number>();
 const synergyStats = { builds: 0, stageOneBuilds: 0, stageTwoBuilds: 0, stageOneLines: 0, stageTwoLines: 0, winsWithSynergy: 0, buildsWithSynergy: 0, winsWithout: 0, buildsWithout: 0 };
 const synergyBySpecies = new Map<string, number>();
+const buildQuality = { builds: 0, love: 0, missing: 0, removalMissing: 0, durabilityMissing: 0, heavyCongestion: 0, lowCostMissing: 0 };
 const allBuildValues: number[] = [];
 const allCarryValues: number[] = [];
 const stage5ByBattle = Array.from({ length: battleCount }, () => 0);
@@ -266,6 +267,15 @@ for (let runIndex = 0; runIndex < runs; runIndex += 1) {
     const withAce = runBattleWithMetrics(createBattle(draft.deck, opponent, cards, battleSeed, draft.syncRate, aceCardId, synergyConfig), opponent);
     let withoutAce: ReturnType<typeof runBattleWithMetrics> | undefined;
     if (aceEligible) withoutAce = runBattleWithMetrics(createBattle(draft.deck, opponent, cards, battleSeed, draft.syncRate, null, synergyConfig), opponent);
+
+    const evaluation = evaluateDeck(draft.deck, cards);
+    buildQuality.builds += 1;
+    buildQuality.love += draft.lovePicks;
+    buildQuality.missing += evaluation.missingCount;
+    buildQuality.removalMissing += Number(evaluation.metrics.removalMissing);
+    buildQuality.durabilityMissing += Number(evaluation.metrics.durabilityMissing);
+    buildQuality.heavyCongestion += Number(evaluation.metrics.heavyCongestion);
+    buildQuality.lowCostMissing += Number(evaluation.metrics.lowCostMissing);
 
     const synergies = activeSpeciesSynergies(draft.deck, cards, synergyConfig);
     synergyStats.builds += 1;
@@ -368,6 +378,15 @@ console.log(JSON.stringify({
   allCarrySync: summarize(allCarryValues),
   deckExhaustionRate: formatRate(totalDeckExhaustions, totalBattles),
   runWinHistogram: Object.fromEntries([...runWinHistogram.entries()].sort((a, b) => a[0] - b[0])),
+  buildQuality: {
+    lovePerBuild: round(buildQuality.love / buildQuality.builds),
+    lovePerRun: round(buildQuality.love / runs),
+    missingPerBuild: round(buildQuality.missing / buildQuality.builds),
+    removalMissing: `${round(buildQuality.removalMissing / buildQuality.builds * 100)}%`,
+    durabilityMissing: `${round(buildQuality.durabilityMissing / buildQuality.builds * 100)}%`,
+    heavyCongestion: `${round(buildQuality.heavyCongestion / buildQuality.builds * 100)}%`,
+    lowCostMissing: `${round(buildQuality.lowCostMissing / buildQuality.builds * 100)}%`,
+  },
   speciesSynergy: {
     buildsWithStageOne: `${round(synergyStats.stageOneBuilds / synergyStats.builds * 100)}%`,
     buildsWithStageTwo: `${round(synergyStats.stageTwoBuilds / synergyStats.builds * 100)}%`,
