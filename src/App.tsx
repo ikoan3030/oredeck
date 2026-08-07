@@ -291,7 +291,18 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
   onAuto: () => void;
   onAdvice: (category: AdviceCategory) => void;
 }) {
-  const dialogue = !offer ? "次のカード、どんなのかな！" : offer.decision.love ? child.dialogue.love[draft.pick % child.dialogue.love.length] : offer.wantsIntervention ? child.dialogue.ask[draft.pick % child.dialogue.ask.length] : `${offer.cards[offer.decision.preferredIndex].name}にする！ ${reasonCopy[offer.decision.reason]}！`;
+  // The crush decision always runs in core; showCrush only decides whether the UI marks it.
+  const crush = Boolean(offer?.decision.love) && child.showCrush !== false;
+  const autoLine = offer
+    ? `${offer.cards[offer.decision.preferredIndex].name}にする！ ${reasonCopy[offer.decision.love ? "aesthetic" : offer.decision.reason]}！`
+    : "";
+  const dialogue = !offer
+    ? "次のカード、どんなのかな！"
+    : crush
+      ? child.dialogue.love[draft.pick % child.dialogue.love.length]
+      : offer.wantsIntervention
+        ? child.dialogue.ask[draft.pick % child.dialogue.ask.length]
+        : autoLine;
   return (
     <main className="game-shell draft-screen">
       <header className="game-header"><div className="mini-logo">兄ちゃん！<b>俺のデッキ作って！</b></div><div className="pick-counter"><span>PICK</span><b>{String(draft.pick + 1).padStart(2, "0")}</b><em>/15</em></div><SyncMeter sync={draft.syncRate} child={child} flash={pickFlash} /></header>
@@ -303,20 +314,20 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
           {offer ? <div className="card-choice">
             {offer.cards.map((card, index) => (
               <button
-                className={`card-choice-button ${offer.decision.love && index === offer.decision.preferredIndex ? "love-lock" : ""} ${pickFlash?.index === index ? `pick-flash-${pickFlash.strength}` : ""}`}
+                className={`card-choice-button ${crush && index === offer.decision.preferredIndex ? "love-lock" : ""} ${pickFlash?.index === index ? `pick-flash-${pickFlash.strength}` : ""}`}
                 key={`${card.id}-${index}`}
                 disabled={!offer.wantsIntervention || offer.decision.love || Boolean(pickFlash)}
                 onClick={() => onPick(index as 0 | 1)}
                 aria-label={`${card.name}を選ぶ`}
               >
-                {offer.decision.love && index === offer.decision.preferredIndex && <span className="love-ribbon">一目惚れ！変更不可</span>}
+                {crush && index === offer.decision.preferredIndex && <span className="love-ribbon">一目惚れ！変更不可</span>}
                 <CardFace card={card} />
                 {offer.wantsIntervention && !offer.decision.love && <span className="choose-label">こっちにする</span>}
               </button>
             ))}
             <div className="vs-burst">VS</div>
           </div> : <div className="loading-card">カードをシャッフル中…</div>}
-          {offer && (!offer.wantsIntervention || offer.decision.love) && <button className="primary-action slam" disabled={Boolean(pickFlash)} onClick={onAuto}>{offer.decision.love ? "このカードで決定！" : "弟のピックを見届ける"}<span>▶</span></button>}
+          {offer && (!offer.wantsIntervention || offer.decision.love) && <button className="primary-action slam" disabled={Boolean(pickFlash)} onClick={onAuto}>{crush ? "このカードで決定！" : "弟のピックを見届ける"}<span>▶</span></button>}
           <Speech speaker={child.displayName} text={dialogue} />
         </section>
         <aside><DeckMaterials draft={draft} cards={cards} /><SpeciesCounter draft={draft} cards={cards} config={synergyConfig} /></aside>
@@ -605,7 +616,7 @@ function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish,
 
 function ClearScreen({ run, cards, child, opponents, onTitle }: { run: RunState; cards: Card[]; child: ChildProfile; opponents: OpponentDefinition[]; onTitle: () => void }) {
   const opponentById = new Map(opponents.map((opponent) => [opponent.id, opponent]));
-  return <main className="clear-screen"><section className="clear-panel"><span className="section-kicker">ARCADE CLEAR</span><h1>6戦完走！</h1><section className="run-results"><h2>バトルの記録</h2>{run.battleResults.map((result, index) => <div className="run-result-row" key={`${result.opponentId}-${index}`}><span>{index + 1}戦目</span><strong className={result.outcome}>{result.outcome === "win" ? "○" : result.outcome === "loss" ? "×" : "△"}</strong><b>{opponentById.get(result.opponentId)?.name ?? result.opponentId}</b></div>)}</section><section className="run-facts"><div className="run-fact"><span>受動介入</span><strong>{run.summary.passiveInterventions}回</strong><small>支持 {run.summary.passiveSupports} / 却下 {run.summary.passiveRejects}</small></div><div className="run-fact"><span>一目惚れで入った札</span>{run.summary.loveCardIds.length ? <ul>{run.summary.loveCardIds.map((cardId, index) => <li key={`${cardId}-${index}`}>{cards.find((card) => card.id === cardId)?.name ?? cardId}</li>)}</ul> : <strong>なし</strong>}</div><div className="run-fact"><span>最後のシンクロ状態</span><strong>{syncStageLabel(run.summary.finalSync, child)}</strong></div></section><button className="primary-action" onClick={onTitle}>タイトルへ<span>↻</span></button></section></main>;
+  return <main className="clear-screen"><section className="clear-panel"><span className="section-kicker">ARCADE CLEAR</span><h1>6戦完走！</h1><section className="run-results"><h2>バトルの記録</h2>{run.battleResults.map((result, index) => <div className="run-result-row" key={`${result.opponentId}-${index}`}><span>{index + 1}戦目</span><strong className={result.outcome}>{result.outcome === "win" ? "○" : result.outcome === "loss" ? "×" : "△"}</strong><b>{opponentById.get(result.opponentId)?.name ?? result.opponentId}</b></div>)}</section><section className="run-facts"><div className="run-fact"><span>受動介入</span><strong>{run.summary.passiveInterventions}回</strong><small>支持 {run.summary.passiveSupports} / 却下 {run.summary.passiveRejects}</small></div>{child.showCrush !== false && <div className="run-fact"><span>一目惚れで入った札</span>{run.summary.loveCardIds.length ? <ul>{run.summary.loveCardIds.map((cardId, index) => <li key={`${cardId}-${index}`}>{cards.find((card) => card.id === cardId)?.name ?? cardId}</li>)}</ul> : <strong>なし</strong>}</div>}<div className="run-fact"><span>最後のシンクロ状態</span><strong>{syncStageLabel(run.summary.finalSync, child)}</strong></div></section><button className="primary-action" onClick={onTitle}>タイトルへ<span>↻</span></button></section></main>;
 }
 
 export default function Home() {

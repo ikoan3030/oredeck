@@ -116,6 +116,12 @@ export interface ChildProfile {
   decisionOrder: string[];
   /** Fixed per character. Deliberately not tied to the sync rate. */
   passiveInterventionRate: number;
+  /**
+   * Presentation switch only: the crush decision always runs in core.
+   * When false the UI shows a crush pick exactly like an ordinary auto pick.
+   * Defaults to shown when the field is absent.
+   */
+  showCrush?: boolean;
   sync: {
     initial: number;
     maximum: number;

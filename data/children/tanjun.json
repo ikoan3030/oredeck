@@ -6,6 +6,7 @@
   "loveThreshold": 2.4,
   "decisionOrder": ["monster", "lower_cost", "higher_attack", "aesthetic", "first"],
   "passiveInterventionRate": 0.5,
+  "showCrush": false,
   "sync": {
     "initial": 0,
     "maximum": 100,
