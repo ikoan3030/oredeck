@@ -152,6 +152,7 @@ const categoryCopy: Record<AdviceCategory, { label: string; detail: string; icon
   skip: { label: "今は見送る", detail: "弟の選び方をそのまま続ける", icon: "続" },
 };
 
+/** Kept as data for future screens. The kid's own picks deliberately state no reason. */
 const reasonCopy: Record<DraftOffer["decision"]["reason"], string> = {
   love: "見た瞬間に心を奪われた",
   monster: "モンスターだから",
@@ -293,8 +294,9 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
 }) {
   // The crush decision always runs in core; showCrush only decides whether the UI marks it.
   const crush = Boolean(offer?.decision.love) && child.showCrush !== false;
+  // The kid never explains himself on his own picks: one line of feeling, no reasoning.
   const autoLine = offer
-    ? `${offer.cards[offer.decision.preferredIndex].name}にする！ ${reasonCopy[offer.decision.love ? "aesthetic" : offer.decision.reason]}！`
+    ? child.dialogue.pick[draft.pick % child.dialogue.pick.length].replace("{name}", offer.cards[offer.decision.preferredIndex].name)
     : "";
   const dialogue = !offer
     ? "次のカード、どんなのかな！"

@@ -148,7 +148,8 @@ export interface ChildProfile {
     faceBias: number;
     attributionKeywords: Keyword[];
   };
-  dialogue: Record<"ask" | "support" | "reject" | "love" | "work" | "finisher", string[]>;
+  /** "pick" lines may carry a {name} placeholder for the chosen card. */
+  dialogue: Record<"pick" | "ask" | "support" | "reject" | "love" | "work" | "finisher", string[]>;
 }
 
 export type PickSource = "auto" | "passive" | "advice" | "love";
