@@ -8,6 +8,7 @@ import {
   evaluateDeck,
   getOpponentById,
   getCurrentOpponentId,
+  instanceHasKeyword,
   generateOffer,
   isAdviceDue,
   isAceUnlocked,
@@ -313,7 +314,7 @@ const HOW_TO_PAGES: HowToPage[] = [
       { text: "PPは毎ターン1ずつ増え、上限は10。コストの分だけPPを使ってカードを出す" },
       { text: "場に出せるモンスターは5体まで" },
       { text: "モンスター同士が戦闘すると、互いの攻撃力分のダメージを与え合う" },
-      { text: "相手の場に守護がいなければ、リーダーを直接攻撃できる" },
+      { text: "相手の場に守護がいなければ、モンスターを無視してリーダーを直接攻撃できます" },
     ],
     note: "バトル中の判断はすべて弟が行います。あなたの仕事はビルドで終わっています。",
   },
@@ -500,6 +501,12 @@ function isDamageEvent(event: BattleEvent | null): boolean {
   return Boolean(event && (event.type === "attack" || (event.type === "effect" && event.keyword === "damage")));
 }
 
+function isGuardlessLeaderAttack(event: BattleEvent | null, cards: Card[]): boolean {
+  if (!event || event.type !== "attack" || !event.targetLeader || !event.beforeSnapshot) return false;
+  const defendingPlayer = event.side === "brother" ? event.beforeSnapshot.opponent : event.beforeSnapshot.brother;
+  return defendingPlayer.board.length > 0 && !defendingPlayer.board.some((instance) => instanceHasKeyword(instance, cards, "guard"));
+}
+
 function eventCardClass(instance: BattleState["brother"]["board"][number], activeEvent: BattleEvent | null): string {
   if (!activeEvent) return "";
   const sourceId = activeEvent.sourceInstanceId ?? activeEvent.instanceId;
@@ -655,6 +662,12 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
   const [activeEvent, setActiveEvent] = useState<BattleEvent | null>(null);
   const [cutIn, setCutIn] = useState<{ kind: CutInKind; visible: boolean } | null>(null);
   const [playbackBusy, setPlaybackBusy] = useState(false);
+  const [explainedDirectAttackIds, setExplainedDirectAttackIds] = useState<Set<string>>(() => new Set());
+  const battleIdentity = battle.events[0]?.id ?? "battle";
+
+  useEffect(() => {
+    setExplainedDirectAttackIds(new Set());
+  }, [battleIdentity]);
 
   useEffect(() => {
     if (visibleEventCount >= battle.events.length) {
@@ -706,6 +719,19 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
   const leaderHitSide = activeEvent && isDamageEvent(activeEvent) && activeEvent.targetLeader ? activeEvent.side === "brother" ? "opponent" : "brother" : null;
   const visualDuration = activeEvent ? `${EVENT_PLAYBACK_TIMING[activeEvent.type].visual?.[speed] ?? EVENT_PLAYBACK_TIMING[activeEvent.type][speed]}ms` : undefined;
   const cardAttackHit = activeEvent?.type === "attack" && Boolean(activeEvent.targetInstanceId);
+  const guardlessLeaderAttack = isGuardlessLeaderAttack(activeEvent, cards);
+
+  useEffect(() => {
+    if (!activeEvent || !guardlessLeaderAttack || explainedDirectAttackIds.has(activeEvent.id) || explainedDirectAttackIds.size >= child.battle.directAttackExplanationLimit) return;
+    setExplainedDirectAttackIds((current) => {
+      if (current.has(activeEvent.id) || current.size >= child.battle.directAttackExplanationLimit) return current;
+      const next = new Set(current);
+      next.add(activeEvent.id);
+      return next;
+    });
+  }, [activeEvent, child.battle.directAttackExplanationLimit, explainedDirectAttackIds, guardlessLeaderAttack]);
+
+  const showDirectAttackExplanation = Boolean(activeEvent && guardlessLeaderAttack && explainedDirectAttackIds.has(activeEvent.id));
 
   useEffect(() => {
     if (!auto || battle.winner || !playbackComplete) return;
@@ -725,6 +751,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
       <div className={"board-zone brother-board " + (damageTargetSide === "brother" ? "battle-target" : "")}>{boardBrother.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} />)}{!boardBrother.board.length && <span className="empty-board">ユウタの場は空</span>}</div>
       <div className={"fighter brother-fighter " + (damageTargetSide === "brother" || leaderHitSide === "brother" ? "life-target" : "")}><div className="avatar kid">ユ</div><div className="life"><span>LIFE</span><b>{lifeBrother.life}</b></div><div className="pp">PP {lifeBrother.pp}/{lifeBrother.maxPp}</div></div>
       <div className="hand-zone">{boardBrother.hand.map((item) => <AnimatedBattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} />)}</div>
+      {showDirectAttackExplanation && <span className="direct-attack-explanation" role="status">{child.battle.directAttackExplanation}</span>}
       <BattleEffectLayer activeEvent={activeEvent} cards={cards} />
     </section>
     <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>

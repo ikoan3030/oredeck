@@ -989,6 +989,22 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .board-card.effect-target-flash { animation: effect-target-flash var(--event-duration, .72s) ease-out; }
 .arena.leader-hit-opponent,
 .arena.leader-hit-brother { animation: leader-hit-shake var(--event-duration, .72s) ease-out; }
+.direct-attack-explanation {
+  position: absolute;
+  z-index: 16;
+  top: 50%;
+  left: 50%;
+  padding: 7px 14px;
+  color: var(--ink);
+  background: var(--yellow);
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--pink);
+  pointer-events: none;
+  font: 1000 clamp(13px, 1.8vw, 19px)/1.1 "Yu Gothic", sans-serif;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-2deg);
+  animation: direct-attack-explanation-pop var(--event-duration, .72s) ease-out both;
+}
 .board-card.event-summon { animation: summon-in var(--event-duration, .55s) cubic-bezier(.2,1.4,.4,1); }
 .board-card.event-sync-flash,
 .hand-card.event-sync-flash { animation: sync-flash var(--event-duration, .8s) ease-out; }
@@ -1204,6 +1220,11 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   51% { transform: translate(7px, -1px); }
   60% { transform: translate(-4px, 1px); }
 }
+@keyframes direct-attack-explanation-pop {
+  0%, 22% { opacity: 0; transform: translate(-50%, -50%) scale(.75) rotate(-2deg); }
+  42% { opacity: 1; transform: translate(-50%, -50%) scale(1.08) rotate(-2deg); }
+  100% { opacity: .92; transform: translate(-50%, -58%) scale(1) rotate(-2deg); }
+}
 @keyframes damage-pop-contact {
   0%, 34% { opacity: 0; transform: translateY(16px) scale(.55) rotate(-8deg); }
   46% { opacity: 1; transform: translateY(-4px) scale(1.15) rotate(4deg); }
@@ -1309,6 +1330,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .board-card.effect-target-flash,
   .arena.leader-hit-opponent,
   .arena.leader-hit-brother,
+  .direct-attack-explanation,
   .board-card.event-summon,
   .board-card.event-sync-flash,
   .hand-card.event-sync-flash,
