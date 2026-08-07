@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   advanceBattle,
   advanceRun,
@@ -78,6 +78,7 @@ interface EventPlaybackTiming {
   fast: number;
   skip: number;
   guardIntercept?: Record<PlaybackSpeed, number>;
+  turnBanner?: Record<PlaybackSpeed, number>;
   visual?: Record<PlaybackSpeed, number>;
   cutIn?: Record<PlaybackSpeed, { before: number; hold: number; after: number }>;
 }
@@ -85,7 +86,7 @@ interface EventPlaybackTiming {
 const PLAYBACK_SPEED_KEY = "oredeck-battle-playback-speed";
 const PLAYBACK_SPEED_LABELS: Record<PlaybackSpeed, string> = { normal: "等速", fast: "倍速", skip: "スキップ" };
 const EVENT_PLAYBACK_TIMING: Record<BattleEventType, EventPlaybackTiming> = {
-  turn: { normal: 260, fast: 130, skip: 70 },
+  turn: { normal: 260, fast: 130, skip: 70, turnBanner: { normal: 500, fast: 250, skip: 0 } },
   draw: { normal: 420, fast: 210, skip: 70 },
   play: { normal: 580, fast: 290, skip: 80, visual: { normal: 580, fast: 290, skip: 120 } },
   effect: { normal: 520, fast: 260, skip: 80, visual: { normal: 520, fast: 260, skip: 100 } },
@@ -629,6 +630,12 @@ function BattleSpeedControls({ speed, onChange }: { speed: PlaybackSpeed; onChan
   return <div className="battle-speed-controls" aria-label="バトル演出速度"><span>演出</span>{(["normal", "fast", "skip"] as PlaybackSpeed[]).map((item) => <button key={item} type="button" className={speed === item ? "active" : ""} aria-pressed={speed === item} onClick={() => onChange(item)}>{PLAYBACK_SPEED_LABELS[item]}</button>)}</div>;
 }
 
+function TurnTransitionBanner({ banner }: { banner: { side: BattleEvent["side"]; text: string; duration: number } | null }) {
+  if (!banner) return null;
+  const side = banner.side === "brother" ? "brother" : "opponent";
+  return <div className={`turn-transition-banner ${side}`} style={{ "--turn-banner-duration": `${banner.duration}ms` } as CSSProperties} role="status" aria-live="polite"><span>{banner.text}</span></div>;
+}
+
 function BattleEffectLayer({ activeEvent, cards, guardPreludeDone }: { activeEvent: BattleEvent | null; cards: Card[]; guardPreludeDone: boolean }) {
   if (!activeEvent) return null;
   const amount = eventDamageAmount(activeEvent);
@@ -678,17 +685,40 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
   const [cutIn, setCutIn] = useState<{ kind: CutInKind; visible: boolean } | null>(null);
   const [playbackBusy, setPlaybackBusy] = useState(false);
   const [guardPreludeDone, setGuardPreludeDone] = useState(true);
+  const [turnBanner, setTurnBanner] = useState<{ side: BattleEvent["side"]; text: string; duration: number } | null>(null);
+  const turnBannerTimer = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (turnBannerTimer.current !== null) window.clearTimeout(turnBannerTimer.current);
+  }, []);
 
   useEffect(() => {
     if (visibleEventCount >= battle.events.length) {
       setPlaybackBusy(false);
       setActiveEvent(null);
       setCutIn(null);
+      setGuardPreludeDone(true);
+      if (turnBannerTimer.current !== null) window.clearTimeout(turnBannerTimer.current);
+      turnBannerTimer.current = null;
+      setTurnBanner(null);
       return;
     }
     const item = battle.events[visibleEventCount];
     const timing = EVENT_PLAYBACK_TIMING[item.type];
     const guardPreludeDuration = item.type === "attack" && isGuardInterceptAttack(item, cards) ? timing.guardIntercept?.[speed] ?? 0 : 0;
+    if (item.type === "turn" || speed === "skip") {
+      if (turnBannerTimer.current !== null) window.clearTimeout(turnBannerTimer.current);
+      turnBannerTimer.current = null;
+      setTurnBanner(null);
+      const turnBannerDuration = item.type === "turn" ? timing.turnBanner?.[speed] ?? 0 : 0;
+      if (turnBannerDuration > 0) {
+        setTurnBanner({ side: item.side, text: item.side === "brother" ? "ユウタのターン！" : `${opponent.name}のターン！`, duration: turnBannerDuration });
+        turnBannerTimer.current = window.setTimeout(() => {
+          setTurnBanner(null);
+          turnBannerTimer.current = null;
+        }, turnBannerDuration);
+      }
+    }
     const cutInKind: CutInKind | null = item.type === "ace" ? "ace" : item.type === "result" ? "finisher" : null;
     const timers: number[] = [];
     const finishEvent = () => {
@@ -713,7 +743,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
       timers.push(window.setTimeout(finishEvent, guardPreludeDuration + timing[speed]));
     }
     return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [battle.events.length, cards, speed, visibleEventCount]);
+  }, [battle.events.length, cards, opponent.name, speed, visibleEventCount]);
 
   const playbackComplete = !playbackBusy && visibleEventCount >= battle.events.length;
   const visibleEvents = battle.events.slice(0, Math.min(battle.events.length, visibleEventCount + (activeEvent ? 1 : 0)));
@@ -746,6 +776,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
     <BattleSpeedControls speed={speed} onChange={onSpeedChange} />
     <AceStatus battle={battle} cards={cards} />
     <SynergyDeclaration synergies={battle.synergies} />
+    <TurnTransitionBanner banner={turnBanner} />
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""}`} style={visualDuration || guardPreludeVisualDuration ? { ...(visualDuration ? { "--event-duration": visualDuration } : {}), ...(guardPreludeVisualDuration ? { "--guard-intercept-duration": guardPreludeVisualDuration } : {}) } as CSSProperties : undefined}>
       <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" || leaderHitSide === "opponent" ? "life-target" : "")}><div className="avatar" style={{ "--rival-color": opponent.color } as CSSProperties}>{opponent.name.slice(0, 1)}</div><div className="life"><span>LIFE</span><b>{lifeOpponent.life}</b></div><div className="pp">PP {lifeOpponent.pp}/{lifeOpponent.maxPp}</div></div>
       <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{boardOpponent.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} />)}{!boardOpponent.board.length && <span className="empty-board">相手の場は空</span>}</div>

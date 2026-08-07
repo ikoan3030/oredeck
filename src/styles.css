@@ -974,6 +974,24 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-speed-controls button:hover,
 .battle-speed-controls button.active { color: var(--ink); background: var(--yellow); border-color: white; }
 .battle-speed-controls button.active { box-shadow: 0 0 8px var(--yellow); }
+.turn-transition-banner {
+  position: fixed;
+  z-index: 24;
+  top: 92px;
+  left: 50%;
+  width: min(360px, calc(100vw - 32px));
+  padding: 8px 22px;
+  color: white;
+  border: 3px solid white;
+  box-shadow: 5px 5px 0 var(--ink);
+  text-align: center;
+  pointer-events: none;
+  transform: translateX(-50%) skew(-8deg);
+  animation: turn-transition-sweep var(--turn-banner-duration, .5s) ease-out both;
+}
+.turn-transition-banner.brother { background: linear-gradient(100deg, transparent, var(--orange) 16%, var(--red) 50%, var(--orange) 84%, transparent); }
+.turn-transition-banner.opponent { background: linear-gradient(100deg, transparent, var(--blue) 16%, #2368ba 50%, var(--blue) 84%, transparent); }
+.turn-transition-banner span { display: block; font: 1000 clamp(17px, 3vw, 25px)/1 "Yu Gothic", sans-serif; letter-spacing: .04em; text-shadow: 3px 3px 0 var(--ink); transform: skew(8deg); }
 
 .battle-target {
   border-color: var(--yellow);
@@ -1286,6 +1304,11 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 }
 @keyframes cut-in-rays-spin { to { transform: rotate(20deg); } }
 @keyframes cut-in-slam { from { opacity: 0; transform: translateX(24%) rotate(-8deg) scale(.75); } }
+@keyframes turn-transition-sweep {
+  0% { opacity: 0; transform: translate(-50%, -10px) skew(-8deg) scaleX(.72); }
+  22% { opacity: 1; transform: translate(-50%, 0) skew(-8deg) scaleX(1); }
+  100% { opacity: 0; transform: translate(-50%, 2px) skew(-8deg) scaleX(1); }
+}
 
 @media (max-width: 1050px) {
   .battle-speed-controls { right: 24px; }
@@ -1293,6 +1316,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 
 @media (max-width: 720px) {
   .arena { --attack-reach: clamp(105px, 22vh, 180px); }
+  .turn-transition-banner { top: 112px; width: min(300px, calc(100vw - 24px)); padding: 7px 14px; border-width: 2px; box-shadow: 3px 3px 0 var(--ink); }
+  .turn-transition-banner span { font-size: clamp(15px, 5vw, 21px); }
   .battle-speed-controls {
     top: 76px;
     right: 8px;
@@ -1323,6 +1348,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 
 @media (prefers-reduced-motion: reduce) {
   .battle-speed-controls,
+  .turn-transition-banner,
   .board-card.event-attack,
   .board-card.guard-intercept-prelude,
   .board-card.guard-intercept-prelude .guard-shield,
