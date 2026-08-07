@@ -15,6 +15,7 @@ import type {
   ChildProfile,
   DraftCard,
   ActiveSpeciesSynergy,
+  BattleCommentaryKind,
   Keyword,
   OpponentDefinition,
 } from "./types";
@@ -31,6 +32,7 @@ function makeInstance(card: Card, instanceId: string, draft?: DraftCard): Battle
     instanceId,
     cardId: card.id,
     intervention: draft?.intervention ?? false,
+    interventionSupported: draft?.interventionSupported,
     source: draft?.source ?? "auto",
     atk: card.atk,
     hp: card.hp,
@@ -79,6 +81,25 @@ function event(state: BattleState, value: Omit<BattleEvent, "id">): BattleState 
     ...next,
     events: [...state.events, { ...value, id, beforeSnapshot: value.beforeSnapshot ?? snapshot(state), snapshot: value.snapshot ?? snapshot(next) }],
   };
+}
+
+function addBattleCommentary(state: BattleState, child: ChildProfile, kind: BattleCommentaryKind, cardName?: string): BattleState {
+  const lines = child.battleCommentary.lines[kind];
+  const frequency = Math.max(0, Math.min(1, child.battleCommentary.frequency[kind]));
+  if (!lines?.length || frequency <= 0 || !state.events.length || state.nextEventId % 100 >= Math.round(frequency * 100)) return state;
+  const line = lines[state.nextEventId % lines.length].replace("{name}", cardName ?? "");
+  const lastIndex = state.events.length - 1;
+  return {
+    ...state,
+    events: state.events.map((item, index) => index === lastIndex ? { ...item, dialogue: line } : item),
+  };
+}
+
+function addLowLifeCommentary(state: BattleState, child: ChildProfile): BattleState {
+  const last = state.events.at(-1);
+  if (!last?.targetLeader || !last.damage || !last.beforeSnapshot || !last.snapshot) return state;
+  if (last.side !== "opponent" || last.beforeSnapshot.brother.life > 5 || last.snapshot.brother.life > 5) return state;
+  return addBattleCommentary(state, child, "lowLife");
 }
 
 function updatePlayers(state: BattleState, active: BattlePlayer, enemy: BattlePlayer): BattleState {
@@ -206,10 +227,8 @@ function markAttribution(
   child: ChildProfile,
   finisher: boolean,
 ): BattleState {
-  if (!instance.intervention || state.attributionFired.includes(instance.instanceId)) return state;
+  if (!instance.intervention || instance.interventionSupported === false || state.attributionFired.includes(instance.instanceId)) return state;
   if (!finisher && !child.battle.attributionKeywords.includes(keyword)) return state;
-  const dialogueList = finisher ? child.dialogue.finisher : child.dialogue.work;
-  const dialogue = dialogueList[state.nextEventId % dialogueList.length];
   const next = event(state, {
     type: "attribution",
     side: "brother",
@@ -217,7 +236,6 @@ function markAttribution(
     cardId: instance.cardId,
     instanceId: instance.instanceId,
     keyword,
-    dialogue,
     effective: true,
   });
   return { ...next, attributionFired: [...next.attributionFired, instance.instanceId] };
@@ -228,6 +246,7 @@ function destroyAtIndex(
   player: BattlePlayer,
   index: number,
   cards: readonly Card[],
+  child: ChildProfile,
 ): { state: BattleState; player: BattlePlayer; destroyed?: BattleCardInstance } {
   const target = player.board[index];
   if (!target) return { state, player };
@@ -243,6 +262,7 @@ function destroyAtIndex(
     targetInstances: [target],
     destroyed: true,
   });
+  if (player.side === "brother") nextState = addBattleCommentary(nextState, child, "ownDestroyed", cardById(cards, target.cardId).name);
   const hasRevive = instanceHasKeyword(target, cards, "revive");
   if (hasRevive && !target.revived) {
     const revived = { ...target, hp: target.maxHp, attacked: false, revived: true, buffSources: [] };
@@ -274,6 +294,7 @@ function applyDestroyTriggers(
   destroyed: BattleCardInstance,
   ownerSide: BattleSide,
   cards: readonly Card[],
+  child: ChildProfile,
 ): BattleState {
   const triggers = destroyed.grantedEffects.filter((effect) => effect.trigger === "on_destroyed" && effect.keyword === "damage");
   if (!triggers.length) return state;
@@ -304,7 +325,7 @@ function applyDestroyTriggers(
         effective: true,
       });
       if (damaged.hp <= 0) {
-        const result = destroyAtIndex(next, next[enemySide], pick.index, cards);
+        const result = destroyAtIndex(next, next[enemySide], pick.index, cards, child);
         next = updatePlayers(result.state, result.player, next[ownerSide]);
       }
       continue;
@@ -323,6 +344,8 @@ function applyDestroyTriggers(
       damage: trigger.value,
       effective: true,
     });
+    if (ownerSide === "brother" && trigger.value >= 4) next = addBattleCommentary(next, child, "leaderDamage");
+    next = addLowLifeCommentary(next, child);
   }
   return next;
 }
@@ -405,6 +428,7 @@ function resolvePlay(
     active = { ...active, board: [...active.board, summoned] };
     next = updatePlayers(next, active, next[other(side)]);
     next = event(next, { type: "play", side, text: `${active.name}は${card.name}を使った`, cardId: card.id, instanceId: instance.instanceId });
+    if (side === "brother" && card.cost >= 5) next = addBattleCommentary(next, child, "largeSummon", card.name);
     const syncBonus = applySyncBonus(next, side, summoned, card, child, cards);
     next = syncBonus.state;
     summoned = syncBonus.instance;
@@ -481,6 +505,8 @@ function resolvePlay(
         damage: effect.value,
         effective: enemy.life < before,
       });
+      if (side === "brother" && effect.value >= 4 && enemy.life < before) next = addBattleCommentary(next, child, "leaderDamage");
+      next = addLowLifeCommentary(next, child);
       if (enemy.life < before) next = markAttribution(next, instance, "damage", child, enemy.life === 0);
       continue;
     }
@@ -550,8 +576,8 @@ function resolvePlay(
           enemy = { ...enemy, board: enemy.board.map((item, index) => index === targetIndex ? damaged : item) };
           next = updatePlayers(next, next[side], enemy);
           if (damaged.hp <= 0) {
-            const result = destroyAtIndex(next, enemy, targetIndex, cards); next = updatePlayers(result.state, next[side], result.player); worked = true;
-            if (result.destroyed) next = applyDestroyTriggers(next, result.destroyed, other(side), cards);
+            const result = destroyAtIndex(next, enemy, targetIndex, cards, child); next = updatePlayers(result.state, next[side], result.player); worked = true;
+            if (result.destroyed) next = applyDestroyTriggers(next, result.destroyed, other(side), cards, child);
             destroyed = true;
           }
         }
@@ -579,8 +605,8 @@ function resolvePlay(
       if (valid.length) {
         const selected = valid.sort((a, b) => b.target.atk - a.target.atk)[0];
         const targetIndex = selected.index;
-        const result = destroyAtIndex(next, enemy, targetIndex, cards); next = updatePlayers(result.state, next[side], result.player);
-        if (result.destroyed) next = applyDestroyTriggers(next, result.destroyed, other(side), cards);
+        const result = destroyAtIndex(next, enemy, targetIndex, cards, child); next = updatePlayers(result.state, next[side], result.player);
+        if (result.destroyed) next = applyDestroyTriggers(next, result.destroyed, other(side), cards, child);
         next = markAttribution(next, instance, "destroy", child, false);
         next = event(next, {
           type: "effect",
@@ -626,6 +652,8 @@ function resolveAttack(state: BattleState, side: BattleSide, attackerIndex: numb
       keyword: "damage",
       effective: attacker.atk > 0,
     });
+    if (side === "brother" && attacker.atk >= 4) next = addBattleCommentary(next, child, "leaderDamage");
+    next = addLowLifeCommentary(next, child);
     if (attacker.atk > 0) next = markAttribution(next, attacker, "damage", child, enemy.life === 0);
     const baseAttack = attacker.atk - attacker.grantedAtk - attacker.buffSources.reduce((sum, source) => sum + source.amount, 0);
     const usefulBuff = attacker.buffSources.find((source) => source.intervention && beforeLife > baseAttack && beforeLife <= attacker.atk);
@@ -656,8 +684,8 @@ function resolveAttack(state: BattleState, side: BattleSide, attackerIndex: numb
     effective: damagedTarget.hp <= 0,
   });
   if (damagedTarget.hp <= 0) {
-    const result = destroyAtIndex(next, next[other(side)], targetIndex, cards); next = updatePlayers(result.state, next[side], result.player);
-    if (result.destroyed) next = applyDestroyTriggers(next, result.destroyed, other(side), cards);
+    const result = destroyAtIndex(next, next[other(side)], targetIndex, cards, child); next = updatePlayers(result.state, next[side], result.player);
+    if (result.destroyed) next = applyDestroyTriggers(next, result.destroyed, other(side), cards, child);
     next = markAttribution(next, attacker, "damage", child, false);
     const baseAttack = attacker.atk - attacker.grantedAtk - attacker.buffSources.reduce((sum, source) => sum + source.amount, 0);
     const usefulBuff = attacker.buffSources.find((source) => source.intervention && target.hp > baseAttack && target.hp <= attacker.atk);
@@ -666,8 +694,8 @@ function resolveAttack(state: BattleState, side: BattleSide, attackerIndex: numb
   const updatedActive = next[side];
   const currentAttackerIndex = updatedActive.board.findIndex((item) => item.instanceId === attacker.instanceId);
   if (currentAttackerIndex >= 0 && updatedActive.board[currentAttackerIndex].hp <= 0) {
-    const result = destroyAtIndex(next, updatedActive, currentAttackerIndex, cards); next = updatePlayers(result.state, result.player, next[other(side)]);
-    if (result.destroyed) next = applyDestroyTriggers(next, result.destroyed, side, cards);
+    const result = destroyAtIndex(next, updatedActive, currentAttackerIndex, cards, child); next = updatePlayers(result.state, result.player, next[other(side)]);
+    if (result.destroyed) next = applyDestroyTriggers(next, result.destroyed, side, cards, child);
   }
   return next;
 }
@@ -743,6 +771,7 @@ export function advanceBattle(
   next = event(next, { type: "turn", side, text: `${turn}ターン目・${active.name}のターン` });
   if (draw.drawn) next = event(next, { type: "draw", side, text: `${active.name}が1枚ドロー`, cardId: draw.drawn.cardId });
 
+  if (draw.aceCard) next = addBattleCommentary(next, child, "ace");
   while (true) {
     active = next[side]; enemy = next[other(side)];
     const playable = active.hand

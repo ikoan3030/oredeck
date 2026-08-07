@@ -96,6 +96,20 @@ export interface BuildSummaryCopy {
   stageKeptText: string;
 }
 
+export type BattleCommentaryKind = "largeSummon" | "ace" | "ownDestroyed" | "leaderDamage" | "lowLife";
+
+export interface BattleCommentaryDefinition {
+  frequency: Record<BattleCommentaryKind, number>;
+  lines: Record<BattleCommentaryKind, string[]>;
+}
+
+export interface PostBattleDialogue {
+  gratitude: string[];
+  aceWin: string[];
+  victory: string[];
+  defeat: string[];
+}
+
 export interface AceDefinition {
   unlockStage: number;
   lifeThreshold: number;
@@ -165,7 +179,9 @@ export interface ChildProfile {
     attributionKeywords: Keyword[];
   };
   /** "pick" lines may carry a {name} placeholder for the chosen card. */
-  dialogue: Record<"pick" | "ask" | "support" | "reject" | "love" | "work" | "finisher", string[]>;
+  dialogue: Record<"pick" | "ask" | "support" | "reject" | "love", string[]>;
+  battleCommentary: BattleCommentaryDefinition;
+  postBattle: PostBattleDialogue;
 }
 
 export type PickSource = "auto" | "passive" | "advice" | "love";
@@ -174,6 +190,7 @@ export interface DraftCard {
   instanceId: string;
   cardId: string;
   intervention: boolean;
+  interventionSupported?: boolean;
   source: PickSource;
 }
 
@@ -306,6 +323,7 @@ export interface BattleCardInstance {
   instanceId: string;
   cardId: string;
   intervention: boolean;
+  interventionSupported?: boolean;
   source: PickSource;
   atk: number;
   hp: number;

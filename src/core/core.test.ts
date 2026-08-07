@@ -563,12 +563,16 @@ test("the ace card uses the 14-card deck, life threshold, and one-use turn-start
   assert.equal(noAce.brother.deck.length, 12);
 });
 
-test("attribution only appears on effective work and never on card play", () => {
+test("attribution has no battle dialogue, while large summons may commentate", () => {
   const ids = ["judgment","judgment","followarrow","followarrow","steel-blessing","steel-blessing","balga","dolguard","grim","alvine","gaiorg","volganid","phoenixeed","valzeid","dolga"];
   const deck: DraftCard[] = ids.map((cardId, index) => ({ instanceId: `i-${index}`, cardId, intervention: index < 6, source: index < 6 ? "advice" : "auto" }));
   const result = runBattle(createBattle(deck, getOpponent("rush"), cards, 98765), cards, child, getOpponent("rush"));
   assert.ok(result.events.filter((item) => item.type === "attribution").every((item) => item.effective));
-  assert.ok(result.events.filter((item) => item.type === "play").every((item) => !item.dialogue));
+  assert.ok(result.events.filter((item) => item.type === "attribution").every((item) => !item.dialogue));
+  assert.ok(result.events.filter((item) => item.type === "play" && item.dialogue).every((item) => {
+    const card = cards.find((candidate) => candidate.id === item.cardId);
+    return item.side === "brother" && card?.cost !== undefined && card.cost >= 5;
+  }));
 });
 
 test("the full draft reaches advice checkpoints, keeps the order live, and respects the two-copy cap", () => {
@@ -588,6 +592,21 @@ test("the full draft reaches advice checkpoints, keeps the order live, and respe
   }
   const counts = state.deck.reduce((map, item) => map.set(item.cardId, (map.get(item.cardId) ?? 0) + 1), new Map<string, number>());
   assert.ok([...counts.values()].every((count) => count <= 2));
+});
+
+test("cards chosen during an advice focus retain advice provenance", () => {
+  const state = applyAdvice(createDraft(24680, child), "removal", child);
+  const offer: DraftOffer = {
+    cards: [get("judgment"), get("zahhak")],
+    decision: { preferredIndex: 0, reason: "first", love: false, scores: [0, 0] },
+    wantsIntervention: false,
+    source: "normal",
+  };
+  const next = resolveOffer(state, offer, child);
+  assert.equal(next.deck[0].cardId, "judgment");
+  assert.equal(next.deck[0].source, "advice");
+  assert.equal(next.deck[0].intervention, true);
+  assert.equal(next.deck[0].interventionSupported, true);
 });
 
 test("sync carries into the next draft through the post-battle cooldown", () => {
@@ -641,6 +660,7 @@ test("a rejected ruling leaves sync untouched", () => {
   assert.equal(draft.syncRate, 24);
   assert.equal(draft.history.at(-1)?.syncBefore, 24);
   assert.equal(draft.history.at(-1)?.syncAfter, 24);
+  assert.equal(draft.deck[0].interventionSupported, false);
 });
 
 test("resetting a run clears battle progress and restores the initial sync", () => {
@@ -693,6 +713,9 @@ test("run summary aggregates passive support, rejection, love cards, outcomes, a
   const rejectOffer: DraftOffer = { cards: [get("dolguard"), get("gaiorg")], decision: rejectDecision, wantsIntervention: true, source: "normal" };
   const rejectedIndex = rejectDecision.preferredIndex === 0 ? 1 : 0;
   draft = resolveOffer(draft, rejectOffer, child, rejectedIndex);
+
+  assert.equal(draft.deck[1].interventionSupported, true);
+  assert.equal(draft.deck[2].interventionSupported, false);
 
   const run = recordBattleResult(createRun(["rush", "wall", "boss"], 50), draft, "brother", child);
   const result = run.battleResults[0];

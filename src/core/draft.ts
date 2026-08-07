@@ -170,13 +170,26 @@ export function resolveOffer(
   const rejectedIndex: 0 | 1 = chosenIndex === 0 ? 1 : 0;
   const chosen = offer.cards[chosenIndex];
   const rejected = offer.cards[rejectedIndex];
-  const source: PickSource = offer.decision.love ? "love" : isPlayerDecision ? "passive" : "auto";
+  const source: PickSource = offer.decision.love
+    ? "love"
+    : isPlayerDecision
+      ? "passive"
+      : activeAdviceFocus(state)
+        ? "advice"
+        : "auto";
   const supported = chosenIndex === offer.decision.preferredIndex;
+  const intervention = source === "passive" || source === "advice";
+  const focus = activeAdviceFocus(state);
+  const interventionSupported = source === "passive"
+    ? supported
+    : source === "advice" && focus
+      ? matchesAdviceCategory(chosen, focus.category)
+      : undefined;
   const syncAfter = source === "passive" ? gainSync(state.syncRate, supported, child) : state.syncRate;
   return {
     ...state,
     pick: state.pick + 1,
-    deck: [...state.deck, { instanceId: `${chosen.id}-${state.pick}-${state.seed}`, cardId: chosen.id, intervention: source === "passive", source }],
+    deck: [...state.deck, { instanceId: `${chosen.id}-${state.pick}-${state.seed}`, cardId: chosen.id, intervention, interventionSupported, source }],
     rejectedCardIds: [...state.rejectedCardIds, rejected.id],
     syncRate: syncAfter,
     passiveInterventions: state.passiveInterventions + (offer.wantsIntervention ? 1 : 0),

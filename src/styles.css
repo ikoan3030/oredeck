@@ -500,6 +500,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .result-burst.win > span { background: var(--blue); }
 .result-burst h1 { margin: 18px 0 6px; font-size: clamp(38px, 7vw, 74px); letter-spacing: -.08em; }
 .result-burst p { margin: 0 0 26px; font: 800 14px/1.6 "Yu Gothic", sans-serif; }
+.post-battle-commentary { max-width: 560px; margin: 20px auto 26px; text-align: left; }
+.post-battle-commentary .speech { margin: 0; box-shadow: 4px 4px 0 var(--cyan); }
 
 @media (max-width: 1050px) {
   .draft-layout, .deck-review-grid { grid-template-columns: 1fr; }
@@ -1140,9 +1142,6 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   box-shadow: 0 0 35px var(--cyan), 0 12px 0 #17151acc;
 }
 .battle-cut-in.finisher .cut-in-band strong { color: var(--yellow); }
-
-.battle-finish-reaction { position: fixed; z-index: 45; inset: 0; pointer-events: none; }
-.battle-finish-reaction .kid-reaction { z-index: 46; top: 82px; }
 
 @keyframes attack-toward-opponent {
   0% { transform: translateY(0) rotate(0); }

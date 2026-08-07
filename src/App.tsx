@@ -635,7 +635,22 @@ function BattleCutIn({ kind }: { kind: CutInKind }) {
   return <div className={"battle-cut-in " + kind} role="status" aria-live="assertive"><div className="cut-in-rays" aria-hidden="true" /><div className="cut-in-art-layer" aria-hidden="true" /><div className="cut-in-band"><span>{kind === "ace" ? "DESTINY DRAW" : "FINISH"}</span><strong>{kind === "ace" ? "ディスティニードロー！！" : "勝負あり！！"}</strong></div></div>;
 }
 
-function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish, finalBattle, speed, onSpeedChange }: { battle: BattleState; cards: Card[]; opponent: OpponentDefinition; onNext: () => void; onAuto: () => void; auto: boolean; onFinish: () => void; finalBattle: boolean; speed: PlaybackSpeed; onSpeedChange: (speed: PlaybackSpeed) => void }) {
+function postBattleLine(battle: BattleState, cards: Card[], child: ChildProfile): string {
+  const index = battle.events.length;
+  const choose = (lines: string[]) => lines[index % lines.length];
+  const cardName = (cardId: string | undefined) => cards.find((card) => card.id === cardId)?.name ?? cardId ?? "このカード";
+
+  if (battle.winner === "opponent") return choose(child.postBattle.defeat);
+  if (battle.winner === "brother") {
+    const aceEvent = battle.events.find((item) => item.type === "ace");
+    if (aceEvent) return choose(child.postBattle.aceWin).replace("{name}", cardName(aceEvent.cardId));
+    const attribution = [...battle.events].reverse().find((item) => item.type === "attribution" && item.cardId);
+    if (attribution) return choose(child.postBattle.gratitude).replace("{name}", cardName(attribution.cardId));
+  }
+  return choose(child.postBattle.victory);
+}
+
+function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, onFinish, finalBattle, speed, onSpeedChange }: { battle: BattleState; cards: Card[]; child: ChildProfile; opponent: OpponentDefinition; onNext: () => void; onAuto: () => void; auto: boolean; onFinish: () => void; finalBattle: boolean; speed: PlaybackSpeed; onSpeedChange: (speed: PlaybackSpeed) => void }) {
   const [visibleEventCount, setVisibleEventCount] = useState(0);
   const [activeEvent, setActiveEvent] = useState<BattleEvent | null>(null);
   const [cutIn, setCutIn] = useState<{ kind: CutInKind; visible: boolean } | null>(null);
@@ -676,11 +691,11 @@ function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish,
   const playbackComplete = !playbackBusy && visibleEventCount >= battle.events.length;
   const visibleEvents = battle.events.slice(0, Math.min(battle.events.length, visibleEventCount + (activeEvent ? 1 : 0)));
   const dialogueEvent = [...visibleEvents].reverse().find((item) => item.dialogue);
-  const attributionEvent = [...visibleEvents].reverse().find((item) => item.type === "attribution" && item.dialogue);
   const recent = visibleEvents.slice(-9).reverse();
   const aceEvent = [...battle.events].reverse().find((item) => item.type === "ace");
   const aceInstanceId = aceEvent?.instanceId;
   const playbackEvent = activeEvent ?? battle.events[visibleEventCount];
+  const postBattleDialogue = playbackComplete && battle.winner ? postBattleLine(battle, cards, child) : null;
   const damageTargetSide = isDamageEvent(activeEvent) && activeEvent?.targetLeader ? activeEvent.side === "brother" ? "opponent" : "brother" : null;
   const boardSnapshot = boardSnapshotForPlayback(playbackEvent);
   const boardOpponent = boardSnapshot?.opponent ?? battle.opponent;
@@ -716,8 +731,7 @@ function BattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish,
     {dialogueEvent && !battle.winner && <div className="battle-speech"><Speech speaker={dialogueEvent.side === "brother" ? "ユウタ" : opponent.name} text={dialogueEvent.dialogue!} tone={dialogueEvent.side === "brother" ? "kid" : "rival"} /></div>}
     {!battle.winner && <div className="battle-controls"><button onClick={onNext} disabled={auto || playbackBusy}>1ターン進める</button><button className="primary-action" onClick={onAuto} disabled={auto || playbackBusy}>{auto ? "自動再生中…" : "最後まで見る"}<span>▶</span></button></div>}
     {cutIn?.visible && <BattleCutIn kind={cutIn.kind} />}
-    {playbackComplete && battle.winner && attributionEvent?.dialogue && <div className="battle-finish-reaction"><ReactionBanner reaction={{ tone: "support", text: attributionEvent.dialogue }} speaker={attributionEvent.side === "brother" ? "ユウタ" : opponent.name} /></div>}
-    {playbackComplete && battle.winner && <div className="result-overlay"><div className={"result-burst " + (battle.winner === "brother" ? "win" : "lose")}><span>{battle.winner === "brother" ? "VICTORY!" : battle.winner === "draw" ? "DRAW" : "DEFEAT"}</span><h1>{battle.winner === "brother" ? "ユウタの勝利！" : battle.winner === "draw" ? "引き分け！" : opponent.name + "の勝利！"}</h1><p>{battle.winner === "brother" ? "デッキは狙い通りに仕事をしただろうか？" : "次の相手とのバトルへ進もう。"}</p><button className="primary-action" onClick={onFinish}>{finalBattle ? "結果を見る" : "次の相手へ"}<span>▶</span></button></div></div>}
+    {playbackComplete && battle.winner && <div className="result-overlay"><div className={"result-burst " + (battle.winner === "brother" ? "win" : "lose")}><span>{battle.winner === "brother" ? "VICTORY!" : battle.winner === "draw" ? "DRAW" : "DEFEAT"}</span><h1>{battle.winner === "brother" ? "ユウタの勝利！" : battle.winner === "draw" ? "引き分け！" : opponent.name + "の勝利！"}</h1><p>{battle.winner === "brother" ? "デッキは狙い通りに仕事をしただろうか？" : "次の相手とのバトルへ進もう。"}</p>{postBattleDialogue && <div className="post-battle-commentary"><Speech speaker={child.displayName} text={postBattleDialogue} /></div>}<button className="primary-action" onClick={onFinish}>{finalBattle ? "結果を見る" : "次の相手へ"}<span>▶</span></button></div></div>}
   </main>;
 }
 
@@ -911,7 +925,7 @@ export default function Home() {
   if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} pickFlash={pickFlash} synergyConfig={synergyConfig} onPick={takePick} onAuto={() => takePick()} onAdvice={chooseAdvice} />;
   if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} synergyConfig={synergyConfig} onBattle={prepareBattle} />;
   if (game.phase === "ace" && game.draft) return <AceSelectionScreen draft={game.draft} cards={cards} selectedCardId={game.aceCardId ?? null} onSelect={selectAceCard} onConfirm={() => startBattle()} onSkip={() => startBattle(null)} />;
-  if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} opponent={currentOpponent} onNext={advanceCurrentBattle} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={changePlaybackSpeed} />;
+  if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} child={child} opponent={currentOpponent} onNext={advanceCurrentBattle} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={changePlaybackSpeed} />;
   if (game.phase === "clear") return <ClearScreen run={game.run} cards={cards} child={child} opponents={opponents} onTitle={returnToTitle} />;
   return <main className="boot-screen"><button className="primary-action" onClick={returnToTitle}>タイトルへ</button></main>;
 }
