@@ -53,6 +53,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .love-ribbon { position: absolute; z-index: 6; padding: 7px 14px; color: white; border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--yellow); top: 17px; left: -16px; background: var(--red); font-size: 15px; transform: rotate(-5deg); }
 
 .card-face { position: relative; overflow: hidden; border: 6px solid var(--ink); border-radius: 12px; padding: 12px; background: #f5eee2; box-shadow: var(--shadow); text-align: left; }
+.card-face.has-guard { padding-bottom: 43px; }
 .card-face.cool { background: linear-gradient(145deg, #e4f2ff 0 32%, #a8caff 32% 36%, #f4f7ff 36%); }
 .card-face.rare-aura { background: linear-gradient(145deg, #252933 0 32%, #e7353f 32% 36%, #e9e4d8 36%); color: var(--ink); }
 .card-face.cute { background: linear-gradient(145deg, #ffe5f1 0 32%, #ff8fc4 32% 36%, #fff4f7 36%); }
@@ -72,6 +73,11 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .stats b:last-child { background: var(--green); }
 .spell-stamp { width: max-content; margin-left: auto; padding: 5px 10px; color: white; background: var(--orange); border: 3px solid var(--ink); transform: rotate(-2deg); }
 .intervention-mark { position: absolute; z-index: 8; top: -7px; right: -7px; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; color: var(--ink); background: var(--yellow); border: 4px solid var(--ink); font-size: 17px; transform: rotate(9deg); }
+.guard-shield { position: absolute; z-index: 9; right: 18%; bottom: 5px; left: 18%; display: grid; place-items: center; height: 25px; color: white; background: linear-gradient(180deg, #68ddff, #1972c8 58%, #0b3c83); border: 3px solid #09284f; border-radius: 10px 10px 16px 16px; box-shadow: 0 0 0 2px var(--cyan), inset 0 -5px 0 #0a4b9b; font: 1000 11px/1 "Yu Gothic", sans-serif; text-shadow: 2px 2px 0 #09284f; }
+.guard-shield::before { content: ""; position: absolute; top: 4px; right: 16%; left: 16%; height: 2px; background: white; opacity: .8; }
+.card-face.compact.has-guard { padding-bottom: 5px; }
+.card-face.compact .guard-shield { right: 12%; bottom: 3px; left: 12%; height: 18px; border-width: 2px; box-shadow: 0 0 0 1px var(--cyan), inset 0 -3px 0 #0a4b9b; font-size: 8px; }
+.board-card .guard-shield { right: 15%; bottom: -8px; left: 15%; height: 20px; border-width: 2px; box-shadow: 0 0 0 1px var(--cyan), inset 0 -4px 0 #0a4b9b; font-size: 8px; }
 .card-face.compact { width: 110px; height: 150px; min-height: 0; padding: 5px; border-width: 3px; border-radius: 6px; box-shadow: 3px 3px 0 var(--ink); }
 .card-face.compact .cost-gem { width: 25px; height: 25px; border-width: 2px; font-size: 13px; }
 .card-face.compact .card-kind, .card-face.compact .effect-line, .card-face.compact .stats, .card-face.compact .spell-stamp { display: none; }
@@ -980,6 +986,10 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 }
 .board-card.event-attack.attack-toward-opponent { animation: attack-toward-opponent var(--event-duration, .72s) cubic-bezier(.2,.8,.25,1); }
 .board-card.event-attack.attack-toward-brother { animation: attack-toward-brother var(--event-duration, .72s) cubic-bezier(.2,.8,.25,1); }
+.board-card.attack-prelude-wait { filter: brightness(.92); }
+.board-card.guard-intercept-prelude { z-index: 6; animation: guard-intercept-forward-opponent var(--guard-intercept-duration, .22s) cubic-bezier(.2,1.2,.4,1) both; }
+.board-card.guard-intercept-prelude.guard-intercept-brother { animation-name: guard-intercept-forward-brother; }
+.board-card.guard-intercept-prelude .guard-shield { animation: guard-shield-pulse var(--guard-intercept-duration, .22s) ease-out both; }
 .board-card.attack-contact-target { animation: attack-contact-target var(--event-duration, .72s) ease-out; }
 .board-card.attack-contact-target.target-knockback-opponent { animation: attack-contact-knockback-opponent var(--event-duration, .72s) ease-out; }
 .board-card.attack-contact-target.target-knockback-brother { animation: attack-contact-knockback-brother var(--event-duration, .72s) ease-out; }
@@ -989,22 +999,6 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .board-card.effect-target-flash { animation: effect-target-flash var(--event-duration, .72s) ease-out; }
 .arena.leader-hit-opponent,
 .arena.leader-hit-brother { animation: leader-hit-shake var(--event-duration, .72s) ease-out; }
-.direct-attack-explanation {
-  position: absolute;
-  z-index: 16;
-  top: 50%;
-  left: 50%;
-  padding: 7px 14px;
-  color: var(--ink);
-  background: var(--yellow);
-  border: 3px solid var(--ink);
-  box-shadow: 4px 4px 0 var(--pink);
-  pointer-events: none;
-  font: 1000 clamp(13px, 1.8vw, 19px)/1.1 "Yu Gothic", sans-serif;
-  white-space: nowrap;
-  transform: translate(-50%, -50%) rotate(-2deg);
-  animation: direct-attack-explanation-pop var(--event-duration, .72s) ease-out both;
-}
 .board-card.event-summon { animation: summon-in var(--event-duration, .55s) cubic-bezier(.2,1.4,.4,1); }
 .board-card.event-sync-flash,
 .hand-card.event-sync-flash { animation: sync-flash var(--event-duration, .8s) ease-out; }
@@ -1173,6 +1167,18 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   63% { transform: translateY(18px) rotate(-4deg) scale(1.02); filter: brightness(1.25); }
   100% { transform: translateY(0) rotate(0); }
 }
+@keyframes guard-intercept-forward-opponent {
+  0%, 100% { transform: translateY(0) scale(1); }
+  52% { transform: translateY(15px) scale(1.08); filter: brightness(1.45) drop-shadow(0 0 18px var(--cyan)); }
+}
+@keyframes guard-intercept-forward-brother {
+  0%, 100% { transform: translateY(0) scale(1); }
+  52% { transform: translateY(-15px) scale(1.08); filter: brightness(1.45) drop-shadow(0 0 18px var(--cyan)); }
+}
+@keyframes guard-shield-pulse {
+  0%, 100% { filter: brightness(1); box-shadow: 0 0 0 1px var(--cyan), inset 0 -4px 0 #0a4b9b; }
+  48% { filter: brightness(2.1); box-shadow: 0 0 0 4px white, 0 0 24px var(--cyan), inset 0 -4px 0 #0a4b9b; }
+}
 @keyframes attack-contact-target {
   0%, 30%, 100% { transform: translate(0) rotate(0); }
   42% { transform: translate(-7px, -3px) rotate(-4deg) scale(1.05); filter: brightness(1.5); }
@@ -1219,11 +1225,6 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   42% { transform: translate(-5px, 1px); }
   51% { transform: translate(7px, -1px); }
   60% { transform: translate(-4px, 1px); }
-}
-@keyframes direct-attack-explanation-pop {
-  0%, 22% { opacity: 0; transform: translate(-50%, -50%) scale(.75) rotate(-2deg); }
-  42% { opacity: 1; transform: translate(-50%, -50%) scale(1.08) rotate(-2deg); }
-  100% { opacity: .92; transform: translate(-50%, -58%) scale(1) rotate(-2deg); }
 }
 @keyframes damage-pop-contact {
   0%, 34% { opacity: 0; transform: translateY(16px) scale(.55) rotate(-8deg); }
@@ -1323,6 +1324,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 @media (prefers-reduced-motion: reduce) {
   .battle-speed-controls,
   .board-card.event-attack,
+  .board-card.guard-intercept-prelude,
+  .board-card.guard-intercept-prelude .guard-shield,
   .board-card.attack-contact-target,
   .arena.attack-hit-card,
   .board-card.effect-source-flash,
@@ -1330,7 +1333,6 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .board-card.effect-target-flash,
   .arena.leader-hit-opponent,
   .arena.leader-hit-brother,
-  .direct-attack-explanation,
   .board-card.event-summon,
   .board-card.event-sync-flash,
   .hand-card.event-sync-flash,

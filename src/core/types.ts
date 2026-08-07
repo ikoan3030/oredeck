@@ -177,8 +177,6 @@ export interface ChildProfile {
   battle: {
     faceBias: number;
     attributionKeywords: Keyword[];
-    directAttackExplanationLimit: number;
-    directAttackExplanation: string;
   };
   /** "pick" lines may carry a {name} placeholder for the chosen card. */
   dialogue: Record<"pick" | "ask" | "support" | "reject" | "love", string[]>;

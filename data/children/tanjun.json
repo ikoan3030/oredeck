@@ -126,9 +126,7 @@
   },
   "battle": {
     "faceBias": 0.82,
-    "attributionKeywords": ["damage", "destroy", "buff"],
-    "directAttackExplanationLimit": 2,
-    "directAttackExplanation": "まもりがいない！"
+    "attributionKeywords": ["damage", "destroy", "buff"]
   },
   "dialogue": {
     "pick": ["{name}にする！", "こっちがいい！", "これだ！", "{name}、もらった！", "うん、こっち！"],
