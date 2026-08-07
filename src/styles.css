@@ -91,9 +91,9 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .kid-reaction.support { border-color: var(--blue); box-shadow: 5px 5px 0 var(--cyan); }
 .kid-reaction.support b { background: var(--blue); }
 .kid-reaction.support span { background: var(--blue); border-color: var(--blue); }
-.kid-reaction.reject { border-color: var(--red); box-shadow: 5px 5px 0 var(--orange); transform: translateX(-50%) rotate(1deg); }
-.kid-reaction.reject b { background: var(--red); }
-.kid-reaction.reject span { background: var(--red); border-color: var(--red); }
+.kid-reaction.reject { border-color: var(--blue); box-shadow: 5px 5px 0 var(--cyan); transform: translateX(-50%) rotate(-1deg); }
+.kid-reaction.reject b { background: var(--blue); }
+.kid-reaction.reject span { background: var(--blue); border-color: var(--blue); }
 
 @keyframes reaction-pop { from { opacity: 0; transform: translate(-50%, -12px) scale(.94); } }
 

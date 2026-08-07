@@ -258,7 +258,7 @@ function Speech({ speaker, text, tone = "kid" }: { speaker: string; text: string
 
 function ReactionBanner({ reaction, speaker }: { reaction: KidReaction; speaker: string }) {
   return <div className={`kid-reaction ${reaction.tone}`} role="status">
-    <b aria-hidden="true">{reaction.tone === "support" ? "！" : "…"}</b>
+    <b aria-hidden="true">！</b>
     <span>{speaker}</span>
     <p>{reaction.text}</p>
   </div>;
