@@ -54,13 +54,13 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 
 .card-face { position: relative; overflow: hidden; border: 6px solid var(--ink); border-radius: 12px; padding: 12px; background: #f5eee2; box-shadow: var(--shadow); text-align: left; }
 .card-face.cool { background: linear-gradient(145deg, #e4f2ff 0 32%, #a8caff 32% 36%, #f4f7ff 36%); }
-.card-face.love { background: linear-gradient(145deg, #252933 0 32%, #e7353f 32% 36%, #e9e4d8 36%); color: var(--ink); }
+.card-face.rare-aura { background: linear-gradient(145deg, #252933 0 32%, #e7353f 32% 36%, #e9e4d8 36%); color: var(--ink); }
 .card-face.cute { background: linear-gradient(145deg, #ffe5f1 0 32%, #ff8fc4 32% 36%, #fff4f7 36%); }
 .card-topline { display: flex; justify-content: space-between; align-items: center; min-height: 38px; }
 .cost-gem { display: grid; place-items: center; width: 48px; height: 48px; margin-top: -4px; color: white; background: var(--blue); border: 4px solid var(--ink); border-radius: 50%; font-size: 24px; transform: rotate(-8deg); box-shadow: 2px 2px 0 white; }
 .card-kind { font: 900 10px/1 Arial, sans-serif; letter-spacing: .16em; background: var(--ink); color: white; padding: 5px 8px; }
 .card-art { position: relative; height: 220px; margin: 8px 0 13px; display: grid; place-items: center; overflow: hidden; border: 4px solid var(--ink); background: repeating-radial-gradient(circle at center, transparent 0 12px, #ffffff30 13px 16px), conic-gradient(from 40deg, var(--blue), var(--cyan), white, var(--orange), var(--blue)); }
-.love .card-art { background: repeating-radial-gradient(circle at center, transparent 0 13px, #ffffff20 14px 17px), conic-gradient(from 30deg, #10131b, #d22332, #ffd928, #1b1f29); }
+.rare-aura .card-art { background: repeating-radial-gradient(circle at center, transparent 0 13px, #ffffff20 14px 17px), conic-gradient(from 30deg, #10131b, #d22332, #ffd928, #1b1f29); }
 .cute .card-art { background: repeating-radial-gradient(circle at center, transparent 0 13px, #ffffff35 14px 17px), conic-gradient(#ff89c2, #ffe348, #83e8ff, #ff89c2); }
 .card-art::before, .card-art::after { content: ""; position: absolute; width: 165%; height: 12px; background: #fff8; transform: rotate(-24deg); }
 .card-art::after { transform: rotate(27deg); width: 130%; }
@@ -275,6 +275,57 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 }
 
 .mode-select-panel { width: min(820px, 100%); }
+/* あそびかた: static reference pages opened from mode select. */
+.mode-card.how-to-card { min-height: 130px; background: linear-gradient(118deg, #171a26 0 58%, #3b3350 58% 100%); box-shadow: 9px 9px 0 var(--pink); margin-top: 22px; }
+.how-to-backdrop { padding: 16px; align-items: start; }
+.how-to-panel {
+  width: min(760px, 100%);
+  margin: auto;
+  display: grid;
+  gap: 14px;
+  padding: clamp(16px, 3vw, 28px);
+  background-color: var(--paper);
+  background-image: radial-gradient(#d8c8b8 1px, transparent 1px);
+  background-size: 10px 10px;
+  border: 7px solid var(--ink);
+  box-shadow: 12px 12px 0 var(--yellow);
+  color: var(--ink);
+  font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+}
+.how-to-head { position: relative; display: grid; gap: 10px; justify-items: start; padding-right: 46px; }
+.how-to-head h2 { margin: 0; font-family: "Arial Black", "Yu Gothic", sans-serif; font-size: clamp(20px, 3.4vw, 30px); letter-spacing: -.04em; }
+.how-to-close {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  color: white;
+  background: var(--ink);
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--red);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.how-to-close:hover { background: var(--red); }
+.how-to-body { display: grid; gap: 12px; }
+.how-to-lead { margin: 0; font-size: clamp(14px, 2.2vw, 17px); font-weight: 900; line-height: 1.7; }
+.how-to-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+.how-to-list li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: baseline; padding: 9px 12px; background: #fffdf7; border: 3px solid var(--ink); box-shadow: 3px 3px 0 #00000018; }
+.how-to-list li b { color: var(--ink); background: var(--yellow); border: 2px solid var(--ink); padding: 2px 8px; font-size: 12px; white-space: nowrap; }
+.how-to-list li span { grid-column: 2; font-size: clamp(12px, 1.9vw, 14px); font-weight: 700; line-height: 1.65; }
+.how-to-list li:not(:has(b)) span { grid-column: 1 / -1; }
+.how-to-note { margin: 0; padding: 11px 13px; background: var(--yellow); border: 3px dashed var(--ink); font-size: clamp(12px, 1.9vw, 14px); font-weight: 900; line-height: 1.65; }
+.how-to-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.how-to-foot .primary-action, .how-to-foot .secondary-action { font-size: 14px; padding: 11px 18px; }
+.how-to-foot .secondary-action:disabled { opacity: .4; cursor: default; transform: none; }
+.how-to-dots { display: flex; gap: 6px; }
+.how-to-dots i { width: 11px; height: 11px; background: #cabfb2; border: 2px solid var(--ink); border-radius: 50%; }
+.how-to-dots i.on { background: var(--red); }
+
 .mode-card {
   position: relative;
   width: min(620px, 100%);
@@ -570,6 +621,18 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .kid-reaction b { width: 28px; height: 28px; font-size: 15px; }
   .kid-reaction span { font-size: 10px; padding: 4px 6px; }
   .kid-reaction p { font-size: 13px; }
+}
+
+@media (max-width: 480px) {
+  .how-to-panel { border-width: 5px; box-shadow: 8px 8px 0 var(--yellow); gap: 10px; }
+  .how-to-backdrop { padding: 8px; }
+  .how-to-head { padding-right: 40px; }
+  .how-to-list li { padding: 7px 9px; gap: 3px 7px; }
+  .how-to-list li b { font-size: 10px; padding: 2px 6px; }
+  .how-to-foot { gap: 7px; }
+  .how-to-foot .primary-action, .how-to-foot .secondary-action { font-size: 12px; padding: 9px 12px; }
+  .how-to-dots i { width: 8px; height: 8px; }
+  .mode-card.how-to-card { min-height: 96px; margin-top: 14px; }
 }
 
 @media (max-width: 390px) {

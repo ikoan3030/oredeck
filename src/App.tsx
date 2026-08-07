@@ -172,7 +172,7 @@ function effectText(card: Card): string {
 }
 
 function CardFace({ card, selected, intervention, compact = false }: { card: Card; selected?: boolean; intervention?: boolean; compact?: boolean }) {
-  const aesthetic = card.aesthetic.C >= 3 ? "love" : card.aesthetic.C >= 2 ? "cool" : card.aesthetic.K >= 2 ? "cute" : "plain";
+  const aesthetic = card.aesthetic.C >= 3 ? "rare-aura" : card.aesthetic.C >= 2 ? "cool" : card.aesthetic.K >= 2 ? "cute" : "plain";
   return (
     <article className={`card-face ${aesthetic} ${selected ? "selected" : ""} ${compact ? "compact" : ""}`}>
       {intervention && <span className="intervention-mark" title="兄ちゃんが選んだカード">兄</span>}
@@ -263,8 +263,110 @@ function ReactionBanner({ reaction, speaker }: { reaction: KidReaction; speaker:
   </div>;
 }
 
+interface HowToPage {
+  title: string;
+  lead?: string;
+  items?: Array<{ term?: string; text: string }>;
+  note?: string;
+}
+
+/** Static reference pages, reachable from mode select at any time. Not a guided tutorial. */
+const HOW_TO_PAGES: HowToPage[] = [
+  {
+    title: "このゲームについて",
+    lead: "デッキを組むのは、あなたではなく弟です。",
+    items: [
+      { text: "弟は自分の好みでカードを選びます。あなた（兄ちゃん）が口を出せるのは、弟が意見を求めてきたときと、区切りごとのアドバイスだけ。" },
+      { text: "完成したデッキで、弟は対戦相手に挑みます。バトルは自動で進行し、あなたは観戦します。" },
+    ],
+    note: "勝たせてやるために、弟の好みを読み、足りないものを補うのがあなたの役目です。",
+  },
+  {
+    title: "カードの見かた",
+    lead: "カードには次の情報があります。",
+    items: [
+      { term: "コスト", text: "場に出すために必要なPP" },
+      { term: "攻撃力／体力", text: "戦闘の数値。体力が0になると破壊される" },
+      { term: "種族", text: "カード右上に表示。ドラゴン／メカ／けもの／天使／悪魔／精霊の6種" },
+      { term: "効果", text: "一部のカードが持つ能力（次ページ）" },
+    ],
+    note: "スペルは使い切りのカードで、モンスターと違い場に残りません。種族も持ちません。",
+  },
+  {
+    title: "効果の説明",
+    lead: "効果は7種類だけです。",
+    items: [
+      { term: "速攻", text: "場に出たターンから攻撃できる（通常は次のターンから）" },
+      { term: "守護", text: "このカードがいる間、相手は先にこのカードを攻撃しなければならない" },
+      { term: "ダメージ", text: "指定の相手に直接ダメージを与える" },
+      { term: "破壊", text: "対象のモンスターを体力に関係なく破壊する" },
+      { term: "強化", text: "味方の攻撃力を上げる" },
+      { term: "ドロー", text: "カードを引く" },
+      { term: "復活", text: "破壊されたとき、一度だけ場に戻ってくる" },
+    ],
+  },
+  {
+    title: "バトルのルール",
+    items: [
+      { text: "お互いのリーダーはライフ20から始まる（一部の強敵はもっと多い）。相手のライフを0にすれば勝ち" },
+      { text: "PPは毎ターン1ずつ増え、上限は10。コストの分だけPPを使ってカードを出す" },
+      { text: "場に出せるモンスターは5体まで" },
+      { text: "モンスター同士が戦闘すると、互いの攻撃力分のダメージを与え合う" },
+      { text: "相手の場に守護がいなければ、リーダーを直接攻撃できる" },
+    ],
+    note: "バトル中の判断はすべて弟が行います。あなたの仕事はビルドで終わっています。",
+  },
+  {
+    title: "シンクロと種族結束",
+    items: [
+      { term: "シンクロ率", text: "弟が意見を求めてきたとき、弟が本当に欲しがっているカードを選んであげると上がります。段階が上がると弟のカードに力が宿り、最大まで達すると、ビルド後に切り札を1枚指定できます。切り札はピンチのとき、必ず手札にやってきます" },
+      { term: "種族結束", text: "同じ種族のカードが4種類そろうと、その種族全体が少し強くなります。6種類そろえば、種族ごとの大きな力が発動します。同じカード2枚は1種類と数えます" },
+    ],
+    note: "シンクロ率は試合をまたいで持ち越されますが、試合が終わるごとに少し下がります。",
+  },
+];
+
+function HowToPlayOverlay({ onClose }: { onClose: () => void }) {
+  const [page, setPage] = useState(0);
+  const current = HOW_TO_PAGES[page];
+  const last = HOW_TO_PAGES.length - 1;
+  return (
+    <div className="modal-backdrop how-to-backdrop">
+      <section className="how-to-panel" role="dialog" aria-modal="true" aria-label="あそびかた">
+        <header className="how-to-head">
+          <span className="section-kicker">HOW TO PLAY</span>
+          <h2>{current.title}</h2>
+          <button type="button" className="how-to-close" onClick={onClose} aria-label="あそびかたを閉じる">×</button>
+        </header>
+        <div className="how-to-body">
+          {current.lead && <p className="how-to-lead">{current.lead}</p>}
+          {current.items && <ul className="how-to-list">
+            {current.items.map((item, index) => (
+              <li key={index}>{item.term && <b>{item.term}</b>}<span>{item.text}</span></li>
+            ))}
+          </ul>}
+          {current.note && <p className="how-to-note">{current.note}</p>}
+        </div>
+        <footer className="how-to-foot">
+          <button type="button" className="secondary-action" onClick={() => setPage((value) => Math.max(0, value - 1))} disabled={page === 0}>◀ 前へ</button>
+          <div className="how-to-dots" aria-label={`${page + 1} / ${HOW_TO_PAGES.length}ページ`}>
+            {HOW_TO_PAGES.map((item, index) => <i key={item.title} className={index === page ? "on" : ""} />)}
+          </div>
+          {page === last
+            ? <button type="button" className="primary-action" onClick={onClose}>閉じる</button>
+            : <button type="button" className="primary-action" onClick={() => setPage((value) => Math.min(last, value + 1))}>次へ ▶</button>}
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 function ModeSelectScreen({ onSelect }: { onSelect: () => void }) {
-  return <main className="mode-select-screen"><section className="mode-select-panel"><span className="section-kicker">SELECT MODE</span><h1>遊び方を選べ！</h1><button className="mode-card active" onClick={onSelect}><strong>アーケードモード</strong><span>6戦の連続バトル</span><b>START ▶</b></button></section></main>;
+  const [howToOpen, setHowToOpen] = useState(false);
+  return <main className="mode-select-screen"><section className="mode-select-panel"><span className="section-kicker">SELECT MODE</span><h1>遊び方を選べ！</h1>
+    <button className="mode-card active" onClick={onSelect}><strong>アーケードモード</strong><span>6戦の連続バトル</span><b>START ▶</b></button>
+    <button className="mode-card how-to-card" onClick={() => setHowToOpen(true)}><strong>あそびかた</strong><span>ルールの説明を読む</span><b>OPEN ▶</b></button>
+  </section>{howToOpen && <HowToPlayOverlay onClose={() => setHowToOpen(false)} />}</main>;
 }
 
 function CharacterSelectScreen({ onSelect }: { onSelect: () => void }) {
