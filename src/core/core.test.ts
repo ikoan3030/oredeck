@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
-import { activeAdviceFocus, applyAdvice, matchesAdviceCategory, activeSpeciesSynergies, advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createLadderRun, createRun, decaySync, decideOffer, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, countSpeciesTypes, instanceHasKeyword, speciesGrant, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition, type SpeciesSynergyConfig } from "./index";
+import { activeAdviceFocus, applyAdvice, matchesAdviceCategory, activeSpeciesSynergies, advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createLadderRun, createRun, decaySync, decideOffer, deferPassiveIntervention, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, countSpeciesTypes, instanceHasKeyword, speciesGrant, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition, type SpeciesSynergyConfig } from "./index";
 
 const cards = JSON.parse(readFileSync(resolve("data/cards.json"), "utf8")) as Card[];
 const child = JSON.parse(readFileSync(resolve("data/children/tanjun.json"), "utf8")) as ChildProfile;
@@ -48,42 +48,60 @@ test("stages are twenty wide and the ace unlocks only at the top one", () => {
   assert.equal(isAceUnlocked(80, child), true);
 });
 
-test("passive intervention stays at the fixed character rate, independent of sync", () => {
-  assert.equal(child.passiveInterventionRate, 0.5);
-  const sample = (sync: number) => {
-    let asked = 0;
-    let normal = 0;
-    for (let seed = 1; seed <= 600; seed += 1) {
-      const generated = generateOffer(createDraft(seed * 7919, child, sync), cards, child);
-      if (generated.offer.decision.love) continue;
-      normal += 1;
-      if (generated.offer.wantsIntervention) asked += 1;
+test("passive intervention positions are fixed by data and seeded at build start", () => {
+  assert.equal("passiveInterventionRate" in child, false);
+  assert.deepEqual(child.passiveInterventions, {
+    total: 7,
+    segments: [
+      { startPick: 1, endPick: 5, count: 2 },
+      { startPick: 6, endPick: 10, count: 2 },
+      { startPick: 11, endPick: 15, count: 2 },
+    ],
+    freeCount: 1,
+  });
+  for (let seed = 1; seed <= 200; seed += 1) {
+    const positions = createDraft(seed * 7919, child).passiveInterventionPicks;
+    assert.equal(positions.length, 7);
+    assert.equal(new Set(positions).size, 7);
+    for (const segment of child.passiveInterventions.segments) {
+      assert.ok(positions.filter((pick) => pick >= segment.startPick && pick <= segment.endPick).length >= segment.count);
     }
-    return asked / normal;
-  };
-  const low = sample(child.sync.initial);
-  const high = sample(child.sync.maximum);
-  assert.ok(Math.abs(low - 0.5) < 0.06, `low sync rate ${low}`);
-  assert.ok(Math.abs(high - 0.5) < 0.06, `high sync rate ${high}`);
-  assert.ok(Math.abs(low - high) < 0.05, `sync must not shift the rate: ${low} vs ${high}`);
+  }
 });
 
-test("love suppresses passive intervention, and an order does not force one", () => {
-  for (let seed = 1; seed <= 600; seed += 1) {
-    const generated = generateOffer(createDraft(seed * 7919, child, child.sync.maximum), cards, child);
-    if (generated.offer.decision.love) assert.equal(generated.offer.wantsIntervention, false);
-  }
-  let asked = 0;
-  let offers = 0;
-  for (let seed = 1; seed <= 600; seed += 1) {
-    const ordered = applyAdvice({ ...createDraft(seed * 7919, child, child.sync.initial), pick: 5 }, "removal", child);
-    const generated = generateOffer(ordered, cards, child);
-    if (generated.offer.decision.love) continue;
-    offers += 1;
-    asked += Number(generated.offer.wantsIntervention);
-  }
-  const rate = asked / offers;
-  assert.ok(Math.abs(rate - child.passiveInterventionRate) < 0.06, `an order must not change the ask rate: ${rate}`);
+test("a completed build keeps seven interventions unless the final no-slot edge is reached", () => {
+  const finish = (seed: number) => {
+    let state = createDraft(seed, child, child.sync.initial);
+    while (state.pick < 15) {
+      const generated = generateOffer(state, cards, child);
+      state = resolveOffer(generated.state, generated.offer, child, generated.offer.wantsIntervention ? generated.offer.decision.preferredIndex : undefined);
+    }
+    return state;
+  };
+  for (let seed = 1; seed <= 10; seed += 1) assert.equal(finish(seed * 7919).passiveInterventions, 7);
+  assert.equal(finish(11 * 7919).passiveInterventions, 6);
+
+  const ordered = applyAdvice({ ...createDraft(1234, child, child.sync.initial), pick: 5 }, "removal", child);
+  const generated = generateOffer(ordered, cards, child);
+  const focus = ordered.adviceFocus;
+  assert.ok(focus);
+  assert.ok(ordered.passiveInterventionPicks.filter((pick) => pick > ordered.pick && pick <= focus.expiresAtPick).length >= 1);
+  assert.equal(generated.state.passiveInterventionPicks.length, 7);
+});
+
+test("love-hit intervention positions defer forward, including the no-slot edge", () => {
+  const plan = {
+    total: 3,
+    segments: [
+      { startPick: 1, endPick: 5, count: 1 },
+      { startPick: 6, endPick: 10, count: 1 },
+      { startPick: 11, endPick: 15, count: 1 },
+    ],
+    freeCount: 0,
+  };
+  assert.deepEqual(deferPassiveIntervention([2, 7, 12], 2, plan), [3, 7, 12]);
+  assert.deepEqual(deferPassiveIntervention([5, 9, 12], 5, plan), [6, 9, 12]);
+  assert.deepEqual(deferPassiveIntervention([15], 15, plan), []);
 });
 
 test("an order raises how often the ordered category is offered, and stops at expiry", () => {

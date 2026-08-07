@@ -36,7 +36,7 @@ import {
 type Phase = "title" | "mode" | "character" | "opponent" | "draft" | "deck" | "ace" | "battle" | "clear";
 
 interface SavedGame {
-  version: 4;
+  version: 5;
   phase: Phase;
   draft: DraftState | null;
   offer: DraftOffer | null;
@@ -125,7 +125,7 @@ function loadPlaybackSpeed(): PlaybackSpeed {
 const SAVE_KEY = "oredeck-prototype-v2";
 
 function createDefaultSave(initialSync = 0, seed = 0): SavedGame {
-  return { version: 4, phase: "title", draft: null, offer: null, adviceOpen: false, battle: null, run: createLadderRun(seed, initialSync), aceCardId: null };
+  return { version: 5, phase: "title", draft: null, offer: null, adviceOpen: false, battle: null, run: createLadderRun(seed, initialSync), aceCardId: null };
 }
 
 const defaultSave = createDefaultSave();
@@ -133,7 +133,7 @@ const defaultSave = createDefaultSave();
 function isSavedGame(value: unknown): value is SavedGame {
   if (!value || typeof value !== "object") return false;
   const saved = value as Partial<SavedGame>;
-  return saved.version === 4 && typeof saved.phase === "string" && Boolean(saved.run && Array.isArray(saved.run.opponentIds) && saved.run.opponentIds.length === 6);
+  return saved.version === 5 && typeof saved.phase === "string" && Boolean(saved.run && Array.isArray(saved.run.opponentIds) && saved.run.opponentIds.length === 6);
 }
 
 function loadSavedGame(raw: string | null): SavedGame | null {

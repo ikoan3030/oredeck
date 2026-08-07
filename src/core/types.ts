@@ -107,6 +107,18 @@ export interface AceDefinition {
   };
 }
 
+export interface PassiveInterventionSegment {
+  startPick: number;
+  endPick: number;
+  count: number;
+}
+
+export interface PassiveInterventionPlan {
+  total: number;
+  segments: PassiveInterventionSegment[];
+  freeCount: number;
+}
+
 export interface ChildProfile {
   id: string;
   name: string;
@@ -114,8 +126,8 @@ export interface ChildProfile {
   aestheticWeights: Record<AestheticKey, number>;
   loveThreshold: number;
   decisionOrder: string[];
-  /** Fixed per character. Deliberately not tied to the sync rate. */
-  passiveInterventionRate: number;
+  /** Fixed per character. Positions are drawn once at build start and are independent of advice weights. */
+  passiveInterventions: PassiveInterventionPlan;
   /**
    * Presentation switch only: the crush decision always runs in core.
    * When false the UI shows a crush pick exactly like an ordinary auto pick.
@@ -206,6 +218,8 @@ export interface DraftState {
   syncRate: number;
   seenAdviceCheckpoints: number[];
   adviceFocus: AdviceFocus | null;
+  /** One-based future/current pick positions scheduled for passive intervention. */
+  passiveInterventionPicks: number[];
   passiveInterventions: number;
   lovePicks: number;
   history: DraftHistoryItem[];

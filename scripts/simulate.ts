@@ -99,8 +99,11 @@ const rawPolicy = optionValue("--policy") ?? "always-match";
 const rawMatchRate = optionValue("--match-rate");
 const rawAceThreshold = optionValue("--ace-threshold");
 const rawAdvice = optionValue("--advice") ?? "normal";
+const rawOffset = optionValue("--offset") ?? "0";
 
 if (!Number.isInteger(runs) || runs < 1) throw new Error("runs must be a positive integer");
+const runOffset = Number(rawOffset);
+if (!Number.isInteger(runOffset) || runOffset < 0) throw new Error("--offset must be a non-negative integer");
 if (mode !== "six" && mode !== "three") throw new Error("--mode must be six or three");
 if (rawAdvice !== "normal" && rawAdvice !== "skip") throw new Error("--advice must be normal or skip");
 const adviceMode = rawAdvice as AdviceMode;
@@ -297,7 +300,7 @@ let totalBattles = 0;
 let totalDeckExhaustions = 0;
 
 for (let runIndex = 0; runIndex < runs; runIndex += 1) {
-  const runSeed = Math.imul(runIndex + 1, 0x9e3779b1) >>> 0;
+  const runSeed = Math.imul(runIndex + runOffset + 1, 0x9e3779b1) >>> 0;
   let run = ladderFor(mode, runSeed);
   let policySeed = (runSeed ^ 0xa5a5a5a5) >>> 0;
   const bundleTargetSpecies = policy.kind === "bundle" ? chooseBundleTargetSpecies((runSeed ^ 0x27d4eb2d) >>> 0) : undefined;
@@ -497,6 +500,7 @@ for (const id of ["rush", "wall", "boss", "sister", "smart-brother", "cousin", "
 
 console.log(JSON.stringify({
   runs,
+  runOffset,
   mode,
   aceThreshold,
   policy,

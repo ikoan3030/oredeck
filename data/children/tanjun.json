@@ -5,7 +5,15 @@
   "aestheticWeights": {"C": 1.0, "K": 0.0, "cool": 0.3, "H": 0.7},
   "loveThreshold": 2.4,
   "decisionOrder": ["monster", "lower_cost", "higher_attack", "aesthetic", "first"],
-  "passiveInterventionRate": 0.5,
+  "passiveInterventions": {
+    "total": 7,
+    "segments": [
+      {"startPick": 1, "endPick": 5, "count": 2},
+      {"startPick": 6, "endPick": 10, "count": 2},
+      {"startPick": 11, "endPick": 15, "count": 2}
+    ],
+    "freeCount": 1
+  },
   "showCrush": false,
   "sync": {
     "initial": 0,
