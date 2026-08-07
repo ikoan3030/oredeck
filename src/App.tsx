@@ -12,7 +12,8 @@ import {
   isAdviceDue,
   isAceUnlocked,
   isRunComplete,
-  markAdviceSkipped,
+  activeAdviceFocus,
+  applyAdvice,
   resolveOffer,
   syncStage,
   SPECIES_ORDER,
@@ -394,6 +395,8 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
   onAuto: () => void;
   onAdvice: (category: AdviceCategory) => void;
 }) {
+  const focus = activeAdviceFocus(draft);
+  const adviceFocusLabel = focus ? `${categoryCopy[focus.category].label.replace("がほしい", "")}を探し中` : null;
   // The crush decision always runs in core; showCrush only decides whether the UI marks it.
   const crush = Boolean(offer?.decision.love) && child.showCrush !== false;
   // The kid never explains himself on his own picks: one line of feeling, no reasoning.
@@ -414,7 +417,7 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
       <SyncStageBanner notice={syncNotice} />
       <div className="draft-layout">
         <section className="choice-zone">
-          <div className="versus-label"><span>どっちを入れる？</span>{offer?.source === "advice" && <b>兄ちゃんの注文ピック</b>}</div>
+          <div className="versus-label"><span>どっちを入れる？</span>{adviceFocusLabel && <b>{adviceFocusLabel}</b>}</div>
           {offer ? <div className="card-choice">
             {offer.cards.map((card, index) => (
               <button
@@ -835,8 +838,9 @@ export default function Home() {
   function chooseAdvice(category: AdviceCategory) {
     if (!game.draft || !child) return;
     setReaction(null);
-    if (category === "skip") { const next = markAdviceSkipped(game.draft); const generated = generateOffer(next, cards, child); setGame({ ...game, draft: generated.state, offer: generated.offer, adviceOpen: false }); return; }
-    const generated = generateOffer(game.draft, cards, child, category);
+    // The order only tilts the offer pool from here on; the next pick is an ordinary one.
+    const next = applyAdvice(game.draft, category, child);
+    const generated = generateOffer(next, cards, child);
     setGame({ ...game, draft: generated.state, offer: generated.offer, adviceOpen: false });
   }
 

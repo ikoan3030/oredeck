@@ -14,7 +14,7 @@ import {
   getOpponentById,
   isAceUnlocked,
   isAdviceDue,
-  markAdviceSkipped,
+  applyAdvice,
   nextRandom,
   resolveOffer,
   SPECIES_ORDER,
@@ -50,11 +50,6 @@ interface DraftSimulationResult {
   policySeed: number;
   adviceOpportunities: number;
   adviceSkipped: number;
-}
-
-interface AdviceDraftChoice {
-  generated: ReturnType<typeof generateOffer>;
-  selectedIndex: 0 | 1;
 }
 
 interface BattleAggregate {
@@ -146,10 +141,6 @@ function chooseAdviceCategory(): Exclude<AdviceCategory, "skip"> | undefined {
   return simulationChild.advice.categories.find((category): category is Exclude<AdviceCategory, "skip"> => category !== "skip");
 }
 
-function offerContainsSpecies(offer: DraftOffer, species: Species): boolean {
-  return offer.cards.some((card) => card.species === species);
-}
-
 function chooseBundleTargetSpecies(seed: number): Species {
   let probe = createDraft(seed, simulationChild, simulationChild.sync.initial);
   for (let pick = 0; pick < 3; pick += 1) {
@@ -171,19 +162,6 @@ function policyMatches(policyValue: AdjudicationPolicy, seed: number): { matches
   return { matches: random.value < rate, seed: random.seed };
 }
 
-function bundleAdviceOffer(state: DraftState, targetSpecies: Species): AdviceDraftChoice | undefined {
-  for (const category of simulationChild.advice.categories) {
-    if (category === "skip") continue;
-    const generated = generateOffer(state, cards, simulationChild, category);
-    if (offerContainsSpecies(generated.offer, targetSpecies)) {
-      const targetIndexes = generated.offer.cards.flatMap((card, index) => card.species === targetSpecies ? [index as 0 | 1] : []);
-      const selectedIndex = targetIndexes.length === 1 ? targetIndexes[0] : generated.offer.decision.preferredIndex;
-      return { generated, selectedIndex };
-    }
-  }
-  return undefined;
-}
-
 function simulateDraft(seed: number, initialSync: number, policyValue: AdjudicationPolicy, initialPolicySeed: number, targetSpecies?: Species): DraftSimulationResult {
   let state = createDraft(seed, simulationChild, initialSync);
   let policySeed = initialPolicySeed >>> 0;
@@ -191,23 +169,11 @@ function simulateDraft(seed: number, initialSync: number, policyValue: Adjudicat
   let adviceSkipped = 0;
   while (state.pick < 15) {
     if (isAdviceDue(state, simulationChild)) {
+      // An order no longer consumes a pick: it only leans the offer pool from here on.
       adviceOpportunities += 1;
-      const adviceChoice = adviceMode === "skip"
-        ? undefined
-        : targetSpecies
-          ? bundleAdviceOffer(state, targetSpecies)
-          : (() => {
-              const category = chooseAdviceCategory();
-              const generated = category ? generateOffer(state, cards, simulationChild, category) : undefined;
-              return generated ? { generated, selectedIndex: generated.offer.decision.preferredIndex } : undefined;
-            })();
-      if (!adviceChoice) {
-        state = markAdviceSkipped(state);
-        adviceSkipped += 1;
-        continue;
-      }
-      state = resolveOffer(adviceChoice.generated.state, adviceChoice.generated.offer, simulationChild, adviceChoice.selectedIndex);
-      continue;
+      const category = adviceMode === "skip" ? undefined : chooseAdviceCategory();
+      if (!category) adviceSkipped += 1;
+      state = applyAdvice(state, category ?? "skip", simulationChild);
     }
 
     const generated = generateOffer(state, cards, simulationChild);

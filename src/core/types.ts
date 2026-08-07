@@ -143,6 +143,10 @@ export interface ChildProfile {
     categories: AdviceCategory[];
     alwaysIntervene: boolean;
     consumesPick: boolean;
+    /** Offer weight applied to the ordered category while the order is live. */
+    focusMultiplier: number;
+    /** How many picks the order stays live for, counted from the checkpoint. */
+    focusPicks: number;
   };
   battle: {
     faceBias: number;
@@ -172,8 +176,14 @@ export interface DraftOffer {
   cards: [Card, Card];
   decision: PickDecision;
   wantsIntervention: boolean;
-  source: "normal" | "advice";
-  adviceCategory?: Exclude<AdviceCategory, "skip">;
+  source: "normal";
+}
+
+/** A live advice order: it only tilts the offer weights, never the pick itself. */
+export interface AdviceFocus {
+  category: Exclude<AdviceCategory, "skip">;
+  /** The order stops applying once the draft reaches this pick number. */
+  expiresAtPick: number;
 }
 
 export interface DraftHistoryItem {
@@ -195,6 +205,7 @@ export interface DraftState {
   rejectedCardIds: string[];
   syncRate: number;
   seenAdviceCheckpoints: number[];
+  adviceFocus: AdviceFocus | null;
   passiveInterventions: number;
   lovePicks: number;
   history: DraftHistoryItem[];

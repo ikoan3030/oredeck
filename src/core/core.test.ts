@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
-import { activeSpeciesSynergies, advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createLadderRun, createRun, decaySync, decideOffer, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, countSpeciesTypes, instanceHasKeyword, speciesGrant, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition, type SpeciesSynergyConfig } from "./index";
+import { activeAdviceFocus, applyAdvice, matchesAdviceCategory, activeSpeciesSynergies, advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createLadderRun, createRun, decaySync, decideOffer, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, countSpeciesTypes, instanceHasKeyword, speciesGrant, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition, type SpeciesSynergyConfig } from "./index";
 
 const cards = JSON.parse(readFileSync(resolve("data/cards.json"), "utf8")) as Card[];
 const child = JSON.parse(readFileSync(resolve("data/children/tanjun.json"), "utf8")) as ChildProfile;
@@ -68,14 +68,62 @@ test("passive intervention stays at the fixed character rate, independent of syn
   assert.ok(Math.abs(low - high) < 0.05, `sync must not shift the rate: ${low} vs ${high}`);
 });
 
-test("love suppresses passive intervention and advice picks always ask, whatever the sync", () => {
+test("love suppresses passive intervention, and an order does not force one", () => {
   for (let seed = 1; seed <= 600; seed += 1) {
     const generated = generateOffer(createDraft(seed * 7919, child, child.sync.maximum), cards, child);
     if (generated.offer.decision.love) assert.equal(generated.offer.wantsIntervention, false);
   }
-  const lowSyncDraft = createDraft(13579, child, child.sync.initial);
-  assert.equal(generateOffer(lowSyncDraft, cards, child, "removal").offer.wantsIntervention, true);
-  assert.equal(generateOffer(lowSyncDraft, cards, child, "guard").offer.wantsIntervention, true);
+  let asked = 0;
+  let offers = 0;
+  for (let seed = 1; seed <= 600; seed += 1) {
+    const ordered = applyAdvice({ ...createDraft(seed * 7919, child, child.sync.initial), pick: 5 }, "removal", child);
+    const generated = generateOffer(ordered, cards, child);
+    if (generated.offer.decision.love) continue;
+    offers += 1;
+    asked += Number(generated.offer.wantsIntervention);
+  }
+  const rate = asked / offers;
+  assert.ok(Math.abs(rate - child.passiveInterventionRate) < 0.06, `an order must not change the ask rate: ${rate}`);
+});
+
+test("an order raises how often the ordered category is offered, and stops at expiry", () => {
+  const sample = (build: (state: ReturnType<typeof createDraft>) => ReturnType<typeof createDraft>) => {
+    let matched = 0;
+    let offered = 0;
+    for (let seed = 1; seed <= 3000; seed += 1) {
+      const state = build({ ...createDraft(seed * 7919, child, child.sync.initial), pick: 5 });
+      const generated = generateOffer(state, cards, child);
+      offered += 2;
+      matched += generated.offer.cards.filter((card) => matchesAdviceCategory(card, "removal")).length;
+    }
+    return matched / offered;
+  };
+  const flat = sample((state) => state);
+  const ordered = sample((state) => applyAdvice(state, "removal", child));
+  const skipped = sample((state) => applyAdvice(state, "skip", child));
+  const expired = sample((state) => ({ ...applyAdvice(state, "removal", child), pick: 10 }));
+
+  assert.ok(ordered > flat * 1.5, `an order should lift the category: ${flat} -> ${ordered}`);
+  assert.ok(Math.abs(skipped - flat) < 0.02, `skipping must change nothing: ${flat} vs ${skipped}`);
+  assert.ok(Math.abs(expired - flat) < 0.02, `the order must lapse at its expiry: ${flat} vs ${expired}`);
+});
+
+test("skipping the checkpoint leaves no order behind", () => {
+  const state = applyAdvice({ ...createDraft(4242, child, child.sync.initial), pick: 5 }, "skip", child);
+  assert.equal(state.adviceFocus, null);
+  assert.equal(activeAdviceFocus(state), null);
+  assert.equal(isAdviceDue(state, child), false, "the checkpoint is still consumed");
+});
+
+test("the advice categories keep one shared definition", () => {
+  assert.equal(matchesAdviceCategory(get("judgment"), "removal"), true);
+  assert.equal(matchesAdviceCategory(get("thunder"), "removal"), true, "damage of three or more counts as removal");
+  assert.equal(matchesAdviceCategory(get("flamebullet"), "removal"), false, "damage of two does not");
+  assert.equal(matchesAdviceCategory(get("grim"), "removal"), false, "monsters never count");
+  assert.equal(matchesAdviceCategory(get("dolguard"), "guard"), true);
+  assert.equal(matchesAdviceCategory(get("grim"), "guard"), false);
+  assert.equal(matchesAdviceCategory(get("balga"), "low_cost"), true);
+  assert.equal(matchesAdviceCategory(get("gorganos"), "low_cost"), false);
 });
 
 const speciesDeck = (cardIds: readonly string[]): DraftCard[] =>
@@ -505,18 +553,17 @@ test("attribution only appears on effective work and never on card play", () => 
   assert.ok(result.events.filter((item) => item.type === "play").every((item) => !item.dialogue));
 });
 
-test("the full draft reaches advice checkpoints, forces advice intervention, and respects the two-copy cap", () => {
+test("the full draft reaches advice checkpoints, keeps the order live, and respects the two-copy cap", () => {
   let state = createDraft(24680, child);
   while (state.pick < 5) {
     const generated = generateOffer(state, cards, child);
     state = resolveOffer(generated.state, generated.offer, child, generated.offer.wantsIntervention ? generated.offer.decision.preferredIndex : undefined);
   }
   assert.equal(isAdviceDue(state, child), true);
-  const advice = generateOffer(state, cards, child, "removal");
-  assert.equal(advice.offer.wantsIntervention, true);
-  assert.ok(advice.offer.cards.every((card) => card.type === "spell" && card.effects.some((effect) => effect.keyword === "destroy" || (effect.keyword === "damage" && effect.value >= 3))));
-  state = resolveOffer(advice.state, advice.offer, child, 0);
-  assert.equal(state.deck.at(-1)?.intervention, true);
+  state = applyAdvice(state, "removal", child);
+  assert.equal(isAdviceDue(state, child), false, "the checkpoint is consumed by ordering");
+  assert.deepEqual(state.adviceFocus, { category: "removal", expiresAtPick: 10 });
+  assert.equal(activeAdviceFocus(state)?.category, "removal");
   while (state.pick < 15) {
     const generated = generateOffer(state, cards, child);
     state = resolveOffer(generated.state, generated.offer, child, generated.offer.wantsIntervention ? generated.offer.decision.preferredIndex : undefined);

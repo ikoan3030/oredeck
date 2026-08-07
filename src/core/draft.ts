@@ -12,6 +12,7 @@ export function createDraft(seed: number, child: ChildProfile, initialSync = chi
     rejectedCardIds: [],
     syncRate: initialSync,
     seenAdviceCheckpoints: [],
+    adviceFocus: null,
     passiveInterventions: 0,
     lovePicks: 0,
     history: [],
@@ -28,49 +29,75 @@ export function markAdviceSkipped(state: DraftState): DraftState {
     : { ...state, seenAdviceCheckpoints: [...state.seenAdviceCheckpoints, state.pick] };
 }
 
-function matchesAdvice(card: Card, category: Exclude<AdviceCategory, "skip">): boolean {
+/** The single definition of what each advice category asks for. */
+export function matchesAdviceCategory(card: Card, category: Exclude<AdviceCategory, "skip">): boolean {
   if (category === "removal") return isRemoval(card);
   if (category === "guard") return hasKeyword(card, "guard");
   return card.cost <= 2;
 }
 
-function eligibleCards(state: DraftState, cards: readonly Card[], category?: Exclude<AdviceCategory, "skip">): Card[] {
+/**
+ * An order does not hand the kid a pick: it leans the offer pool toward the category
+ * until the next checkpoint (or the end of the build). Skipping leaves the pool alone.
+ */
+export function applyAdvice(state: DraftState, category: AdviceCategory, child: ChildProfile): DraftState {
+  const seen = markAdviceSkipped(state);
+  if (category === "skip") return seen;
+  return { ...seen, adviceFocus: { category, expiresAtPick: state.pick + child.advice.focusPicks } };
+}
+
+export function activeAdviceFocus(state: DraftState): DraftState["adviceFocus"] {
+  return state.adviceFocus && state.pick < state.adviceFocus.expiresAtPick ? state.adviceFocus : null;
+}
+
+/**
+ * Weighted draw over the pool. Consumes exactly one random value, the same as the flat
+ * draw, so a live order never shifts how many values a pick takes from the stream.
+ */
+function weightedIndex(seed: number, weights: readonly number[]): { index: number; seed: number } {
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  const next = nextRandom(seed);
+  let cursor = next.value * total;
+  for (let index = 0; index < weights.length; index += 1) {
+    cursor -= weights[index];
+    if (cursor <= 0) return { index, seed: next.seed };
+  }
+  return { index: weights.length - 1, seed: next.seed };
+}
+
+function eligibleCards(state: DraftState, cards: readonly Card[]): Card[] {
   const counts = new Map<string, number>();
   state.deck.forEach((item) => counts.set(item.cardId, (counts.get(item.cardId) ?? 0) + 1));
-  const underCap = cards.filter((card) => (counts.get(card.id) ?? 0) < 2);
-  const filtered = category ? underCap.filter((card) => matchesAdvice(card, category)) : underCap;
-  return filtered.length >= 2 ? filtered : underCap;
+  return cards.filter((card) => (counts.get(card.id) ?? 0) < 2);
 }
 
 export function generateOffer(
   state: DraftState,
   cards: readonly Card[],
   child: ChildProfile,
-  adviceCategory?: Exclude<AdviceCategory, "skip">,
 ): { state: DraftState; offer: DraftOffer } {
-  // Every card is offered at the same rate: the pool carries no per-card weighting.
-  const pool = eligibleCards(state, cards, adviceCategory);
-  const first = randomIndex(state.seed, pool.length);
+  const pool = eligibleCards(state, cards);
+  const focus = activeAdviceFocus(state);
+  // Without a live order every card is offered at the same rate, and the flat draw is kept
+  // as-is so unordered builds reproduce exactly.
+  const draw = (seed: number, from: readonly Card[]) => focus
+    ? weightedIndex(seed, from.map((card) => matchesAdviceCategory(card, focus.category) ? child.advice.focusMultiplier : 1))
+    : randomIndex(seed, from.length);
+  const first = draw(state.seed, pool);
   const secondPool = pool.filter((_, index) => index !== first.index);
-  const second = randomIndex(first.seed, secondPool.length);
+  const second = draw(first.seed, secondPool);
   const offered: [Card, Card] = [pool[first.index], secondPool[second.index]];
   const decision = decideOffer(offered, child);
   let seed = second.seed;
-  let wantsIntervention = Boolean(adviceCategory);
-  if (!adviceCategory && !decision.love) {
+  let wantsIntervention = false;
+  if (!decision.love) {
     const chance = nextRandom(seed);
     seed = chance.seed;
     wantsIntervention = chance.value < child.passiveInterventionRate;
   }
   return {
     state: { ...state, seed },
-    offer: {
-      cards: offered,
-      decision,
-      wantsIntervention,
-      source: adviceCategory ? "advice" : "normal",
-      adviceCategory,
-    },
+    offer: { cards: offered, decision, wantsIntervention, source: "normal" },
   };
 }
 
@@ -85,17 +112,16 @@ export function resolveOffer(
   const rejectedIndex: 0 | 1 = chosenIndex === 0 ? 1 : 0;
   const chosen = offer.cards[chosenIndex];
   const rejected = offer.cards[rejectedIndex];
-  const source: PickSource = offer.decision.love ? "love" : offer.source === "advice" ? "advice" : isPlayerDecision ? "passive" : "auto";
+  const source: PickSource = offer.decision.love ? "love" : isPlayerDecision ? "passive" : "auto";
   const supported = chosenIndex === offer.decision.preferredIndex;
   const syncAfter = source === "passive" ? gainSync(state.syncRate, supported, child) : state.syncRate;
   return {
     ...state,
     pick: state.pick + 1,
-    deck: [...state.deck, { instanceId: `${chosen.id}-${state.pick}-${state.seed}`, cardId: chosen.id, intervention: source === "passive" || source === "advice", source }],
+    deck: [...state.deck, { instanceId: `${chosen.id}-${state.pick}-${state.seed}`, cardId: chosen.id, intervention: source === "passive", source }],
     rejectedCardIds: [...state.rejectedCardIds, rejected.id],
     syncRate: syncAfter,
-    seenAdviceCheckpoints: offer.source === "advice" && !state.seenAdviceCheckpoints.includes(state.pick) ? [...state.seenAdviceCheckpoints, state.pick] : state.seenAdviceCheckpoints,
-    passiveInterventions: state.passiveInterventions + (offer.source === "normal" && offer.wantsIntervention ? 1 : 0),
+    passiveInterventions: state.passiveInterventions + (offer.wantsIntervention ? 1 : 0),
     lovePicks: state.lovePicks + (offer.decision.love ? 1 : 0),
     history: [...state.history, {
       pick: state.pick + 1,

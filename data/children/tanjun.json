@@ -112,7 +112,9 @@
     "checkpoints": [5, 10],
     "categories": ["removal", "guard", "low_cost", "skip"],
     "alwaysIntervene": true,
-    "consumesPick": true
+    "consumesPick": true,
+    "focusMultiplier": 2.0,
+    "focusPicks": 5
   },
   "battle": {
     "faceBias": 0.82,
