@@ -1,5 +1,5 @@
 {
-  "thresholds": {"stageOne": 3, "stageTwo": 6},
+  "thresholds": {"stageOne": 4, "stageTwo": 6},
   "bondSuffix": "結束",
   "stageLabels": ["小", "大"],
   "species": [

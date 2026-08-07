@@ -94,13 +94,14 @@ test("spells never count toward a species", () => {
   assert.equal(cards.filter((card) => card.type === "spell").every((card) => card.species === null), true);
 });
 
-test("three types reach stage one and six types reach stage two", () => {
-  const three = activeSpeciesSynergies(speciesDeck(["grim", "gorganos", "balga", "grim"]), cards, synergy);
-  assert.deepEqual(three.map((item) => [item.species, item.stage]), [["けもの", 1]]);
-  assert.equal(three[0].label, "けもの結束・小");
+test("four types reach stage one and six types reach stage two", () => {
+  assert.deepEqual(synergy.thresholds, { stageOne: 4, stageTwo: 6 });
+  const four = activeSpeciesSynergies(speciesDeck(["grim", "gorganos", "balga", "dolga", "grim"]), cards, synergy);
+  assert.deepEqual(four.map((item) => [item.species, item.stage]), [["けもの", 1]]);
+  assert.equal(four[0].label, "けもの結束・小");
 
-  const two = activeSpeciesSynergies(speciesDeck(["grim", "gorganos", "grim"]), cards, synergy);
-  assert.equal(two.length, 0);
+  const three = activeSpeciesSynergies(speciesDeck(["grim", "gorganos", "balga", "grim"]), cards, synergy);
+  assert.equal(three.length, 0, "three types no longer reach stage one");
 
   const six = activeSpeciesSynergies(speciesDeck(["grim", "gorganos", "balga", "dolga", "zahhak", "mewrin"]), cards, synergy);
   assert.deepEqual(six.map((item) => [item.species, item.stage]), [["けもの", 2]]);
@@ -108,7 +109,7 @@ test("three types reach stage one and six types reach stage two", () => {
 });
 
 test("stage one grants +1 attack to that species only", () => {
-  const deck = speciesDeck(["grim", "gorganos", "balga", "judgment"]);
+  const deck = speciesDeck(["grim", "gorganos", "balga", "dolga", "judgment"]);
   const battle = createBattle(deck, getOpponent("wall"), cards, 7, 0, null, synergy);
   const all = [...battle.brother.deck, ...battle.brother.hand];
   const grim = all.find((item) => item.cardId === "grim")!;
@@ -176,14 +177,14 @@ test("the mech stage two adds a destroy trigger that damages an enemy", () => {
 });
 
 test("stage one splits into attack species and health species", () => {
-  const beasts = createBattle(speciesDeck(["grim", "gorganos", "balga"]), getOpponent("wall"), cards, 7, 0, null, synergy);
+  const beasts = createBattle(speciesDeck(["grim", "gorganos", "balga", "dolga"]), getOpponent("wall"), cards, 7, 0, null, synergy);
   const grim = [...beasts.brother.deck, ...beasts.brother.hand].find((item) => item.cardId === "grim")!;
   assert.equal(grim.grantedAtk, 1);
   assert.equal(grim.grantedHp, 0);
   assert.equal(grim.atk, get("grim").atk + 1);
   assert.equal(grim.hp, get("grim").hp);
 
-  const mechs = createBattle(speciesDeck(["gaiorg", "zamud", "gearload"]), getOpponent("wall"), cards, 7, 0, null, synergy);
+  const mechs = createBattle(speciesDeck(["gaiorg", "zamud", "gearload", "mentena"]), getOpponent("wall"), cards, 7, 0, null, synergy);
   const gaiorg = [...mechs.brother.deck, ...mechs.brother.hand].find((item) => item.cardId === "gaiorg")!;
   assert.equal(gaiorg.grantedAtk, 0);
   assert.equal(gaiorg.grantedHp, 1);
@@ -194,7 +195,7 @@ test("stage one splits into attack species and health species", () => {
 
 test("granted health survives combat that would otherwise kill the card", () => {
   const opponent = getOpponent("wall");
-  const battle = createBattle(speciesDeck(["gaiorg", "zamud", "gearload"]), opponent, cards, 7, 0, null, synergy);
+  const battle = createBattle(speciesDeck(["gaiorg", "zamud", "gearload", "mentena"]), opponent, cards, 7, 0, null, synergy);
   const mech = [...battle.brother.deck, ...battle.brother.hand].find((item) => item.cardId === "gaiorg")!;
   const attacker = { ...battle.opponent.hand[0], cardId: "gorganos", atk: 5, hp: 6, maxHp: 6, summonedTurn: 0, attacked: false };
   const staged = {
@@ -258,15 +259,15 @@ test("the demon stage two hits the enemy leader when a demon lands", () => {
 });
 
 test("the spirit stage two heals allies without passing their ceiling", () => {
-  const deck = speciesDeck(["fiorina", "gravewald", "kagerou", "fiorina", "gravewald", "kagerou"]);
-  assert.deepEqual(activeSpeciesSynergies(deck, cards, synergy).map((item) => item.stage), [1], "only three spirit types exist in the current pool");
+  const deck = speciesDeck(["fiorina", "gravewald", "kagerou", "sylphy", "fiorina", "gravewald"]);
+  assert.deepEqual(activeSpeciesSynergies(deck, cards, synergy).map((item) => item.stage), [1], "four types stop at stage one; copies do not count");
 
   const spiritGrant = speciesGrant("精霊", 2, synergy)!;
   assert.equal(spiritGrant.hp, 1, "the stage-one health carries under the heal");
   assert.deepEqual(spiritGrant.effects.map((effect) => [effect.trigger, effect.keyword, effect.value, effect.target]), [["on_play", "heal", 1, "all_allies"]]);
 
   const opponent = getOpponent("wall");
-  const battle = createBattle(speciesDeck(["gravewald", "kagerou", "fiorina"]), opponent, cards, 5, 0, null, synergy);
+  const battle = createBattle(speciesDeck(["gravewald", "kagerou", "fiorina", "sylphy"]), opponent, cards, 5, 0, null, synergy);
   const all = [...battle.brother.deck, ...battle.brother.hand];
   const played = { ...all.find((item) => item.cardId === "kagerou")!, grantedEffects: [{ trigger: "on_play" as const, keyword: "heal" as const, value: 1, target: "all_allies" as const }] };
   const hurt = { ...all.find((item) => item.cardId === "gravewald")!, summonedTurn: 0, attacked: true };
