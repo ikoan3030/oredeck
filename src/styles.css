@@ -477,7 +477,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-turn { padding: 7px 16px; color: var(--ink); background: var(--yellow); border: 3px solid white; transform: skew(-8deg); }
 .arena { --attack-reach: clamp(180px, 26vh, 260px); --attack-leader-reach: clamp(220px, 32vh, 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, 16vw, 190px); position: relative; z-index: 2; min-height: calc(100vh - 72px); margin-right: 300px; padding: 20px 100px 165px; display: grid; grid-template-rows: auto minmax(120px, 1fr) 26px minmax(120px, 1fr) auto; gap: 8px; }
 .fighter { display: flex; align-items: center; gap: 12px; }
-.opponent-fighter { justify-content: flex-end; }
+.opponent-fighter { justify-content: space-between; }
+.opponent-leader-info { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
 .brother-fighter { justify-content: flex-start; }
 .avatar { display: grid; place-items: center; width: 62px; height: 62px; border-radius: 50%; color: white; background: var(--rival-color); border: 5px solid var(--ink); font-size: 29px; box-shadow: 3px 3px 0 white; }
 .avatar.kid { background: var(--blue); }
@@ -485,6 +486,18 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .life span { font: 900 9px Arial, sans-serif; color: var(--yellow); }
 .life b { font-size: 30px; }
 .pp { padding: 6px 10px; color: var(--ink); background: var(--cyan); border: 3px solid var(--ink); font-size: 12px; }
+.opponent-hand-zone { min-width: 0; display: flex; align-items: center; gap: 8px; flex: 1 1 auto; padding: 4px 8px; }
+.opponent-hand-label { display: grid; flex: 0 0 auto; justify-items: center; gap: 2px; color: #c9d9ff; font: 900 9px/1.1 "Yu Gothic", sans-serif; text-align: center; }
+.opponent-hand-label b { display: grid; place-items: center; width: 25px; height: 25px; color: var(--ink); background: var(--cyan); border: 3px solid var(--ink); border-radius: 50%; font: 1000 13px/1 Arial, sans-serif; }
+.opponent-hand-cards { min-width: 0; display: flex; align-items: center; gap: 4px; overflow: hidden; }
+.opponent-hand-card { position: relative; width: 39px; height: 56px; flex: 0 0 auto; }
+.opponent-hand-card + .opponent-hand-card { margin-left: -12px; }
+.opponent-card-back { position: relative; display: grid; place-items: center; width: 100%; height: 100%; overflow: hidden; background: linear-gradient(145deg, #314f8c, #111a3b); border: 3px solid var(--ink); border-radius: 6px; box-shadow: 3px 3px 0 #0008, inset 0 0 0 2px #84d9ff77; }
+.opponent-card-back::before { content: ""; position: absolute; width: 22px; height: 22px; border: 3px solid var(--yellow); transform: rotate(45deg); box-shadow: 0 0 0 2px var(--ink), 0 0 12px #ffd92899; }
+.opponent-card-back::after { content: ""; position: absolute; width: 9px; height: 9px; border: 2px solid var(--cyan); transform: rotate(45deg); background: #17254f; }
+.opponent-card-back i { position: relative; z-index: 1; width: 5px; height: 30px; background: var(--pink); box-shadow: 0 0 8px var(--pink); transform: rotate(45deg); }
+.opponent-hand-draw { animation: opponent-hand-draw var(--event-duration, .34s) cubic-bezier(.2,.8,.25,1) both; }
+.opponent-hand-play { animation: opponent-hand-play var(--event-duration, .48s) cubic-bezier(.2,.8,.25,1) both; }
 .board-zone { min-height: 128px; display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px; border: 3px dashed #ffffff44; border-radius: 20px; }
 .opponent-board { align-items: flex-start; }
 .brother-board { align-items: flex-end; }
@@ -632,6 +645,17 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .board-card > b { font-size: 25px; }
   .board-card > div span { min-width: 24px; font-size: 10px; }
   .fighter { gap: 5px; }
+  .opponent-leader-info { gap: 5px; }
+  .opponent-hand-zone { gap: 4px; padding: 2px 0; }
+  .opponent-hand-label { font-size: 7px; }
+  .opponent-hand-label b { width: 21px; height: 21px; border-width: 2px; font-size: 11px; }
+  .opponent-hand-cards { gap: 0; }
+  .opponent-hand-card { width: 25px; height: 36px; }
+  .opponent-hand-card + .opponent-hand-card { margin-left: -9px; }
+  .opponent-card-back { border-width: 2px; border-radius: 4px; box-shadow: 2px 2px 0 #0008, inset 0 0 0 1px #84d9ff77; }
+  .opponent-card-back::before { width: 13px; height: 13px; border-width: 2px; }
+  .opponent-card-back::after { width: 5px; height: 5px; border-width: 1px; }
+  .opponent-card-back i { width: 3px; height: 19px; }
   .avatar { width: 46px; height: 46px; border-width: 3px; font-size: 21px; }
   .life b { font-size: 22px; }
   .battle-speech { display: none; }
@@ -1310,6 +1334,16 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   from { opacity: 0; transform: translateY(22px) scale(.6) rotate(-8deg); filter: brightness(2); }
   68% { transform: translateY(-5px) scale(1.08) rotate(2deg); }
 }
+@keyframes opponent-hand-draw {
+  from { opacity: 0; transform: translate(-24px, -14px) scale(.45) rotate(-8deg); }
+  68% { opacity: 1; transform: translate(3px, 2px) scale(1.08) rotate(2deg); }
+  to { opacity: 1; transform: translate(0) scale(1) rotate(0); }
+}
+@keyframes opponent-hand-play {
+  from { opacity: 1; transform: translate(0) scale(1); }
+  32% { transform: translateY(4px) scale(1.08) rotate(2deg); filter: brightness(1.5); }
+  to { opacity: 0; transform: translateY(28px) scale(.45) rotate(8deg); }
+}
 @keyframes summon-prelude {
   0%, 100% { transform: scale(1); filter: brightness(1); }
   45% { transform: scale(1.08); filter: brightness(2.1) drop-shadow(0 0 22px var(--yellow)); }
@@ -1410,6 +1444,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .board-card.event-summon,
   .board-card.summon-prelude,
   .hand-card.summon-prelude,
+  .opponent-hand-card,
   .board-card.event-sync-flash,
   .hand-card.event-sync-flash,
   .hand-card.event-ace-card,

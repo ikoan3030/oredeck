@@ -617,6 +617,13 @@ function boardSnapshotForPlayback(event: BattleEvent | undefined) {
   return (BEFORE_RESOLUTION_BOARD_EVENTS.has(event.type) ? event.beforeSnapshot ?? event.snapshot : event.snapshot ?? event.beforeSnapshot);
 }
 
+function opponentHandForPlayback(event: BattleEvent | undefined, fallback: BattleState["opponent"]["hand"]): BattleState["opponent"]["hand"] {
+  if (!event) return fallback;
+  if (event.type === "play" && event.side === "opponent") return event.beforeSnapshot?.opponent.hand ?? fallback;
+  if (event.type === "draw" || (event.type === "effect" && event.keyword === "draw")) return event.snapshot?.opponent.hand ?? fallback;
+  return fallback;
+}
+
 function BoardCard({ instance, cards, ace = false, activeEvent = null }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null }) {
   const card = cards.find((item) => item.id === instance.cardId)!;
   const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
@@ -641,6 +648,16 @@ function AnimatedBattleHandCard({ instance, cards, ace, activeEvent = null, guar
   const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
   const className = "hand-card " + (syncBonus && !ace ? "sync-granted " : "") + (ace ? "ace-granted " : "") + eventCardClass(instance, activeEvent, cards, guardPreludeDone, attackPreludeDone, summonPreludeDone);
   return <div className={className} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}><CardFace compact card={card} intervention={instance.intervention} keywords={instanceVisibleKeywords(instance, cards)} />{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}</div>;
+}
+
+function AnimatedOpponentHandCard({ instance, activeEvent = null }: { instance: BattleState["opponent"]["hand"][number]; activeEvent?: BattleEvent | null }) {
+  const drawEvent = activeEvent?.side === "opponent" && (activeEvent.type === "draw" || (activeEvent.type === "effect" && activeEvent.keyword === "draw"));
+  const entered = drawEvent && (activeEvent.type === "draw"
+    ? activeEvent.snapshot?.opponent.hand.at(-1)?.instanceId === instance.instanceId
+    : activeEvent.targetInstanceIds?.includes(instance.instanceId));
+  const left = activeEvent?.type === "play" && activeEvent.side === "opponent" && activeEvent.instanceId === instance.instanceId;
+  const className = `opponent-hand-card${entered ? " opponent-hand-draw" : ""}${left ? " opponent-hand-play" : ""}`;
+  return <div className={className} data-event-id={left ? activeEvent.id : undefined} aria-hidden="true"><span className="opponent-card-back"><i /></span></div>;
 }
 
 function AceStatus({ battle, cards }: { battle: BattleState; cards: Card[] }) {
@@ -839,6 +856,8 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
   const boardSnapshot = boardSnapshotForPlayback(playbackEvent);
   const boardOpponent = boardSnapshot?.opponent ?? battle.opponent;
   const boardBrother = boardSnapshot?.brother ?? battle.brother;
+  const opponentHand = speed === "skip" ? battle.opponent.hand : opponentHandForPlayback(playbackEvent, boardOpponent.hand);
+  const brotherHand = speed === "skip" ? battle.brother.hand : boardBrother.hand;
   const lifeSnapshot = playbackEvent?.snapshot;
   const lifeOpponent = lifeSnapshot?.opponent ?? battle.opponent;
   const lifeBrother = lifeSnapshot?.brother ?? battle.brother;
@@ -887,12 +906,12 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
     <SynergyDeclaration synergies={battle.synergies} />
     <TurnTransitionBanner banner={turnBanner} />
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={arenaStyle}>
-      <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" || leaderHitSide === "opponent" ? "life-target" : "")}><div className="avatar" style={{ "--rival-color": opponent.color } as CSSProperties}>{opponent.name.slice(0, 1)}</div><div className="life"><span>LIFE</span><b>{lifeOpponent.life}</b></div><div className="pp">PP {lifeOpponent.pp}/{lifeOpponent.maxPp}</div></div>
+      <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" || leaderHitSide === "opponent" ? "life-target" : "")}><div className="opponent-hand-zone" aria-label={`相手の手札 ${opponentHand.length}枚`}><div className="opponent-hand-label"><span>相手の手札</span><b>{opponentHand.length}</b></div><div className="opponent-hand-cards">{opponentHand.map((item) => <AnimatedOpponentHandCard key={item.instanceId} instance={item} activeEvent={activeEvent} />)}</div></div><div className="opponent-leader-info"><div className="avatar" style={{ "--rival-color": opponent.color } as CSSProperties}>{opponent.name.slice(0, 1)}</div><div className="life"><span>LIFE</span><b>{lifeOpponent.life}</b></div><div className="pp">PP {lifeOpponent.pp}/{lifeOpponent.maxPp}</div></div></div>
       <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{boardOpponent.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!boardOpponent.board.length && <span className="empty-board">相手の場は空</span>}</div>
       <div className="board-line"><b>AUTO CARD BATTLE</b></div>
       <div className={"board-zone brother-board " + (damageTargetSide === "brother" ? "battle-target" : "")}>{boardBrother.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!boardBrother.board.length && <span className="empty-board">ユウタの場は空</span>}</div>
       <div className={"fighter brother-fighter " + (damageTargetSide === "brother" || leaderHitSide === "brother" ? "life-target" : "")}><div className="avatar kid">ユ</div><div className="life"><span>LIFE</span><b>{lifeBrother.life}</b></div><div className="pp">PP {lifeBrother.pp}/{lifeBrother.maxPp}</div></div>
-      <div className="hand-zone">{boardBrother.hand.map((item) => <AnimatedBattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}</div>
+      <div className="hand-zone">{brotherHand.map((item) => <AnimatedBattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}</div>
       <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} />
     </section>
     <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
