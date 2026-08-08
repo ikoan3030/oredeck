@@ -13,6 +13,7 @@ import type {
   BattleState,
   Card,
   ChildProfile,
+  AttackStyle,
   DraftCard,
   ActiveSpeciesSynergy,
   BattleCommentaryKind,
@@ -209,15 +210,62 @@ function canPlay(instance: BattleCardInstance, player: BattlePlayer, enemy: Batt
   return true;
 }
 
-function chooseEnemyTarget(enemy: BattlePlayer, preferKillableAtk = Number.POSITIVE_INFINITY): number {
-  const killable = enemy.board
-    .map((card, index) => ({ card, index }))
+function chooseTargetFromCandidates(candidates: Array<{ card: BattleCardInstance; index: number }>, preferKillableAtk = Number.POSITIVE_INFINITY): number {
+  const killable = candidates
     .filter(({ card }) => card.hp <= preferKillableAtk)
     .sort((a, b) => b.card.atk - a.card.atk || a.card.hp - b.card.hp);
   if (killable.length) return killable[0].index;
-  return enemy.board
-    .map((card, index) => ({ card, index }))
+  return candidates
     .sort((a, b) => a.card.hp - b.card.hp || b.card.atk - a.card.atk)[0]?.index ?? -1;
+}
+
+function chooseEnemyTarget(enemy: BattlePlayer, preferKillableAtk = Number.POSITIVE_INFINITY): number {
+  return chooseTargetFromCandidates(enemy.board.map((card, index) => ({ card, index })), preferKillableAtk);
+}
+
+function isWastefulTrade(attacker: BattleCardInstance, target: BattleCardInstance): boolean {
+  return attacker.hp <= target.atk && target.hp > attacker.atk;
+}
+
+function isFavorableTrade(attacker: BattleCardInstance, target: BattleCardInstance): boolean {
+  return target.hp <= attacker.atk && attacker.hp > target.atk;
+}
+
+function chooseAttackBoardTarget(
+  attacker: BattleCardInstance,
+  candidates: Array<{ card: BattleCardInstance; index: number }>,
+): { targetIndex: number; favorable: boolean } {
+  const favorable = candidates.filter(({ card }) => isFavorableTrade(attacker, card));
+  if (favorable.length) return { targetIndex: chooseTargetFromCandidates(favorable, attacker.atk), favorable: true };
+  const safe = candidates.filter(({ card }) => !isWastefulTrade(attacker, card));
+  return { targetIndex: chooseTargetFromCandidates(safe, attacker.atk), favorable: false };
+}
+
+function chooseAttackTarget(
+  attacker: BattleCardInstance,
+  enemy: BattlePlayer,
+  attackStyle: AttackStyle,
+  faceBias: number,
+  randomValue: number,
+  cards: readonly Card[],
+): { targetLeader: boolean; targetIndex: number } | null {
+  const guards = enemy.board.map((card, index) => ({ card, index })).filter(({ card }) => instanceHasKeyword(card, cards, "guard"));
+  const candidates = guards.length ? guards : enemy.board.map((card, index) => ({ card, index }));
+  const boardChoice = chooseAttackBoardTarget(attacker, candidates);
+
+  // A favorable trade is always more important than the character's preferred posture.
+  if (boardChoice.favorable) return { targetLeader: false, targetIndex: boardChoice.targetIndex };
+
+  // A guard blocks the leader, so a bad guard trade is a genuine attack skip.
+  if (guards.length) return boardChoice.targetIndex >= 0 ? { targetLeader: false, targetIndex: boardChoice.targetIndex } : null;
+  if (!enemy.board.length) return { targetLeader: true, targetIndex: -1 };
+
+  if (attackStyle === "board") {
+    return boardChoice.targetIndex >= 0 ? { targetLeader: false, targetIndex: boardChoice.targetIndex } : null;
+  }
+  if (attackStyle === "face") return { targetLeader: true, targetIndex: -1 };
+  if (randomValue < faceBias || boardChoice.targetIndex < 0) return { targetLeader: true, targetIndex: -1 };
+  return { targetLeader: false, targetIndex: boardChoice.targetIndex };
 }
 
 function markAttribution(
@@ -627,16 +675,16 @@ function resolvePlay(
   return next;
 }
 
-function resolveAttack(state: BattleState, side: BattleSide, attackerIndex: number, faceBias: number, cards: readonly Card[], child: ChildProfile): BattleState {
+function resolveAttack(state: BattleState, side: BattleSide, attackerIndex: number, faceBias: number, attackStyle: AttackStyle, cards: readonly Card[], child: ChildProfile): BattleState {
   let active = state[side]; let enemy = state[other(side)];
   const attacker = active.board[attackerIndex];
   if (!attacker || attacker.attacked) return state;
-  const guards = enemy.board.map((card, index) => ({ card, index })).filter(({ card }) => instanceHasKeyword(card, cards, "guard"));
   const random = nextRandom(state.seed);
   let next = { ...state, seed: random.seed };
-  const attackFace = guards.length === 0 && (enemy.board.length === 0 || random.value < faceBias);
+  const choice = chooseAttackTarget(attacker, enemy, attackStyle, faceBias, random.value, cards);
+  if (!choice) return next;
   active = { ...active, board: active.board.map((item, index) => index === attackerIndex ? { ...item, attacked: true } : item) };
-  if (attackFace) {
+  if (choice.targetLeader) {
     const beforeLife = enemy.life;
     enemy = { ...enemy, life: Math.max(0, enemy.life - attacker.atk) };
     next = updatePlayers(next, active, enemy);
@@ -660,7 +708,7 @@ function resolveAttack(state: BattleState, side: BattleSide, attackerIndex: numb
     if (usefulBuff) next = markAttribution(next, { ...attacker, instanceId: usefulBuff.instanceId, intervention: true }, "buff", child, enemy.life === 0);
     return next;
   }
-  const targetIndex = guards.length ? guards.sort((a, b) => a.card.hp - b.card.hp)[0].index : chooseEnemyTarget(enemy, attacker.atk);
+  const targetIndex = choice.targetIndex;
   const target = enemy.board[targetIndex];
   if (!target) return updatePlayers(next, active, enemy);
   const damagedTarget = { ...target, hp: target.hp - attacker.atk };
@@ -784,11 +832,12 @@ export function advanceBattle(
   }
 
   const faceBias = side === "brother" ? child.battle.faceBias : opponent.faceBias;
+  const attackStyle = side === "brother" ? child.battle.attackStyle ?? "balanced" : opponent.attackStyle ?? "balanced";
   let attackerCursor = 0;
   while (attackerCursor < next[side].board.length) {
     const attacker = next[side].board[attackerCursor];
     const rush = instanceHasKeyword(attacker, cards, "rush");
-    if (!attacker.attacked && (attacker.summonedTurn < turn || rush)) next = resolveAttack(next, side, attackerCursor, faceBias, cards, child);
+    if (!attacker.attacked && (attacker.summonedTurn < turn || rush)) next = resolveAttack(next, side, attackerCursor, faceBias, attackStyle, cards, child);
     if (next.brother.life <= 0 || next.opponent.life <= 0) break;
     const stillAtCursor = next[side].board[attackerCursor]?.instanceId === attacker.instanceId;
     attackerCursor += stillAtCursor ? 1 : 0;

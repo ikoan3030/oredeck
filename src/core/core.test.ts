@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
-import { activeAdviceFocus, applyAdvice, matchesAdviceCategory, activeSpeciesSynergies, advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createLadderRun, createRun, decaySync, decideOffer, deferPassiveIntervention, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, countSpeciesTypes, instanceHasKeyword, speciesGrant, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition, type SpeciesSynergyConfig } from "./index";
+import { activeAdviceFocus, applyAdvice, matchesAdviceCategory, activeSpeciesSynergies, advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createLadderRun, createRun, decaySync, decideOffer, deferPassiveIntervention, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, countSpeciesTypes, instanceHasKeyword, speciesGrant, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type AttackStyle, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition, type SpeciesSynergyConfig } from "./index";
 
 const cards = JSON.parse(readFileSync(resolve("data/cards.json"), "utf8")) as Card[];
 const child = JSON.parse(readFileSync(resolve("data/children/tanjun.json"), "utf8")) as ChildProfile;
@@ -11,6 +11,29 @@ const synergy = JSON.parse(readFileSync(resolve("data/species.json"), "utf8")) a
 const get = (id: string) => cards.find((card) => card.id === id)!;
 const getOpponent = (id: string) => getOpponentById(opponents, id)!;
 const battleDeck = (cardId: string): DraftCard[] => Array.from({ length: 15 }, (_, index) => ({ instanceId: `battle-${index}`, cardId, intervention: false, source: "auto" }));
+
+function attackScenario(style: AttackStyle, attackerAtk: number, attackerHp: number, targets: Array<{ atk: number; hp: number; guard?: boolean }>, seed = 1) {
+  const opponent: OpponentDefinition = { ...getOpponent("rush"), id: "attack-test", deck: Array.from({ length: 15 }, () => "grim"), attackStyle: "balanced" };
+  const deck = battleDeck("grim");
+  const initial = createBattle(deck, opponent, cards, seed);
+  const attacker = { ...initial.brother.hand[0], atk: attackerAtk, hp: attackerHp, maxHp: attackerHp, summonedTurn: 0, attacked: false };
+  const opponentBoard = targets.map((spec, index) => ({
+    ...initial.opponent.hand[index],
+    atk: spec.atk,
+    hp: spec.hp,
+    maxHp: spec.hp,
+    grantedKeywords: spec.guard ? [...initial.opponent.hand[index].grantedKeywords, "guard" as const] : initial.opponent.hand[index].grantedKeywords,
+  }));
+  const battle = {
+    ...initial,
+    brother: { ...initial.brother, deck: [], hand: [], board: [attacker], life: 20, maxPp: 0, pp: 0 },
+    opponent: { ...initial.opponent, deck: [], hand: [], board: opponentBoard, life: 20, maxPp: 0, pp: 0 },
+    activeSide: "brother" as const,
+    turn: 0,
+  };
+  const testChild = { ...child, battle: { ...child.battle, attackStyle: style } };
+  return { battle, opponent, testChild };
+}
 
 test("aesthetic score follows the fixed C/H/cool/K weights", () => {
   assert.equal(aestheticScore(get("gravewald"), child), 2.7);
@@ -408,8 +431,8 @@ test("monster play events snapshot the summoned card on the board", () => {
 
 test("attack events carry structured card and leader targets", () => {
   const base = createBattle(battleDeck("grim"), getOpponent("wall"), cards, 1);
-  const attacker = { ...base.brother.hand[0], summonedTurn: 0, attacked: false };
-  const target = { ...base.opponent.hand[0], cardId: "gaiorg", atk: 3, hp: 5, maxHp: 5, summonedTurn: 0 };
+  const attacker = { ...base.brother.hand[0], atk: 3, hp: 4, maxHp: 4, summonedTurn: 0, attacked: false };
+  const target = { ...base.opponent.hand[0], cardId: "gaiorg", atk: 3, hp: 3, maxHp: 3, summonedTurn: 0 };
   const cardTargetState = {
     ...base,
     turn: 1,
@@ -436,6 +459,49 @@ test("attack events carry structured card and leader targets", () => {
   assert.equal(leaderAttack.targetLeader, true);
   assert.equal(leaderAttack.damage, attacker.atk);
   assert.equal(leaderAttack.targetInstanceId, undefined);
+});
+
+test("shared attack rules skip wasteful trades and prioritize favorable ones", () => {
+  const wasteful = attackScenario("face", 2, 2, [{ atk: 4, hp: 4, guard: true }]);
+  const skipped = advanceBattle(wasteful.battle, cards, wasteful.testChild, wasteful.opponent);
+  assert.equal(skipped.events.some((item) => item.type === "attack"), false);
+  assert.equal(skipped.brother.board[0].attacked, false, "a skipped attack is not marked as spent");
+  assert.equal(skipped.opponent.board[0].hp, 4);
+
+  const favorable = attackScenario("face", 4, 4, [{ atk: 3, hp: 3 }]);
+  const favorableResult = advanceBattle(favorable.battle, cards, favorable.testChild, favorable.opponent);
+  const favorableAttack = favorableResult.events.find((item) => item.type === "attack");
+  assert.ok(favorableAttack);
+  assert.equal(favorableAttack.targetLeader, undefined, "a favorable trade overrides face preference");
+  assert.equal(favorableAttack.targetInstanceId, favorable.battle.opponent.board[0].instanceId);
+});
+
+test("attack styles choose face, board, and fallback defaults after shared rules", () => {
+  const face = attackScenario("face", 3, 4, [{ atk: 1, hp: 5 }]);
+  const faceResult = advanceBattle(face.battle, cards, face.testChild, face.opponent);
+  assert.ok(faceResult.events.some((item) => item.type === "attack" && item.targetLeader));
+
+  const board = attackScenario("board", 3, 4, [{ atk: 1, hp: 5 }]);
+  const boardResult = advanceBattle(board.battle, cards, board.testChild, board.opponent);
+  const boardAttack = boardResult.events.find((item) => item.type === "attack");
+  assert.ok(boardAttack);
+  assert.equal(boardAttack.targetInstanceId, board.battle.opponent.board[0].instanceId);
+
+  const fallback = attackScenario("balanced", 3, 4, [{ atk: 1, hp: 5 }]);
+  const fallbackChild = { ...fallback.testChild, battle: { ...fallback.testChild.battle, attackStyle: undefined } };
+  const fallbackResult = advanceBattle(fallback.battle, cards, fallbackChild, fallback.opponent);
+  assert.ok(fallbackResult.events.some((item) => item.type === "attack"));
+});
+
+test("attack styles are assigned in external data", () => {
+  assert.equal(child.battle.attackStyle, "face");
+  assert.equal(getOpponent("rush").attackStyle, "face");
+  assert.equal(getOpponent("sister").attackStyle, "balanced");
+  assert.equal(getOpponent("smart-brother").attackStyle, "balanced");
+  assert.equal(getOpponent("cousin").attackStyle, "balanced");
+  assert.equal(getOpponent("wall").attackStyle, "board");
+  assert.equal(getOpponent("executive").attackStyle, "board");
+  assert.equal(getOpponent("boss").attackStyle, "balanced");
 });
 
 test("effect events carry their source, target collection, damage, and destruction data", () => {

@@ -126,6 +126,7 @@
   },
   "battle": {
     "faceBias": 0.82,
+    "attackStyle": "face",
     "attributionKeywords": ["damage", "destroy", "buff"]
   },
   "dialogue": {

@@ -7,6 +7,7 @@
     "speciesSynergy": true,
     "color": "#3867d6",
     "faceBias": 0.22,
+    "attackStyle": "board",
     "intro": "組織の壁役をなめるなよ。オレの鉄壁陣を抜けるかな！",
     "taunts": [
       "そんな貧弱な攻撃でオレの壁を抜けるつもりか！",
@@ -38,6 +39,7 @@
     "trait": "軽いカードで一気に攻める",
     "color": "#ef3e36",
     "faceBias": 0.92,
+    "attackStyle": "face",
     "intro": "守るヒマなんてやらねえ！ 一気に決めるぜ！",
     "taunts": [
       "遅い遅い！ 重いカードを抱えてる場合かよ！",
@@ -69,6 +71,7 @@
     "trait": "守護と復活でじっくり受ける",
     "color": "#5dade2",
     "faceBias": 0.28,
+    "attackStyle": "balanced",
     "intro": "こ、こわいけど……守っていれば、きっと大丈夫！",
     "taunts": [
       "まだ、あきらめないで……復活できるから……！",
@@ -100,6 +103,7 @@
     "trait": "除去スペルで盤面を整理する",
     "color": "#45aaf2",
     "faceBias": 0.42,
+    "attackStyle": "balanced",
     "intro": "盤面を読めば、勝ち筋は自然に見えてくるよ。",
     "taunts": [
       "その盤面なら、除去一枚で十分だね。",
@@ -131,6 +135,7 @@
     "trait": "重い一撃で押しつぶす",
     "color": "#a55eea",
     "faceBias": 0.62,
+    "attackStyle": "balanced",
     "intro": "軽い小細工より、でかい一発のほうが気持ちいいだろ！",
     "taunts": [
       "その小さな札で、この重量級を止めるのか？",
@@ -163,6 +168,7 @@
     "speciesSynergy": true,
     "color": "#8854d0",
     "faceBias": 0.38,
+    "attackStyle": "board",
     "intro": "組織の中枢まで来たか。ここからは均衡を崩していく。",
     "taunts": [
       "守りだけでは、幹部の座は奪えない。",
@@ -195,6 +201,7 @@
     "speciesSynergy": true,
     "color": "#7f5af0",
     "faceBias": 0.57,
+    "attackStyle": "balanced",
     "leaderLife": 28,
     "intro": "攻めるだけでも、守るだけでも勝てないぞ！",
     "taunts": [

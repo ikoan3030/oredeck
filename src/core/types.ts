@@ -35,6 +35,7 @@ export interface Card {
 }
 
 export type AdviceCategory = "removal" | "guard" | "low_cost" | "skip";
+export type AttackStyle = "face" | "board" | "balanced";
 
 /**
  * One grant applied to a card. The same shape backs species synergy, the sync stage bonus
@@ -176,6 +177,8 @@ export interface ChildProfile {
   };
   battle: {
     faceBias: number;
+    /** Attack target preference. Missing data falls back to balanced in core. */
+    attackStyle?: AttackStyle;
     attributionKeywords: Keyword[];
   };
   /** "pick" lines may carry a {name} placeholder for the chosen card. */
@@ -309,6 +312,8 @@ export interface OpponentDefinition {
   trait: string;
   deck: string[];
   faceBias: number;
+  /** Attack target preference. Missing data falls back to balanced in core. */
+  attackStyle?: AttackStyle;
   color: string;
   leaderLife?: number;
   /** Organization opponents may resolve their deck's species grants at battle start. */
