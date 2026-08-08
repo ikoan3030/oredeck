@@ -487,6 +487,17 @@ test("attack styles choose face, board, and fallback defaults after shared rules
   assert.ok(boardAttack);
   assert.equal(boardAttack.targetInstanceId, board.battle.opponent.board[0].instanceId);
 
+  const boardFaceFallback = attackScenario("board", 2, 2, [{ atk: 4, hp: 4 }]);
+  const boardFaceResult = advanceBattle(boardFaceFallback.battle, cards, boardFaceFallback.testChild, boardFaceFallback.opponent);
+  assert.ok(boardFaceResult.events.some((item) => item.type === "attack" && item.targetLeader), "board style faces when every board trade is wasteful");
+  const balancedFaceFallback = attackScenario("balanced", 2, 2, [{ atk: 4, hp: 4 }]);
+  const balancedFaceResult = advanceBattle(balancedFaceFallback.battle, cards, balancedFaceFallback.testChild, balancedFaceFallback.opponent);
+  assert.ok(boardFaceResult.events.filter((item) => item.type === "attack").length >= balancedFaceResult.events.filter((item) => item.type === "attack").length, "board style does not lose an attack when face is available");
+
+  const boardGuard = attackScenario("board", 2, 2, [{ atk: 4, hp: 4, guard: true }]);
+  const boardGuardResult = advanceBattle(boardGuard.battle, cards, boardGuard.testChild, boardGuard.opponent);
+  assert.equal(boardGuardResult.events.some((item) => item.type === "attack"), false, "a wasteful guard trade still blocks the leader");
+
   const fallback = attackScenario("balanced", 3, 4, [{ atk: 1, hp: 5 }]);
   const fallbackChild = { ...fallback.testChild, battle: { ...fallback.testChild.battle, attackStyle: undefined } };
   const fallbackResult = advanceBattle(fallback.battle, cards, fallbackChild, fallback.opponent);

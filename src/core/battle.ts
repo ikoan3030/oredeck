@@ -261,7 +261,9 @@ function chooseAttackTarget(
   if (!enemy.board.length) return { targetLeader: true, targetIndex: -1 };
 
   if (attackStyle === "board") {
-    return boardChoice.targetIndex >= 0 ? { targetLeader: false, targetIndex: boardChoice.targetIndex } : null;
+    // Board is a priority, not a reason to pass. If every board target would be
+    // a wasteful trade and no guard blocks the leader, fall back to face.
+    return boardChoice.targetIndex >= 0 ? { targetLeader: false, targetIndex: boardChoice.targetIndex } : { targetLeader: true, targetIndex: -1 };
   }
   if (attackStyle === "face") return { targetLeader: true, targetIndex: -1 };
   if (randomValue < faceBias || boardChoice.targetIndex < 0) return { targetLeader: true, targetIndex: -1 };
