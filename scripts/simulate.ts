@@ -55,6 +55,8 @@ interface DraftSimulationResult {
 interface BattleAggregate {
   battles: number;
   wins: number;
+  totalTurns: number;
+  shutoutWins: number;
   buildSync: number[];
   carrySync: number[];
   buildStages: Record<string, number>;
@@ -198,15 +200,19 @@ function simulateDraft(seed: number, initialSync: number, policyValue: Adjudicat
   return { draft: state, policySeed, adviceOpportunities, adviceSkipped };
 }
 
-function runBattleWithMetrics(initial: BattleState, opponent: OpponentDefinition): { battle: BattleState; lifeThresholdReached: boolean; deckExhausted: boolean; aceActivated: boolean; comebackWin: boolean } {
+function runBattleWithMetrics(initial: BattleState, opponent: OpponentDefinition): { battle: BattleState; lifeThresholdReached: boolean; deckExhausted: boolean; aceActivated: boolean; comebackWin: boolean; brotherDamaged: boolean } {
   let next = initial;
   let lifeThresholdReached = next.brother.life <= simulationChild.ace.lifeThreshold;
   let deckExhausted = next.brother.deck.length === 0 || next.opponent.deck.length === 0;
   let aceActivated = false;
   let wasBehindAtAce = false;
+  let brotherDamaged = false;
   while (!next.winner) {
     const before = next;
     next = advanceBattle(next, cards, simulationChild, opponent);
+    const turnEvents = next.events.slice(before.events.length);
+    brotherDamaged ||= turnEvents.some((event) => event.side === "opponent" && event.targetLeader && (event.damage ?? 0) > 0);
+    brotherDamaged ||= next.brother.life < before.brother.life;
     if (!before.brother.aceUsed && next.brother.aceUsed) {
       aceActivated = true;
       wasBehindAtAce = before.brother.life < before.opponent.life;
@@ -214,13 +220,15 @@ function runBattleWithMetrics(initial: BattleState, opponent: OpponentDefinition
     lifeThresholdReached ||= next.brother.life <= simulationChild.ace.lifeThreshold;
     deckExhausted ||= next.brother.deck.length === 0 || next.opponent.deck.length === 0;
   }
-  return { battle: next, lifeThresholdReached, deckExhausted, aceActivated, comebackWin: aceActivated && wasBehindAtAce && next.winner === "brother" };
+  return { battle: next, lifeThresholdReached, deckExhausted, aceActivated, comebackWin: aceActivated && wasBehindAtAce && next.winner === "brother", brotherDamaged };
 }
 
 function createAggregate(): BattleAggregate {
   return {
     battles: 0,
     wins: 0,
+    totalTurns: 0,
+    shutoutWins: 0,
     buildSync: [],
     carrySync: [],
     buildStages: {},
@@ -370,6 +378,8 @@ for (let runIndex = 0; runIndex < runs; runIndex += 1) {
     const aggregate = aggregates[battleIndex];
     aggregate.battles += 1;
     aggregate.wins += Number(result.winner === "brother");
+    aggregate.totalTurns += withAce.battle.turn;
+    aggregate.shutoutWins += Number(result.winner === "brother" && !withAce.brotherDamaged);
     aggregate.buildSync.push(result.syncAfterBuild);
     aggregate.carrySync.push(result.syncAfterDecay);
     aggregate.passiveInterventions += result.passiveInterventions;
@@ -436,6 +446,10 @@ const formatAggregate = (aggregate: BattleAggregate, battleIndex: number) => ({
   },
   passiveInterventions: {
     averagePerBattle: Number((aggregate.passiveInterventions / aggregate.battles).toFixed(3)),
+  },
+  matchQuality: {
+    averageTurns: Number((aggregate.totalTurns / aggregate.battles).toFixed(3)),
+    shutoutRateAmongWins: formatRate(aggregate.shutoutWins, aggregate.wins),
   },
   deckExhaustionRate: formatRate(aggregate.deckExhausted, aggregate.battles),
   syncBoundaryWithinHalf: {
