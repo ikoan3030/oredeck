@@ -1004,6 +1004,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 }
 .board-card.event-attack.attack-toward-opponent { animation: attack-toward-opponent var(--event-duration, .72s) cubic-bezier(.2,.8,.25,1); }
 .board-card.event-attack.attack-toward-brother { animation: attack-toward-brother var(--event-duration, .72s) cubic-bezier(.2,.8,.25,1); }
+.board-card.attack-windup,
+.hand-card.attack-windup { animation: attack-windup var(--attack-prelude-duration, .15s) ease-out both; }
 .board-card.attack-prelude-wait { filter: brightness(.92); }
 .board-card.guard-intercept-prelude { z-index: 6; animation: guard-intercept-forward-opponent var(--guard-intercept-duration, .22s) cubic-bezier(.2,1.2,.4,1) both; }
 .board-card.guard-intercept-prelude.guard-intercept-brother { animation-name: guard-intercept-forward-brother; }
@@ -1018,6 +1020,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .arena.leader-hit-opponent,
 .arena.leader-hit-brother { animation: leader-hit-shake var(--event-duration, .72s) ease-out; }
 .board-card.event-summon { animation: summon-in var(--event-duration, .55s) cubic-bezier(.2,1.4,.4,1); }
+.board-card.summon-prelude,
+.hand-card.summon-prelude { animation: summon-prelude var(--summon-prelude-duration, .3s) ease-out both; }
 .board-card.event-sync-flash,
 .hand-card.event-sync-flash { animation: sync-flash var(--event-duration, .8s) ease-out; }
 .hand-card.event-ace-card { animation: ace-card-arrive var(--event-duration, .9s) ease-out; }
@@ -1042,6 +1046,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   transform: translate(-50%, -50%);
   animation: attack-impact var(--event-duration, .72s) ease-out both;
 }
+.attack-impact.afterglow { animation: attack-impact-afterglow var(--attack-afterglow-duration, .18s) ease-out both; }
 .damage-pop {
   position: absolute;
   color: white;
@@ -1185,6 +1190,10 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   63% { transform: translateY(18px) rotate(-4deg) scale(1.02); filter: brightness(1.25); }
   100% { transform: translateY(0) rotate(0); }
 }
+@keyframes attack-windup {
+  0%, 100% { transform: translate(0) scale(1); filter: brightness(1); }
+  55% { transform: translateY(-5px) scale(1.04); filter: brightness(1.35) drop-shadow(0 0 12px var(--yellow)); }
+}
 @keyframes guard-intercept-forward-opponent {
   0%, 100% { transform: translateY(0) scale(1); }
   52% { transform: translateY(15px) scale(1.08); filter: brightness(1.45) drop-shadow(0 0 18px var(--cyan)); }
@@ -1227,6 +1236,10 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   62% { opacity: .85; transform: translate(-50%, -50%) scale(1.55) rotate(28deg); }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(2.15) rotate(46deg); }
 }
+@keyframes attack-impact-afterglow {
+  0% { opacity: .9; transform: translate(-50%, -50%) scale(1.1) rotate(18deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.7) rotate(34deg); }
+}
 @keyframes effect-source-flash {
   0%, 100% { filter: brightness(1); }
   38% { filter: brightness(1.5) saturate(1.3) drop-shadow(0 0 12px var(--cyan)); }
@@ -1268,6 +1281,11 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 @keyframes summon-in {
   from { opacity: 0; transform: translateY(22px) scale(.6) rotate(-8deg); filter: brightness(2); }
   68% { transform: translateY(-5px) scale(1.08) rotate(2deg); }
+}
+@keyframes summon-prelude {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  45% { transform: scale(1.08); filter: brightness(2.1) drop-shadow(0 0 22px var(--yellow)); }
+  70% { transform: scale(1.03); filter: brightness(1.35) drop-shadow(0 0 12px var(--orange)); }
 }
 @keyframes sync-flash {
   0%, 100% { filter: brightness(1); }
@@ -1350,6 +1368,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .battle-speed-controls,
   .turn-transition-banner,
   .board-card.event-attack,
+  .board-card.attack-windup,
+  .hand-card.attack-windup,
   .board-card.guard-intercept-prelude,
   .board-card.guard-intercept-prelude .guard-shield,
   .board-card.attack-contact-target,
@@ -1360,6 +1380,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .arena.leader-hit-opponent,
   .arena.leader-hit-brother,
   .board-card.event-summon,
+  .board-card.summon-prelude,
+  .hand-card.summon-prelude,
   .board-card.event-sync-flash,
   .hand-card.event-sync-flash,
   .hand-card.event-ace-card,
@@ -1367,6 +1389,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .life-target .life,
   .damage-pop,
   .attack-impact,
+  .attack-impact.afterglow,
   .effect-hit-label,
   .effect-source-label,
   .summon-pop,

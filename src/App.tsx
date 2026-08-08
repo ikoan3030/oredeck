@@ -77,6 +77,9 @@ interface EventPlaybackTiming {
   normal: number;
   fast: number;
   skip: number;
+  attackPrelude?: Record<PlaybackSpeed, number>;
+  attackAfterglow?: Record<PlaybackSpeed, number>;
+  summonPrelude?: Record<PlaybackSpeed, number>;
   guardIntercept?: Record<PlaybackSpeed, number>;
   turnBanner?: Record<PlaybackSpeed, number>;
   visual?: Record<PlaybackSpeed, number>;
@@ -84,16 +87,17 @@ interface EventPlaybackTiming {
 }
 
 const PLAYBACK_SPEED_KEY = "oredeck-battle-playback-speed";
-const PLAYBACK_SPEED_LABELS: Record<PlaybackSpeed, string> = { normal: "等速", fast: "倍速", skip: "スキップ" };
+const PLAYBACK_SPEED_LABELS: Record<PlaybackSpeed, string> = { normal: "じっくり", fast: "さくさく", skip: "スキップ" };
+// Keep the internal keys stable for localStorage compatibility: normal is rich pacing, fast is quick pacing.
 const EVENT_PLAYBACK_TIMING: Record<BattleEventType, EventPlaybackTiming> = {
-  turn: { normal: 260, fast: 130, skip: 70, turnBanner: { normal: 500, fast: 250, skip: 0 } },
-  draw: { normal: 420, fast: 210, skip: 70 },
-  play: { normal: 580, fast: 290, skip: 80, visual: { normal: 580, fast: 290, skip: 120 } },
-  effect: { normal: 520, fast: 260, skip: 80, visual: { normal: 520, fast: 260, skip: 100 } },
-  attack: { normal: 760, fast: 380, skip: 90, guardIntercept: { normal: 220, fast: 110, skip: 0 }, visual: { normal: 760, fast: 380, skip: 140 } },
-  destroyed: { normal: 520, fast: 260, skip: 80, visual: { normal: 520, fast: 260, skip: 100 } },
-  attribution: { normal: 1100, fast: 550, skip: 100 },
-  taunt: { normal: 900, fast: 450, skip: 100 },
+  turn: { normal: 200, fast: 130, skip: 70, turnBanner: { normal: 700, fast: 0, skip: 0 } },
+  draw: { normal: 340, fast: 210, skip: 70 },
+  play: { normal: 480, fast: 290, skip: 80, summonPrelude: { normal: 300, fast: 0, skip: 0 }, visual: { normal: 480, fast: 290, skip: 120 } },
+  effect: { normal: 420, fast: 260, skip: 80, visual: { normal: 420, fast: 260, skip: 100 } },
+  attack: { normal: 600, fast: 380, skip: 90, attackPrelude: { normal: 150, fast: 0, skip: 0 }, attackAfterglow: { normal: 180, fast: 0, skip: 0 }, guardIntercept: { normal: 220, fast: 110, skip: 0 }, visual: { normal: 600, fast: 380, skip: 140 } },
+  destroyed: { normal: 450, fast: 260, skip: 80, visual: { normal: 450, fast: 260, skip: 100 } },
+  attribution: { normal: 1400, fast: 550, skip: 100 },
+  taunt: { normal: 1100, fast: 450, skip: 100 },
   result: {
     normal: 900,
     fast: 500,
@@ -105,7 +109,7 @@ const EVENT_PLAYBACK_TIMING: Record<BattleEventType, EventPlaybackTiming> = {
     },
   },
   sync_bonus: { normal: 900, fast: 450, skip: 100, visual: { normal: 800, fast: 400, skip: 140 } },
-  heal: { normal: 520, fast: 260, skip: 80, visual: { normal: 520, fast: 260, skip: 100 } },
+  heal: { normal: 480, fast: 260, skip: 80, visual: { normal: 480, fast: 260, skip: 100 } },
   ace: {
     normal: 1200,
     fast: 700,
@@ -516,7 +520,20 @@ function isGuardInterceptAttack(event: BattleEvent | null, cards: Card[]): boole
   return Boolean(target && instanceHasKeyword(target, cards, "guard"));
 }
 
-function eventCardClass(instance: BattleState["brother"]["board"][number], activeEvent: BattleEvent | null, cards: Card[], guardPreludeDone: boolean): string {
+function isLargeSummon(event: BattleEvent | null, cards: Card[]): boolean {
+  if (!event || event.type !== "play" || !event.cardId) return false;
+  const card = cards.find((item) => item.id === event.cardId);
+  return card?.type === "monster" && card.cost >= 5;
+}
+
+function eventCardClass(
+  instance: BattleState["brother"]["board"][number],
+  activeEvent: BattleEvent | null,
+  cards: Card[],
+  guardPreludeDone: boolean,
+  attackPreludeDone = true,
+  summonPreludeDone = true,
+): string {
   if (!activeEvent) return "";
   const sourceId = activeEvent.sourceInstanceId ?? activeEvent.instanceId;
   const isSource = sourceId === instance.instanceId;
@@ -524,13 +541,14 @@ function eventCardClass(instance: BattleState["brother"]["board"][number], activ
   if (!isSource && !isTarget) return "";
   if (activeEvent.type === "attack" && isSource) {
     if (isGuardInterceptAttack(activeEvent, cards) && !guardPreludeDone) return "attack-prelude-wait";
+    if (!attackPreludeDone) return "attack-windup";
     return "event-attack " + (activeEvent.side === "brother" ? "attack-toward-opponent" : "attack-toward-brother") + (activeEvent.targetLeader ? " attack-to-leader" : "");
   }
   if (activeEvent.type === "attack" && isTarget) {
     if (isGuardInterceptAttack(activeEvent, cards) && !guardPreludeDone) return `guard-intercept-prelude ${activeEvent.side === "brother" ? "guard-intercept-opponent" : "guard-intercept-brother"}`;
     return "attack-contact-target " + (activeEvent.side === "brother" ? "target-knockback-opponent" : "target-knockback-brother");
   }
-  if (activeEvent.type === "play" && isSource) return "event-summon";
+  if (activeEvent.type === "play" && isSource) return summonPreludeDone ? "event-summon" : "summon-prelude";
   if (activeEvent.type === "effect" && isSource) return "effect-source-flash";
   if ((activeEvent.type === "effect" || activeEvent.type === "destroyed") && isTarget) return "effect-target-flash";
   if (activeEvent.type === "sync_bonus" && isTarget) return "event-sync-flash";
@@ -566,17 +584,17 @@ function BattleHandCard({ instance, cards, ace }: { instance: BattleState["broth
   return <div className={`hand-card ${syncBonus && !ace ? "sync-granted" : ""} ${ace ? "ace-granted" : ""}`}><CardFace compact card={card} intervention={instance.intervention} />{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}</div>;
 }
 
-function AnimatedBoardCard({ instance, cards, ace = false, activeEvent = null, guardPreludeDone = true }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null; guardPreludeDone?: boolean }) {
+function AnimatedBoardCard({ instance, cards, ace = false, activeEvent = null, guardPreludeDone = true, attackPreludeDone = true, summonPreludeDone = true }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null; guardPreludeDone?: boolean; attackPreludeDone?: boolean; summonPreludeDone?: boolean }) {
   const card = cards.find((item) => item.id === instance.cardId)!;
   const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
-  const className = "board-card " + (instance.intervention ? "intervened " : "") + (syncBonus && !ace ? "sync-granted " : "") + (ace ? "ace-granted " : "") + eventCardClass(instance, activeEvent, cards, guardPreludeDone);
+  const className = "board-card " + (instance.intervention ? "intervened " : "") + (syncBonus && !ace ? "sync-granted " : "") + (ace ? "ace-granted " : "") + eventCardClass(instance, activeEvent, cards, guardPreludeDone, attackPreludeDone, summonPreludeDone);
   return <div className={className} title={card.name} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}>{instance.intervention && <span className="intervention-mark">兄</span>}{card.species && <span className="species-tag">{card.species}</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}{instanceHasKeyword(instance, cards, "guard") && <GuardShield />}<b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
 }
 
-function AnimatedBattleHandCard({ instance, cards, ace, activeEvent = null, guardPreludeDone = true }: { instance: BattleState["brother"]["hand"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null; guardPreludeDone?: boolean }) {
+function AnimatedBattleHandCard({ instance, cards, ace, activeEvent = null, guardPreludeDone = true, attackPreludeDone = true, summonPreludeDone = true }: { instance: BattleState["brother"]["hand"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null; guardPreludeDone?: boolean; attackPreludeDone?: boolean; summonPreludeDone?: boolean }) {
   const card = cards.find((item) => item.id === instance.cardId)!;
   const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
-  const className = "hand-card " + (syncBonus && !ace ? "sync-granted " : "") + (ace ? "ace-granted " : "") + eventCardClass(instance, activeEvent, cards, guardPreludeDone);
+  const className = "hand-card " + (syncBonus && !ace ? "sync-granted " : "") + (ace ? "ace-granted " : "") + eventCardClass(instance, activeEvent, cards, guardPreludeDone, attackPreludeDone, summonPreludeDone);
   return <div className={className} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}><CardFace compact card={card} intervention={instance.intervention} guard={instanceHasKeyword(instance, cards, "guard")} />{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}</div>;
 }
 
@@ -636,7 +654,7 @@ function TurnTransitionBanner({ banner }: { banner: { side: BattleEvent["side"];
   return <div className={`turn-transition-banner ${side}`} style={{ "--turn-banner-duration": `${banner.duration}ms` } as CSSProperties} role="status" aria-live="polite"><span>{banner.text}</span></div>;
 }
 
-function BattleEffectLayer({ activeEvent, cards, guardPreludeDone }: { activeEvent: BattleEvent | null; cards: Card[]; guardPreludeDone: boolean }) {
+function BattleEffectLayer({ activeEvent, cards, guardPreludeDone, attackAfterglow }: { activeEvent: BattleEvent | null; cards: Card[]; guardPreludeDone: boolean; attackAfterglow: boolean }) {
   if (!activeEvent) return null;
   const amount = eventDamageAmount(activeEvent);
   const targetSide = activeEvent.side === "brother" ? "opponent" : "brother";
@@ -650,7 +668,7 @@ function BattleEffectLayer({ activeEvent, cards, guardPreludeDone }: { activeEve
   const isAttackOnCard = activeEvent.type === "attack" && Boolean(activeEvent.targetInstanceId) && !isGuardPrelude;
   const attackerSide = activeEvent.side;
   return <div className="battle-effect-layer" aria-live="polite">
-    {isAttackOnCard && <span className={`attack-impact ${attackerSide === "brother" ? "opponent" : "brother"}`} aria-hidden="true" />}
+    {isAttackOnCard && <span className={`attack-impact ${attackerSide === "brother" ? "opponent" : "brother"} ${attackAfterglow ? "afterglow" : ""}`} aria-hidden="true" />}
     {isAttackOnCard && activeEvent.retaliationDamage !== undefined && <span className={`damage-pop attack-retaliation ${attackerSide}`}>-{activeEvent.retaliationDamage}</span>}
     {amount !== null && !isGuardPrelude && <span className={`damage-pop ${targetSide} ${isAttackOnCard ? "attack-contact" : "effect-hit"}`}>-{amount}</span>}
     {activeEvent.type === "play" && <span className={"summon-pop " + activeEvent.side}>登場！</span>}
@@ -685,6 +703,9 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
   const [cutIn, setCutIn] = useState<{ kind: CutInKind; visible: boolean } | null>(null);
   const [playbackBusy, setPlaybackBusy] = useState(false);
   const [guardPreludeDone, setGuardPreludeDone] = useState(true);
+  const [attackPreludeDone, setAttackPreludeDone] = useState(true);
+  const [summonPreludeDone, setSummonPreludeDone] = useState(true);
+  const [attackAfterglow, setAttackAfterglow] = useState(false);
   const [turnBanner, setTurnBanner] = useState<{ side: BattleEvent["side"]; text: string; duration: number } | null>(null);
   const turnBannerTimer = useRef<number | null>(null);
 
@@ -698,6 +719,9 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
       setActiveEvent(null);
       setCutIn(null);
       setGuardPreludeDone(true);
+      setAttackPreludeDone(true);
+      setSummonPreludeDone(true);
+      setAttackAfterglow(false);
       if (turnBannerTimer.current !== null) window.clearTimeout(turnBannerTimer.current);
       turnBannerTimer.current = null;
       setTurnBanner(null);
@@ -706,6 +730,10 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
     const item = battle.events[visibleEventCount];
     const timing = EVENT_PLAYBACK_TIMING[item.type];
     const guardPreludeDuration = item.type === "attack" && isGuardInterceptAttack(item, cards) ? timing.guardIntercept?.[speed] ?? 0 : 0;
+    const attackPreludeDuration = item.type === "attack" ? timing.attackPrelude?.[speed] ?? 0 : 0;
+    const attackAfterglowDuration = item.type === "attack" ? timing.attackAfterglow?.[speed] ?? 0 : 0;
+    const summonPreludeDuration = isLargeSummon(item, cards) ? timing.summonPrelude?.[speed] ?? 0 : 0;
+    const preludeDuration = guardPreludeDuration + attackPreludeDuration + summonPreludeDuration;
     if (item.type === "turn" || speed === "skip") {
       if (turnBannerTimer.current !== null) window.clearTimeout(turnBannerTimer.current);
       turnBannerTimer.current = null;
@@ -725,6 +753,9 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
       setCutIn(null);
       setActiveEvent(null);
       setGuardPreludeDone(true);
+      setAttackPreludeDone(true);
+      setSummonPreludeDone(true);
+      setAttackAfterglow(false);
       setPlaybackBusy(false);
       setVisibleEventCount((count) => count + 1);
     };
@@ -732,6 +763,9 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
     setPlaybackBusy(true);
     setActiveEvent(item);
     setGuardPreludeDone(guardPreludeDuration === 0);
+    setAttackPreludeDone(attackPreludeDuration === 0);
+    setSummonPreludeDone(summonPreludeDuration === 0);
+    setAttackAfterglow(false);
     if (cutInKind && timing.cutIn) {
       const cutInTiming = timing.cutIn[speed];
       setCutIn({ kind: cutInKind, visible: false });
@@ -740,7 +774,10 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
     } else {
       setCutIn(null);
       if (guardPreludeDuration > 0) timers.push(window.setTimeout(() => setGuardPreludeDone(true), guardPreludeDuration));
-      timers.push(window.setTimeout(finishEvent, guardPreludeDuration + timing[speed]));
+      if (attackPreludeDuration > 0) timers.push(window.setTimeout(() => setAttackPreludeDone(true), guardPreludeDuration + attackPreludeDuration));
+      if (summonPreludeDuration > 0) timers.push(window.setTimeout(() => setSummonPreludeDone(true), summonPreludeDuration));
+      if (attackAfterglowDuration > 0) timers.push(window.setTimeout(() => setAttackAfterglow(true), preludeDuration + timing[speed]));
+      timers.push(window.setTimeout(finishEvent, preludeDuration + timing[speed] + attackAfterglowDuration));
     }
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [battle.events.length, cards, opponent.name, speed, visibleEventCount]);
@@ -761,7 +798,11 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
   const lifeOpponent = lifeSnapshot?.opponent ?? battle.opponent;
   const lifeBrother = lifeSnapshot?.brother ?? battle.brother;
   const leaderHitSide = activeEvent && isDamageEvent(activeEvent) && activeEvent.targetLeader ? activeEvent.side === "brother" ? "opponent" : "brother" : null;
-  const visualDuration = activeEvent ? `${EVENT_PLAYBACK_TIMING[activeEvent.type].visual?.[speed] ?? EVENT_PLAYBACK_TIMING[activeEvent.type][speed]}ms` : undefined;
+  const activeTiming = activeEvent ? EVENT_PLAYBACK_TIMING[activeEvent.type] : null;
+  const visualDuration = activeEvent ? `${activeTiming!.visual?.[speed] ?? activeTiming![speed]}ms` : undefined;
+  const attackPreludeDuration = activeEvent?.type === "attack" ? `${activeTiming?.attackPrelude?.[speed] ?? 0}ms` : undefined;
+  const attackAfterglowDuration = activeEvent?.type === "attack" ? `${activeTiming?.attackAfterglow?.[speed] ?? 0}ms` : undefined;
+  const summonPreludeDuration = activeEvent && isLargeSummon(activeEvent, cards) ? `${activeTiming?.summonPrelude?.[speed] ?? 0}ms` : undefined;
   const guardPreludeVisualDuration = activeEvent?.type === "attack" && isGuardInterceptAttack(activeEvent, cards) ? `${EVENT_PLAYBACK_TIMING.attack.guardIntercept?.[speed] ?? 0}ms` : undefined;
   const cardAttackHit = activeEvent?.type === "attack" && Boolean(activeEvent.targetInstanceId);
 
@@ -777,14 +818,14 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
     <AceStatus battle={battle} cards={cards} />
     <SynergyDeclaration synergies={battle.synergies} />
     <TurnTransitionBanner banner={turnBanner} />
-    <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""}`} style={visualDuration || guardPreludeVisualDuration ? { ...(visualDuration ? { "--event-duration": visualDuration } : {}), ...(guardPreludeVisualDuration ? { "--guard-intercept-duration": guardPreludeVisualDuration } : {}) } as CSSProperties : undefined}>
+    <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={visualDuration || guardPreludeVisualDuration || attackPreludeDuration || attackAfterglowDuration || summonPreludeDuration ? { ...(visualDuration ? { "--event-duration": visualDuration } : {}), ...(guardPreludeVisualDuration ? { "--guard-intercept-duration": guardPreludeVisualDuration } : {}), ...(attackPreludeDuration ? { "--attack-prelude-duration": attackPreludeDuration } : {}), ...(attackAfterglowDuration ? { "--attack-afterglow-duration": attackAfterglowDuration } : {}), ...(summonPreludeDuration ? { "--summon-prelude-duration": summonPreludeDuration } : {}) } as CSSProperties : undefined}>
       <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" || leaderHitSide === "opponent" ? "life-target" : "")}><div className="avatar" style={{ "--rival-color": opponent.color } as CSSProperties}>{opponent.name.slice(0, 1)}</div><div className="life"><span>LIFE</span><b>{lifeOpponent.life}</b></div><div className="pp">PP {lifeOpponent.pp}/{lifeOpponent.maxPp}</div></div>
-      <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{boardOpponent.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} />)}{!boardOpponent.board.length && <span className="empty-board">相手の場は空</span>}</div>
+      <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{boardOpponent.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!boardOpponent.board.length && <span className="empty-board">相手の場は空</span>}</div>
       <div className="board-line"><b>AUTO CARD BATTLE</b></div>
-      <div className={"board-zone brother-board " + (damageTargetSide === "brother" ? "battle-target" : "")}>{boardBrother.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} />)}{!boardBrother.board.length && <span className="empty-board">ユウタの場は空</span>}</div>
+      <div className={"board-zone brother-board " + (damageTargetSide === "brother" ? "battle-target" : "")}>{boardBrother.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!boardBrother.board.length && <span className="empty-board">ユウタの場は空</span>}</div>
       <div className={"fighter brother-fighter " + (damageTargetSide === "brother" || leaderHitSide === "brother" ? "life-target" : "")}><div className="avatar kid">ユ</div><div className="life"><span>LIFE</span><b>{lifeBrother.life}</b></div><div className="pp">PP {lifeBrother.pp}/{lifeBrother.maxPp}</div></div>
-      <div className="hand-zone">{boardBrother.hand.map((item) => <AnimatedBattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} />)}</div>
-      <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} />
+      <div className="hand-zone">{boardBrother.hand.map((item) => <AnimatedBattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}</div>
+      <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} />
     </section>
     <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
     {dialogueEvent && !battle.winner && <div className="battle-speech"><Speech speaker={dialogueEvent.side === "brother" ? "ユウタ" : opponent.name} text={dialogueEvent.dialogue!} tone={dialogueEvent.side === "brother" ? "kid" : "rival"} /></div>}
