@@ -271,22 +271,25 @@ function SyncStageBanner({ notice }: { notice: SyncNotice | null }) {
 
 function DeckMaterials({ draft, cards, small = false }: { draft: DraftState; cards: Card[]; small?: boolean }) {
   const data = evaluateDeck(draft.deck, cards);
-  const maxCurve = Math.max(1, ...data.curve);
+  const byId = new Map(cards.map((card) => [card.id, card]));
+  const curve = Array.from({ length: 8 }, () => ({ monsters: 0, spells: 0 }));
+  draft.deck.forEach((item) => {
+    const card = byId.get(item.cardId);
+    if (!card) return;
+    const bucket = Math.min(7, Math.max(0, card.cost - 1));
+    curve[bucket][card.type === "monster" ? "monsters" : "spells"] += 1;
+  });
+  const maxCurve = Math.max(1, ...curve.map((item) => item.monsters + item.spells));
   return (
     <section className={`materials-panel ${small ? "small" : ""}`}>
       <div className="panel-heading"><span>DECK DATA</span><b>{data.size}/15</b></div>
-      <div className="material-grid">
-        <div><span>除去</span><strong>{data.removal}</strong><small>目安 2</small></div>
-        <div><span>守護</span><strong>{data.guards}</strong><small>目安 2</small></div>
-        <div><span>6コスト〜</span><strong>{data.heavy}</strong><small>目安 2以下</small></div>
-        <div><span>〜2コスト</span><strong>{data.lowCost}</strong><small>目安 4</small></div>
+      <div className="curve-legend" aria-label="マナカーブ凡例"><span className="monster">■ モンスター</span><span className="spell">■ 呪文</span></div>
+      <div className="curve" aria-label="マナカーブ">
+        {curve.map((item, index) => {
+          const total = item.monsters + item.spells;
+          return <div key={index}><span className="curve-stack" style={{ height: `${total ? Math.max(4, total / maxCurve * 54) : 0}px` }}><i className="curve-spells" style={{ height: `${total ? item.spells / total * 100 : 0}%` }} /><i className="curve-monsters" style={{ height: `${total ? item.monsters / total * 100 : 0}%` }} /></span><b>{index === 7 ? "7+" : index + 1}</b></div>;
+        })}
       </div>
-      {!small && <>
-        <div className="substats"><span>平均コスト <b>{data.averageCost.toFixed(1)}</b></span><span>モンスター <b>{data.monsters}</b></span><span>スペル <b>{data.spells}</b></span></div>
-        <div className="curve" aria-label="コスト分布">
-          {data.curve.slice(1).map((value, index) => <div key={index}><i style={{ height: `${Math.max(4, value / maxCurve * 54)}px` }} /><span>{index === 7 ? "8+" : index + 1}</span></div>)}
-        </div>
-      </>}
     </section>
   );
 }
@@ -512,6 +515,7 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
       {adviceOpen && <div className="modal-backdrop"><section className="advice-modal">
         <div className="advice-title"><span>兄ちゃん会議！</span><h2>デッキを見て、ひとこと注文しよう</h2><p>注文したカードも、このまま通常の1枠として入る。</p></div>
         <DeckMaterials draft={draft} cards={cards} small />
+        <SpeciesCounter draft={draft} cards={cards} config={synergyConfig} />
         {!speciesMenuOpen ? <div className="advice-options">{adviceCategories.map((category) => {
           const copy = categoryCopy[category];
           return <button key={category} disabled={Boolean(pickFlash)} onClick={() => category === "species" ? setSpeciesMenuOpen(true) : onAdvice(category)}><b>{copy.icon}</b><span><strong>{copy.label}</strong><small>{copy.detail}</small></span></button>;
