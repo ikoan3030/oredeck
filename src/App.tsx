@@ -24,6 +24,7 @@ import {
   type AdviceCategory,
   type BattleEvent,
   type BattleEventType,
+  type BattleCardInstance,
   type BattleState,
   type Card,
   type ChildProfile,
@@ -79,8 +80,16 @@ interface EventPlaybackTiming {
   skip: number;
   attackPrelude?: Record<PlaybackSpeed, number>;
   attackAfterglow?: Record<PlaybackSpeed, number>;
+  attackReach?: Record<PlaybackSpeed, string>;
+  attackLeaderReach?: Record<PlaybackSpeed, string>;
+  attackOverlap?: Record<PlaybackSpeed, string>;
+  attackKnockback?: Record<PlaybackSpeed, string>;
+  attackShake?: Record<PlaybackSpeed, string>;
   summonPrelude?: Record<PlaybackSpeed, number>;
   guardIntercept?: Record<PlaybackSpeed, number>;
+  guardInterceptDistance?: Record<PlaybackSpeed, string>;
+  leaderShake?: Record<PlaybackSpeed, string>;
+  attackImpactSize?: Record<PlaybackSpeed, string>;
   turnBanner?: Record<PlaybackSpeed, number>;
   visual?: Record<PlaybackSpeed, number>;
   cutIn?: Record<PlaybackSpeed, { before: number; hold: number; after: number }>;
@@ -94,7 +103,23 @@ const EVENT_PLAYBACK_TIMING: Record<BattleEventType, EventPlaybackTiming> = {
   draw: { normal: 340, fast: 210, skip: 70 },
   play: { normal: 480, fast: 290, skip: 80, summonPrelude: { normal: 300, fast: 0, skip: 0 }, visual: { normal: 480, fast: 290, skip: 120 } },
   effect: { normal: 420, fast: 260, skip: 80, visual: { normal: 420, fast: 260, skip: 100 } },
-  attack: { normal: 600, fast: 380, skip: 90, attackPrelude: { normal: 150, fast: 0, skip: 0 }, attackAfterglow: { normal: 180, fast: 0, skip: 0 }, guardIntercept: { normal: 220, fast: 110, skip: 0 }, visual: { normal: 600, fast: 380, skip: 140 } },
+  attack: {
+    normal: 600,
+    fast: 380,
+    skip: 90,
+    attackPrelude: { normal: 150, fast: 0, skip: 0 },
+    attackAfterglow: { normal: 180, fast: 0, skip: 0 },
+    attackReach: { normal: "clamp(270px, 38vh, 380px)", fast: "clamp(180px, 26vh, 260px)", skip: "0px" },
+    attackLeaderReach: { normal: "clamp(360px, 48vh, 500px)", fast: "clamp(180px, 26vh, 260px)", skip: "0px" },
+    attackOverlap: { normal: "28px", fast: "0px", skip: "0px" },
+    attackKnockback: { normal: "34px", fast: "20px", skip: "0px" },
+    attackShake: { normal: "10px", fast: "5px", skip: "0px" },
+    guardIntercept: { normal: 220, fast: 110, skip: 0 },
+    guardInterceptDistance: { normal: "36px", fast: "15px", skip: "0px" },
+    leaderShake: { normal: "12px", fast: "5px", skip: "0px" },
+    attackImpactSize: { normal: "clamp(150px, 20vw, 240px)", fast: "clamp(115px, 16vw, 190px)", skip: "100px" },
+    visual: { normal: 600, fast: 380, skip: 140 },
+  },
   destroyed: { normal: 450, fast: 260, skip: 80, visual: { normal: 450, fast: 260, skip: 100 } },
   attribution: { normal: 1400, fast: 550, skip: 100 },
   taunt: { normal: 1100, fast: 450, skip: 100 },
@@ -179,15 +204,35 @@ function effectText(card: Card): string {
   }).join(" / ");
 }
 
-function GuardShield() {
-  return <span className="guard-shield" title="守護" aria-label="守護">守護</span>;
+type VisibleKeyword = "guard" | "rush" | "revive";
+
+const VISIBLE_KEYWORD_META: Record<VisibleKeyword, { label: string; symbol: string }> = {
+  guard: { label: "守護", symbol: "盾" },
+  rush: { label: "速攻", symbol: "↯" },
+  revive: { label: "復活", symbol: "↻" },
+};
+
+const VISIBLE_KEYWORD_ORDER: VisibleKeyword[] = ["guard", "rush", "revive"];
+
+function cardVisibleKeywords(card: Card): VisibleKeyword[] {
+  return VISIBLE_KEYWORD_ORDER.filter((keyword) => card.effects.some((effect) => effect.keyword === keyword));
 }
 
-function CardFace({ card, selected, intervention, compact = false, guard }: { card: Card; selected?: boolean; intervention?: boolean; compact?: boolean; guard?: boolean }) {
+function instanceVisibleKeywords(instance: BattleCardInstance, cards: Card[]): VisibleKeyword[] {
+  return VISIBLE_KEYWORD_ORDER.filter((keyword) => instanceHasKeyword(instance, cards, keyword));
+}
+
+function KeywordBadges({ keywords, compact = false }: { keywords: VisibleKeyword[]; compact?: boolean }) {
+  const visible = [...new Set(keywords)].slice(0, 3);
+  if (!visible.length) return null;
+  return <div className={`keyword-badges ${compact ? "compact" : ""}`} aria-label={`キーワード: ${visible.map((keyword) => VISIBLE_KEYWORD_META[keyword].label).join("・")}`}>{visible.map((keyword) => { const meta = VISIBLE_KEYWORD_META[keyword]; return <span key={keyword} className={`keyword-badge keyword-${keyword}`} title={meta.label} aria-label={meta.label}><i aria-hidden="true">{meta.symbol}</i><b>{meta.label}</b></span>; })}</div>;
+}
+
+function CardFace({ card, selected, intervention, compact = false, keywords }: { card: Card; selected?: boolean; intervention?: boolean; compact?: boolean; keywords?: VisibleKeyword[] }) {
   const aesthetic = card.aesthetic.C >= 3 ? "rare-aura" : card.aesthetic.C >= 2 ? "cool" : card.aesthetic.K >= 2 ? "cute" : "plain";
-  const hasGuard = guard ?? card.effects.some((effect) => effect.keyword === "guard");
+  const visibleKeywords = keywords ?? cardVisibleKeywords(card);
   return (
-    <article className={`card-face ${aesthetic} ${selected ? "selected" : ""} ${compact ? "compact" : ""} ${hasGuard ? "has-guard" : ""}`}>
+    <article className={`card-face ${aesthetic} ${selected ? "selected" : ""} ${compact ? "compact" : ""} ${visibleKeywords.length ? "has-keywords" : ""}`}>
       {intervention && <span className="intervention-mark" title="兄ちゃんが選んだカード">兄</span>}
       {card.species && <span className="species-tag" title={`種族：${card.species}`}>{card.species}</span>}
       <div className="card-topline"><span className="cost-gem">{card.cost}</span><span className="card-kind">{card.type === "monster" ? "MONSTER" : "SPELL"}</span></div>
@@ -195,7 +240,7 @@ function CardFace({ card, selected, intervention, compact = false, guard }: { ca
       <h3>{card.name}</h3>
       <p className="effect-line">{effectText(card)}</p>
       {card.type === "monster" ? <div className="stats"><b>ATK {card.atk}</b><b>HP {card.hp}</b></div> : <div className="spell-stamp">ACTION</div>}
-      {hasGuard && <GuardShield />}
+      <KeywordBadges keywords={visibleKeywords} compact={compact} />
     </article>
   );
 }
@@ -575,27 +620,27 @@ function boardSnapshotForPlayback(event: BattleEvent | undefined) {
 function BoardCard({ instance, cards, ace = false, activeEvent = null }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null }) {
   const card = cards.find((item) => item.id === instance.cardId)!;
   const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
-  return <div className={`board-card ${instance.intervention ? "intervened" : ""} ${syncBonus && !ace ? "sync-granted" : ""} ${ace ? "ace-granted" : ""}`} title={card.name}>{instance.intervention && <span className="intervention-mark">兄</span>}{card.species && <span className="species-tag">{card.species}</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}{instanceHasKeyword(instance, cards, "guard") && <GuardShield />}<b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
+  return <div className={`board-card ${instance.intervention ? "intervened" : ""} ${syncBonus && !ace ? "sync-granted" : ""} ${ace ? "ace-granted" : ""}`} title={card.name}>{instance.intervention && <span className="intervention-mark">兄</span>}{card.species && <span className="species-tag">{card.species}</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}<KeywordBadges keywords={instanceVisibleKeywords(instance, cards)} compact /><b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
 }
 
 function BattleHandCard({ instance, cards, ace }: { instance: BattleState["brother"]["hand"][number]; cards: Card[]; ace?: boolean }) {
   const card = cards.find((item) => item.id === instance.cardId)!;
   const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
-  return <div className={`hand-card ${syncBonus && !ace ? "sync-granted" : ""} ${ace ? "ace-granted" : ""}`}><CardFace compact card={card} intervention={instance.intervention} />{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}</div>;
+  return <div className={`hand-card ${syncBonus && !ace ? "sync-granted" : ""} ${ace ? "ace-granted" : ""}`}><CardFace compact card={card} intervention={instance.intervention} keywords={instanceVisibleKeywords(instance, cards)} />{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}</div>;
 }
 
 function AnimatedBoardCard({ instance, cards, ace = false, activeEvent = null, guardPreludeDone = true, attackPreludeDone = true, summonPreludeDone = true }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null; guardPreludeDone?: boolean; attackPreludeDone?: boolean; summonPreludeDone?: boolean }) {
   const card = cards.find((item) => item.id === instance.cardId)!;
   const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
   const className = "board-card " + (instance.intervention ? "intervened " : "") + (syncBonus && !ace ? "sync-granted " : "") + (ace ? "ace-granted " : "") + eventCardClass(instance, activeEvent, cards, guardPreludeDone, attackPreludeDone, summonPreludeDone);
-  return <div className={className} title={card.name} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}>{instance.intervention && <span className="intervention-mark">兄</span>}{card.species && <span className="species-tag">{card.species}</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}{instanceHasKeyword(instance, cards, "guard") && <GuardShield />}<b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
+  return <div className={className} title={card.name} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}>{instance.intervention && <span className="intervention-mark">兄</span>}{card.species && <span className="species-tag">{card.species}</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}<KeywordBadges keywords={instanceVisibleKeywords(instance, cards)} compact /><b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
 }
 
 function AnimatedBattleHandCard({ instance, cards, ace, activeEvent = null, guardPreludeDone = true, attackPreludeDone = true, summonPreludeDone = true }: { instance: BattleState["brother"]["hand"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null; guardPreludeDone?: boolean; attackPreludeDone?: boolean; summonPreludeDone?: boolean }) {
   const card = cards.find((item) => item.id === instance.cardId)!;
   const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
   const className = "hand-card " + (syncBonus && !ace ? "sync-granted " : "") + (ace ? "ace-granted " : "") + eventCardClass(instance, activeEvent, cards, guardPreludeDone, attackPreludeDone, summonPreludeDone);
-  return <div className={className} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}><CardFace compact card={card} intervention={instance.intervention} guard={instanceHasKeyword(instance, cards, "guard")} />{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}</div>;
+  return <div className={className} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}><CardFace compact card={card} intervention={instance.intervention} keywords={instanceVisibleKeywords(instance, cards)} />{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}</div>;
 }
 
 function AceStatus({ battle, cards }: { battle: BattleState; cards: Card[] }) {
@@ -802,9 +847,32 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
   const visualDuration = activeEvent ? `${activeTiming!.visual?.[speed] ?? activeTiming![speed]}ms` : undefined;
   const attackPreludeDuration = activeEvent?.type === "attack" ? `${activeTiming?.attackPrelude?.[speed] ?? 0}ms` : undefined;
   const attackAfterglowDuration = activeEvent?.type === "attack" ? `${activeTiming?.attackAfterglow?.[speed] ?? 0}ms` : undefined;
+  const attackReach = activeEvent?.type === "attack" ? activeTiming?.attackReach?.[speed] : undefined;
+  const attackLeaderReach = activeEvent?.type === "attack" ? activeTiming?.attackLeaderReach?.[speed] : undefined;
+  const attackOverlap = activeEvent?.type === "attack" ? activeTiming?.attackOverlap?.[speed] : undefined;
+  const attackKnockback = activeEvent?.type === "attack" ? activeTiming?.attackKnockback?.[speed] : undefined;
+  const attackShake = activeEvent?.type === "attack" ? activeTiming?.attackShake?.[speed] : undefined;
+  const guardInterceptDistance = activeEvent?.type === "attack" && isGuardInterceptAttack(activeEvent, cards) ? activeTiming?.guardInterceptDistance?.[speed] : undefined;
+  const leaderShake = activeEvent?.type === "attack" && activeEvent.targetLeader ? activeTiming?.leaderShake?.[speed] : undefined;
+  const attackImpactSize = activeEvent?.type === "attack" ? activeTiming?.attackImpactSize?.[speed] : undefined;
   const summonPreludeDuration = activeEvent && isLargeSummon(activeEvent, cards) ? `${activeTiming?.summonPrelude?.[speed] ?? 0}ms` : undefined;
   const guardPreludeVisualDuration = activeEvent?.type === "attack" && isGuardInterceptAttack(activeEvent, cards) ? `${EVENT_PLAYBACK_TIMING.attack.guardIntercept?.[speed] ?? 0}ms` : undefined;
   const cardAttackHit = activeEvent?.type === "attack" && Boolean(activeEvent.targetInstanceId);
+  const arenaStyle: CSSProperties | undefined = visualDuration || guardPreludeVisualDuration || attackPreludeDuration || attackAfterglowDuration || summonPreludeDuration || attackReach || attackLeaderReach || attackOverlap || attackKnockback || attackShake || guardInterceptDistance || leaderShake || attackImpactSize ? {
+    ...(visualDuration ? { "--event-duration": visualDuration } : {}),
+    ...(guardPreludeVisualDuration ? { "--guard-intercept-duration": guardPreludeVisualDuration } : {}),
+    ...(attackPreludeDuration ? { "--attack-prelude-duration": attackPreludeDuration } : {}),
+    ...(attackAfterglowDuration ? { "--attack-afterglow-duration": attackAfterglowDuration } : {}),
+    ...(summonPreludeDuration ? { "--summon-prelude-duration": summonPreludeDuration } : {}),
+    ...(attackReach ? { "--attack-reach": attackReach } : {}),
+    ...(attackLeaderReach ? { "--attack-leader-reach": attackLeaderReach } : {}),
+    ...(attackOverlap ? { "--attack-overlap": attackOverlap } : {}),
+    ...(attackKnockback ? { "--attack-knockback": attackKnockback } : {}),
+    ...(attackShake ? { "--attack-shake": attackShake } : {}),
+    ...(guardInterceptDistance ? { "--guard-intercept-distance": guardInterceptDistance } : {}),
+    ...(leaderShake ? { "--leader-shake": leaderShake } : {}),
+    ...(attackImpactSize ? { "--attack-impact-size": attackImpactSize } : {}),
+  } as CSSProperties : undefined;
 
   useEffect(() => {
     if (!auto || battle.winner || !playbackComplete) return;
@@ -818,7 +886,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAuto, auto, on
     <AceStatus battle={battle} cards={cards} />
     <SynergyDeclaration synergies={battle.synergies} />
     <TurnTransitionBanner banner={turnBanner} />
-    <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={visualDuration || guardPreludeVisualDuration || attackPreludeDuration || attackAfterglowDuration || summonPreludeDuration ? { ...(visualDuration ? { "--event-duration": visualDuration } : {}), ...(guardPreludeVisualDuration ? { "--guard-intercept-duration": guardPreludeVisualDuration } : {}), ...(attackPreludeDuration ? { "--attack-prelude-duration": attackPreludeDuration } : {}), ...(attackAfterglowDuration ? { "--attack-afterglow-duration": attackAfterglowDuration } : {}), ...(summonPreludeDuration ? { "--summon-prelude-duration": summonPreludeDuration } : {}) } as CSSProperties : undefined}>
+    <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={arenaStyle}>
       <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" || leaderHitSide === "opponent" ? "life-target" : "")}><div className="avatar" style={{ "--rival-color": opponent.color } as CSSProperties}>{opponent.name.slice(0, 1)}</div><div className="life"><span>LIFE</span><b>{lifeOpponent.life}</b></div><div className="pp">PP {lifeOpponent.pp}/{lifeOpponent.maxPp}</div></div>
       <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{boardOpponent.board.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!boardOpponent.board.length && <span className="empty-board">相手の場は空</span>}</div>
       <div className="board-line"><b>AUTO CARD BATTLE</b></div>
