@@ -34,7 +34,7 @@ export interface Card {
   rarity: "common" | "rare" | "legend";
 }
 
-export type AdviceCategory = "removal" | "guard" | "low_cost" | "skip";
+export type AdviceCategory = "species" | "spell" | "low_cost" | "high_cost" | "skip";
 export type AttackStyle = "face" | "board" | "balanced";
 
 /**
@@ -182,7 +182,7 @@ export interface ChildProfile {
     attributionKeywords: Keyword[];
   };
   /** "pick" lines may carry a {name} placeholder for the chosen card. */
-  dialogue: Record<"pick" | "ask" | "support" | "reject" | "love", string[]>;
+  dialogue: Record<"pick" | "ask" | "support" | "reject" | "love" | "advice", string[]>;
   battleCommentary: BattleCommentaryDefinition;
   postBattle: PostBattleDialogue;
 }
@@ -214,6 +214,8 @@ export interface DraftOffer {
 /** A live advice order: it only tilts the offer weights, never the pick itself. */
 export interface AdviceFocus {
   category: Exclude<AdviceCategory, "skip">;
+  /** Required when category is species; absent for the other order types. */
+  targetSpecies?: Species;
   /** The order stops applying once the draft reaches this pick number. */
   expiresAtPick: number;
 }

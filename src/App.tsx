@@ -32,6 +32,7 @@ import {
   type DraftState,
   type OpponentDefinition,
   type RunState,
+  type Species,
   type SpeciesSynergyConfig,
 } from "@/src/core";
 
@@ -178,11 +179,11 @@ function loadSavedGame(raw: string | null): SavedGame | null {
   }
 }
 
-const categoryCopy: Record<AdviceCategory, { label: string; detail: string; icon: string }> = {
-  removal: { label: "除去がほしい", detail: "相手の切り札をどかすカード", icon: "破" },
-  guard: { label: "守護がほしい", detail: "攻撃を受け止めるモンスター", icon: "守" },
-  low_cost: { label: "軽いカードがほしい", detail: "2コスト以下で早く動けるカード", icon: "軽" },
-  skip: { label: "今は見送る", detail: "弟の選び方をそのまま続ける", icon: "続" },
+const categoryCopy: Record<Exclude<AdviceCategory, "skip">, { label: string; detail: string; icon: string }> = {
+  species: { label: "種族を狙う", detail: "狙う種族のカードを集める", icon: "種" },
+  spell: { label: "呪文をとったら？", detail: "スペル全般を集める", icon: "呪" },
+  low_cost: { label: "出しやすいのをとったら？", detail: "コスト2以下を集める", icon: "軽" },
+  high_cost: { label: "強いのをとったら？", detail: "コスト5以上を集める", icon: "強" },
 };
 
 /** Kept as data for future screens. The kid's own picks deliberately state no reason. */
@@ -451,10 +452,21 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
   synergyConfig: SpeciesSynergyConfig;
   onPick: (index: 0 | 1) => void;
   onAuto: () => void;
-  onAdvice: (category: AdviceCategory) => void;
+  onAdvice: (category: Exclude<AdviceCategory, "skip">, targetSpecies?: Species) => void;
 }) {
   const focus = activeAdviceFocus(draft);
-  const adviceFocusLabel = focus ? `${categoryCopy[focus.category].label.replace("がほしい", "")}を探し中` : null;
+  const adviceFocusLabel = focus
+    ? focus.category === "species" && focus.targetSpecies
+      ? `${focus.targetSpecies}を探し中`
+      : `${categoryCopy[focus.category].label}を探し中`
+    : null;
+  const [speciesMenuOpen, setSpeciesMenuOpen] = useState(false);
+  const speciesCounts = countSpeciesTypes(draft.deck, cards);
+  const adviceCategories = child.advice.categories.filter((category): category is Exclude<AdviceCategory, "skip"> => category !== "skip");
+
+  useEffect(() => {
+    if (!adviceOpen) setSpeciesMenuOpen(false);
+  }, [adviceOpen]);
   // The crush decision always runs in core; showCrush only decides whether the UI marks it.
   const crush = Boolean(offer?.decision.love) && child.showCrush !== false;
   // The kid never explains himself on his own picks: one line of feeling, no reasoning.
@@ -500,10 +512,13 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
       {adviceOpen && <div className="modal-backdrop"><section className="advice-modal">
         <div className="advice-title"><span>兄ちゃん会議！</span><h2>デッキを見て、ひとこと注文しよう</h2><p>注文したカードも、このまま通常の1枠として入る。</p></div>
         <DeckMaterials draft={draft} cards={cards} small />
-        <div className="advice-options">{child.advice.categories.map((category) => {
+        {!speciesMenuOpen ? <div className="advice-options">{adviceCategories.map((category) => {
           const copy = categoryCopy[category];
-          return <button key={category} disabled={Boolean(pickFlash)} onClick={() => onAdvice(category)} className={category === "skip" ? "skip" : ""}><b>{copy.icon}</b><span><strong>{copy.label}</strong><small>{copy.detail}</small></span></button>;
-        })}</div>
+          return <button key={category} disabled={Boolean(pickFlash)} onClick={() => category === "species" ? setSpeciesMenuOpen(true) : onAdvice(category)}><b>{copy.icon}</b><span><strong>{copy.label}</strong><small>{copy.detail}</small></span></button>;
+        })}</div> : <div className="species-advice-menu">
+          <button type="button" className="advice-back" onClick={() => setSpeciesMenuOpen(false)}>← 4系統の注文に戻る</button>
+          <div className="species-advice-options">{SPECIES_ORDER.map((species) => <button key={species} type="button" disabled={Boolean(pickFlash)} onClick={() => onAdvice("species", species)}><b>{species.slice(0, 1)}</b><span><strong>{species}</strong><small>デッキ内 {speciesCounts[species]}種類</small></span></button>)}</div>
+        </div>}
       </section></div>}
     </main>
   );
@@ -1036,11 +1051,12 @@ export default function Home() {
     setPendingGame(committed);
   }
 
-  function chooseAdvice(category: AdviceCategory) {
+  function chooseAdvice(category: Exclude<AdviceCategory, "skip">, targetSpecies?: Species) {
     if (!game.draft || !child) return;
-    setReaction(null);
+    const adviceLines = child.dialogue.advice;
+    setReaction({ tone: "support", text: adviceLines[game.draft.pick % adviceLines.length] });
     // The order only tilts the offer pool from here on; the next pick is an ordinary one.
-    const next = applyAdvice(game.draft, category, child);
+    const next = applyAdvice(game.draft, category, child, targetSpecies);
     const generated = generateOffer(next, cards, child);
     setGame({ ...game, draft: generated.state, offer: generated.offer, adviceOpen: false });
   }

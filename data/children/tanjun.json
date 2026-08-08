@@ -118,7 +118,7 @@
   },
   "advice": {
     "checkpoints": [5, 10],
-    "categories": ["removal", "guard", "low_cost", "skip"],
+    "categories": ["species", "spell", "low_cost", "high_cost"],
     "alwaysIntervene": true,
     "consumesPick": true,
     "focusMultiplier": 2.0,
@@ -134,7 +134,8 @@
     "ask": ["兄ちゃん、どっちがいいと思う？", "どっちもよさそうなんだよなー！", "兄ちゃんが決めてくれよ！"],
     "support": ["だよな！ こっち、ぜったい強いって！", "兄ちゃんも分かってるじゃん！"],
     "reject": ["そっちか！ よし、それでいく！", "うーん、分かった！", "兄ちゃんがそう言うなら！"],
-    "love": ["うおおっ！ こいつ絶対入れる！", "見ろよ兄ちゃん、めちゃくちゃカッコいい！"]
+    "love": ["うおおっ！ こいつ絶対入れる！", "見ろよ兄ちゃん、めちゃくちゃカッコいい！"],
+    "advice": ["わかった！"]
   },
   "battleCommentary": {
     "frequency": {

@@ -1,8 +1,7 @@
 import { decideOffer } from "./decision";
-import { hasKeyword, isRemoval } from "./evaluation";
 import { nextRandom, randomIndex } from "./random";
 import { gainSync } from "./sync";
-import type { AdviceCategory, Card, ChildProfile, DraftOffer, DraftState, PassiveInterventionPlan, PickSource } from "./types";
+import type { AdviceCategory, Card, ChildProfile, DraftOffer, DraftState, PassiveInterventionPlan, PickSource, Species } from "./types";
 
 const DRAFT_PICK_COUNT = 15;
 
@@ -85,21 +84,24 @@ export function markAdviceSkipped(state: DraftState): DraftState {
     : { ...state, seenAdviceCheckpoints: [...state.seenAdviceCheckpoints, state.pick] };
 }
 
-/** The single definition of what each advice category asks for. */
-export function matchesAdviceCategory(card: Card, category: Exclude<AdviceCategory, "skip">): boolean {
-  if (category === "removal") return isRemoval(card);
-  if (category === "guard") return hasKeyword(card, "guard");
-  return card.cost <= 2;
+/** The single definition of what each advice order asks for. */
+export function matchesAdviceCategory(card: Card, category: Exclude<AdviceCategory, "skip">, targetSpecies?: Species): boolean {
+  if (category === "species") return card.type === "monster" && card.species === targetSpecies;
+  if (category === "spell") return card.type === "spell";
+  if (category === "low_cost") return card.cost <= 2;
+  return card.cost >= 5;
 }
 
 /**
  * An order does not hand the kid a pick: it leans the offer pool toward the category
  * until the next checkpoint (or the end of the build). Skipping leaves the pool alone.
  */
-export function applyAdvice(state: DraftState, category: AdviceCategory, child: ChildProfile): DraftState {
+export function applyAdvice(state: DraftState, category: AdviceCategory, child: ChildProfile, targetSpecies?: Species): DraftState {
   const seen = markAdviceSkipped(state);
   if (category === "skip") return seen;
-  return { ...seen, adviceFocus: { category, expiresAtPick: state.pick + child.advice.focusPicks } };
+  const adviceFocus: DraftState["adviceFocus"] = { category, expiresAtPick: state.pick + child.advice.focusPicks };
+  if (targetSpecies !== undefined) adviceFocus.targetSpecies = targetSpecies;
+  return { ...seen, adviceFocus };
 }
 
 export function activeAdviceFocus(state: DraftState): DraftState["adviceFocus"] {
@@ -137,7 +139,7 @@ export function generateOffer(
   // Without a live order every card is offered at the same rate, and the flat draw is kept
   // as-is so unordered builds reproduce exactly.
   const draw = (seed: number, from: readonly Card[]) => focus
-    ? weightedIndex(seed, from.map((card) => matchesAdviceCategory(card, focus.category) ? child.advice.focusMultiplier : 1))
+    ? weightedIndex(seed, from.map((card) => matchesAdviceCategory(card, focus.category, focus.targetSpecies) ? child.advice.focusMultiplier : 1))
     : randomIndex(seed, from.length);
   const first = draw(state.seed, pool);
   const secondPool = pool.filter((_, index) => index !== first.index);
@@ -183,7 +185,7 @@ export function resolveOffer(
   const interventionSupported = source === "passive"
     ? supported
     : source === "advice" && focus
-      ? matchesAdviceCategory(chosen, focus.category)
+      ? matchesAdviceCategory(chosen, focus.category, focus.targetSpecies)
       : undefined;
   const syncAfter = source === "passive" ? gainSync(state.syncRate, supported, child) : state.syncRate;
   return {

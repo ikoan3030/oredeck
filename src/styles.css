@@ -151,6 +151,15 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .advice-options small { font: 700 11px/1.4 "Yu Gothic", sans-serif; color: #555; }
 .advice-options button.skip { box-shadow: 4px 4px 0 #888; }
 .advice-options button.skip > b { background: #ddd; }
+.species-advice-menu { display: grid; gap: 14px; margin-top: 20px; }
+.advice-back { justify-self: start; padding: 8px 12px; color: var(--ink); background: #fff; border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--blue); font: 900 12px/1.2 "Yu Gothic", sans-serif; cursor: pointer; }
+.species-advice-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.species-advice-options button { display: flex; align-items: center; gap: 10px; padding: 10px; text-align: left; background: white; border: 4px solid var(--ink); box-shadow: 4px 4px 0 var(--cyan); cursor: pointer; }
+.species-advice-options button:hover { background: #e9f4ff; transform: translateY(-3px); }
+.species-advice-options button > b { display: grid; place-items: center; width: 38px; height: 38px; color: white; background: var(--blue); border: 3px solid var(--ink); font-size: 18px; }
+.species-advice-options span { display: grid; gap: 3px; }
+.species-advice-options strong { font-size: 15px; }
+.species-advice-options small { font: 700 11px/1.3 "Yu Gothic", sans-serif; color: #555; }
 
 .deck-screen { padding-bottom: 60px; }
 .completion-stamp { padding: 8px 15px; color: var(--ink); background: var(--yellow); border: 3px solid white; transform: rotate(2deg); }
@@ -622,7 +631,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .love-ribbon { font-size: 9px; padding: 5px; left: -5px; top: 9px; }
   .speech { padding: 10px; }
   .speech p { font-size: 13px; }
-  .advice-options, .rival-cards { grid-template-columns: 1fr; }
+  .advice-options, .rival-cards, .species-advice-options { grid-template-columns: 1fr; }
   .deck-review-grid { padding: 38px 12px 20px; }
   .deck-row { grid-template-columns: 34px 36px 1fr auto; }
   .deck-row small { display: none; }

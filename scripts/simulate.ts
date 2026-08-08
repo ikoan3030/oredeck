@@ -142,8 +142,19 @@ function opponentById(id: string): OpponentDefinition {
   return opponent;
 }
 
-function chooseAdviceCategory(): Exclude<AdviceCategory, "skip"> | undefined {
-  return simulationChild.advice.categories.find((category): category is Exclude<AdviceCategory, "skip"> => category !== "skip");
+interface AdviceOrder {
+  category: Exclude<AdviceCategory, "skip">;
+  targetSpecies?: Species;
+}
+
+function chooseAdviceOrder(state: DraftState, targetSpecies?: Species, policyValue?: AdjudicationPolicy): AdviceOrder | undefined {
+  if (policyValue?.kind === "bundle" && targetSpecies !== undefined) return { category: "species", targetSpecies };
+
+  // Keep the ordinary simulator close to the former missing-materials policy:
+  // first ask for cheap cards when the curve is short, otherwise ask for spells.
+  const deckCards = state.deck.map((item) => cards.find((card) => card.id === item.cardId)).filter((card): card is Card => Boolean(card));
+  const lowCost = deckCards.filter((card) => card.cost <= 2).length;
+  return { category: lowCost < 4 ? "low_cost" : "spell" };
 }
 
 function chooseBundleTargetSpecies(seed: number): Species {
@@ -176,9 +187,9 @@ function simulateDraft(seed: number, initialSync: number, policyValue: Adjudicat
     if (isAdviceDue(state, simulationChild)) {
       // An order no longer consumes a pick: it only leans the offer pool from here on.
       adviceOpportunities += 1;
-      const category = adviceMode === "skip" ? undefined : chooseAdviceCategory();
-      if (!category) adviceSkipped += 1;
-      state = applyAdvice(state, category ?? "skip", simulationChild);
+      const order = adviceMode === "skip" ? undefined : chooseAdviceOrder(state, targetSpecies, policyValue);
+      if (!order) adviceSkipped += 1;
+      state = applyAdvice(state, order?.category ?? "skip", simulationChild, order?.targetSpecies);
     }
 
     const generated = generateOffer(state, cards, simulationChild);
