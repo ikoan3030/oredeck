@@ -112,6 +112,7 @@ interface EventPlaybackTiming {
 }
 
 const PLAYBACK_SPEED_KEY = "oredeck-battle-playback-speed";
+const BATTLE_LOG_EXPANDED_KEY = "oredeck-battle-log-expanded";
 const PLAYBACK_SPEED_LABELS: Record<PlaybackSpeed, string> = { normal: "じっくり", fast: "さくさく", skip: "スキップ" };
 // Keep the internal keys stable for localStorage compatibility: normal is rich pacing, fast is quick pacing.
 const EVENT_PLAYBACK_TIMING: Record<BattleEventType, EventPlaybackTiming> = {
@@ -232,6 +233,13 @@ const VISIBLE_KEYWORD_ORDER: VisibleKeyword[] = ["guard", "rush", "revive"];
 
 function cardVisibleKeywords(card: Card): VisibleKeyword[] {
   return VISIBLE_KEYWORD_ORDER.filter((keyword) => card.effects.some((effect) => effect.keyword === keyword));
+}
+
+function loadBattleLogExpanded(): boolean {
+  if (typeof window === "undefined") return true;
+  const saved = window.localStorage.getItem(BATTLE_LOG_EXPANDED_KEY);
+  if (saved === "expanded" || saved === "collapsed") return saved === "expanded";
+  return !window.matchMedia("(max-width: 390px)").matches;
 }
 
 function instanceVisibleKeywords(instance: BattleCardInstance, cards: Card[]): VisibleKeyword[] {
@@ -740,7 +748,7 @@ function LegacyBattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onF
     <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
     <div className="battle-speech battle-speech-opponent" aria-live="polite">{!battle.winner && opponentDialogueEvent && <Speech speaker={opponent.name} text={opponentDialogueEvent.dialogue!} tone="rival" />}</div>
     <div className="battle-speech battle-speech-brother" aria-live="polite">{!battle.winner && brotherDialogueEvent && <Speech speaker="ユウタ" text={brotherDialogueEvent.dialogue!} tone="kid" />}</div>
-    {!battle.winner && <div className="battle-controls"><button onClick={onNext} disabled={auto}>1ターン進める</button><button className="primary-action" onClick={onAuto}>{auto ? "自動再生中…" : "最後まで見る"}<span>▶</span></button></div>}
+    {!battle.winner && <div className="battle-controls"><button onClick={onNext} disabled={auto}>ターンを進める</button><button className="primary-action" onClick={onAuto}>{auto ? "自動再生中…" : "最後までスキップ"}<span>▶</span></button></div>}
     {battle.winner && <div className="result-overlay"><div className={`result-burst ${battle.winner === "brother" ? "win" : "lose"}`}><span>{battle.winner === "brother" ? "VICTORY!" : battle.winner === "draw" ? "DRAW" : "DEFEAT"}</span><h1>{battle.winner === "brother" ? "ユウタの勝利！" : battle.winner === "draw" ? "引き分け！" : `${opponent.name}の勝利！`}</h1><p>{battle.winner === "brother" ? "デッキは狙い通りに仕事をしただろうか？" : "次の相手とのバトルへ進もう。"}</p><button className="primary-action" onClick={onFinish}>{finalBattle ? "結果を見る" : "次の相手へ"}<span>▶</span></button></div></div>}
   </main>;
 }
@@ -808,11 +816,16 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
   const [summonPreludeDone, setSummonPreludeDone] = useState(true);
   const [attackAfterglow, setAttackAfterglow] = useState(false);
   const [turnBanner, setTurnBanner] = useState<{ side: BattleEvent["side"]; text: string; duration: number } | null>(null);
+  const [logExpanded, setLogExpanded] = useState(loadBattleLogExpanded);
   const turnBannerTimer = useRef<number | null>(null);
 
   useEffect(() => () => {
     if (turnBannerTimer.current !== null) window.clearTimeout(turnBannerTimer.current);
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(BATTLE_LOG_EXPANDED_KEY, logExpanded ? "expanded" : "collapsed");
+  }, [logExpanded]);
 
   useEffect(() => {
     if (visibleEventCount >= battle.events.length) {
@@ -941,7 +954,6 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
 
   return <main className="battle-screen">
     <header className="battle-header"><div><span>{opponent.title}</span><strong>{opponent.name}</strong></div><div className="battle-turn">TURN <b>{battle.turn}</b></div><div className="brother-name"><span>単純弟</span><strong>ユウタ</strong></div></header>
-    <BattleSpeedControls speed={speed} onChange={onSpeedChange} />
     <AceStatus battle={battle} cards={cards} />
     <SynergyDeclaration synergies={battle.synergies} />
     <TurnTransitionBanner banner={turnBanner} />
@@ -954,10 +966,10 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
       <div className="hand-zone">{brotherHand.map((item) => <AnimatedBattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}</div>
       <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} />
     </section>
-    <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
+    <aside className={`battle-log ${logExpanded ? "expanded" : "collapsed"}`} aria-label="バトルログ"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b><button className="battle-log-toggle" type="button" aria-expanded={logExpanded} onClick={() => setLogExpanded((expanded) => !expanded)}>{logExpanded ? "収納" : "展開"}</button></div>{(logExpanded ? recent : recent.slice(0, 1)).map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
     <div className="battle-speech battle-speech-opponent" aria-live="polite">{!battle.winner && opponentDialogueEvent && <Speech speaker={opponent.name} text={opponentDialogueEvent.dialogue!} tone="rival" />}</div>
     <div className="battle-speech battle-speech-brother" aria-live="polite">{!battle.winner && brotherDialogueEvent && <Speech speaker="ユウタ" text={brotherDialogueEvent.dialogue!} tone="kid" />}</div>
-    {!battle.winner && <div className="battle-controls"><button onClick={onManualNext} disabled={auto || playbackBusy}>1往復進める</button><button className="primary-action" onClick={onAuto} disabled={auto || playbackBusy}>{auto ? "自動再生中…" : "最後まで見る"}<span>▶</span></button></div>}
+    {!battle.winner && <div className="battle-controls"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /><button onClick={onManualNext} disabled={auto || playbackBusy}>ターンを進める</button><button className="primary-action" onClick={onAuto} disabled={auto || playbackBusy}>{auto ? "自動再生中…" : "最後までスキップ"}<span>▶</span></button></div>}
     {cutIn?.visible && <BattleCutIn kind={cutIn.kind} />}
     {playbackComplete && battle.winner && <div className="result-overlay"><div className={"result-burst " + (battle.winner === "brother" ? "win" : "lose")}><span>{battle.winner === "brother" ? "VICTORY!" : battle.winner === "draw" ? "DRAW" : "DEFEAT"}</span><h1>{battle.winner === "brother" ? "ユウタの勝利！" : battle.winner === "draw" ? "引き分け！" : opponent.name + "の勝利！"}</h1><p>{battle.winner === "brother" ? "デッキは狙い通りに仕事をしただろうか？" : "次の相手とのバトルへ進もう。"}</p>{postBattleDialogue && <div className="post-battle-commentary"><Speech speaker={child.displayName} text={postBattleDialogue} /></div>}<button className="primary-action" onClick={onFinish}>{finalBattle ? "結果を見る" : "次の相手へ"}<span>▶</span></button></div></div>}
   </main>;
