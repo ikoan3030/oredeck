@@ -713,16 +713,32 @@ function AceStatus({ battle, cards }: { battle: BattleState; cards: Card[] }) {
   return <div className={`ace-status ${battle.brother.aceUsed ? "used" : "ready"}`}><span>切り札</span>{battle.brother.aceUsed ? <strong>発動済み</strong> : <><strong>{card?.name ?? "指定札"}</strong><small>待機中</small></>}</div>;
 }
 
+function battleLogText(item: BattleEvent, cards: Card[]): string {
+  if (item.type !== "attribution" || !item.cardId) return item.text;
+  const cardName = cards.find((card) => card.id === item.cardId)?.name ?? item.cardId;
+  return `兄ちゃんが選んだ${cardName}が活躍！`;
+}
+
+function compactAttributionEvents(events: BattleEvent[]): BattleEvent[] {
+  const shownCardIds = new Set<string>();
+  return events.filter((item) => {
+    if (item.type !== "attribution" || !item.cardId) return true;
+    if (shownCardIds.has(item.cardId)) return false;
+    shownCardIds.add(item.cardId);
+    return true;
+  });
+}
+
 function LegacyBattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish, finalBattle }: { battle: BattleState; cards: Card[]; opponent: OpponentDefinition; onNext: () => void; onAuto: () => void; auto: boolean; onFinish: () => void; finalBattle: boolean }) {
   const brotherDialogueEvent = [...battle.events].reverse().find((item) => item.side === "brother" && item.dialogue);
   const opponentDialogueEvent = [...battle.events].reverse().find((item) => item.side === "opponent" && item.dialogue);
   const aceEvent = [...battle.events].reverse().find((item) => item.type === "ace");
   const syncEvent = [...battle.events].reverse().find((item) => item.type === "sync_bonus");
-  const recent = battle.events.slice(-9);
+  const recentEvents = battle.events.slice(-9);
   for (const importantEvent of [syncEvent, aceEvent]) {
-    if (importantEvent && !recent.some((item) => item.id === importantEvent.id)) recent.push(importantEvent);
+    if (importantEvent && !recentEvents.some((item) => item.id === importantEvent.id)) recentEvents.push(importantEvent);
   }
-  recent.reverse();
+  const recent = compactAttributionEvents(recentEvents).reverse();
   const aceInstanceId = aceEvent?.instanceId;
   const [shownAceEventId, setShownAceEventId] = useState<string | null>(null);
   const [showAceBanner, setShowAceBanner] = useState(false);
@@ -745,7 +761,7 @@ function LegacyBattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onF
       <div className="fighter brother-fighter"><div className="avatar kid">ユ</div><div className="life"><span>LIFE</span><b>{battle.brother.life}</b></div><div className="pp">PP {battle.brother.pp}/{battle.brother.maxPp}</div></div>
       <div className="hand-zone">{battle.brother.hand.map((item) => <BattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} />)}</div>
     </section>
-    <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
+    <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{battleLogText(item, cards)}</p>)}</aside>
     <div className="battle-speech battle-speech-opponent" aria-live="polite">{!battle.winner && opponentDialogueEvent && <Speech speaker={opponent.name} text={opponentDialogueEvent.dialogue!} tone="rival" />}</div>
     <div className="battle-speech battle-speech-brother" aria-live="polite">{!battle.winner && brotherDialogueEvent && <Speech speaker="ユウタ" text={brotherDialogueEvent.dialogue!} tone="kid" />}</div>
     {!battle.winner && <div className="battle-controls"><button onClick={onNext} disabled={auto}>ターンを進める</button><button className="primary-action" onClick={onAuto}>{auto ? "自動再生中…" : "最後までスキップ"}<span>▶</span></button></div>}
@@ -900,7 +916,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
   const visibleEvents = battle.events.slice(0, Math.min(battle.events.length, visibleEventCount + (activeEvent ? 1 : 0)));
   const brotherDialogueEvent = [...visibleEvents].reverse().find((item) => item.side === "brother" && item.dialogue);
   const opponentDialogueEvent = [...visibleEvents].reverse().find((item) => item.side === "opponent" && item.dialogue);
-  const recent = visibleEvents.slice(-9).reverse();
+  const recent = compactAttributionEvents(visibleEvents).slice(-9).reverse();
   const aceEvent = [...battle.events].reverse().find((item) => item.type === "ace");
   const aceInstanceId = aceEvent?.instanceId;
   const playbackEvent = activeEvent ?? battle.events[visibleEventCount];
@@ -966,7 +982,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
       <div className="hand-zone">{brotherHand.map((item) => <AnimatedBattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}</div>
       <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} />
     </section>
-    <aside className={`battle-log ${logExpanded ? "expanded" : "collapsed"}`} aria-label="バトルログ"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b><button className="battle-log-toggle" type="button" aria-expanded={logExpanded} onClick={() => setLogExpanded((expanded) => !expanded)}>{logExpanded ? "収納" : "展開"}</button></div>{(logExpanded ? recent : recent.slice(0, 1)).map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
+    <aside className={`battle-log ${logExpanded ? "expanded" : "collapsed"}`} aria-label="バトルログ"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b><button className="battle-log-toggle" type="button" aria-expanded={logExpanded} onClick={() => setLogExpanded((expanded) => !expanded)}>{logExpanded ? "収納" : "展開"}</button></div>{(logExpanded ? recent : recent.slice(0, 1)).map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{battleLogText(item, cards)}</p>)}</aside>
     <div className="battle-speech battle-speech-opponent" aria-live="polite">{!battle.winner && opponentDialogueEvent && <Speech speaker={opponent.name} text={opponentDialogueEvent.dialogue!} tone="rival" />}</div>
     <div className="battle-speech battle-speech-brother" aria-live="polite">{!battle.winner && brotherDialogueEvent && <Speech speaker="ユウタ" text={brotherDialogueEvent.dialogue!} tone="kid" />}</div>
     {!battle.winner && <div className="battle-controls"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /><button onClick={onManualNext} disabled={auto || playbackBusy}>ターンを進める</button><button className="primary-action" onClick={onAuto} disabled={auto || playbackBusy}>{auto ? "自動再生中…" : "最後までスキップ"}<span>▶</span></button></div>}
