@@ -688,7 +688,8 @@ function AceStatus({ battle, cards }: { battle: BattleState; cards: Card[] }) {
 }
 
 function LegacyBattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onFinish, finalBattle }: { battle: BattleState; cards: Card[]; opponent: OpponentDefinition; onNext: () => void; onAuto: () => void; auto: boolean; onFinish: () => void; finalBattle: boolean }) {
-  const dialogueEvent = [...battle.events].reverse().find((item) => item.dialogue);
+  const brotherDialogueEvent = [...battle.events].reverse().find((item) => item.side === "brother" && item.dialogue);
+  const opponentDialogueEvent = [...battle.events].reverse().find((item) => item.side === "opponent" && item.dialogue);
   const aceEvent = [...battle.events].reverse().find((item) => item.type === "ace");
   const syncEvent = [...battle.events].reverse().find((item) => item.type === "sync_bonus");
   const recent = battle.events.slice(-9);
@@ -719,7 +720,8 @@ function LegacyBattleScreen({ battle, cards, opponent, onNext, onAuto, auto, onF
       <div className="hand-zone">{battle.brother.hand.map((item) => <BattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} />)}</div>
     </section>
     <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
-    {dialogueEvent && !battle.winner && <div className="battle-speech"><Speech speaker={dialogueEvent.side === "brother" ? "ユウタ" : opponent.name} text={dialogueEvent.dialogue!} tone={dialogueEvent.side === "brother" ? "kid" : "rival"} /></div>}
+    <div className="battle-speech battle-speech-opponent" aria-live="polite">{!battle.winner && opponentDialogueEvent && <Speech speaker={opponent.name} text={opponentDialogueEvent.dialogue!} tone="rival" />}</div>
+    <div className="battle-speech battle-speech-brother" aria-live="polite">{!battle.winner && brotherDialogueEvent && <Speech speaker="ユウタ" text={brotherDialogueEvent.dialogue!} tone="kid" />}</div>
     {!battle.winner && <div className="battle-controls"><button onClick={onNext} disabled={auto}>1ターン進める</button><button className="primary-action" onClick={onAuto}>{auto ? "自動再生中…" : "最後まで見る"}<span>▶</span></button></div>}
     {battle.winner && <div className="result-overlay"><div className={`result-burst ${battle.winner === "brother" ? "win" : "lose"}`}><span>{battle.winner === "brother" ? "VICTORY!" : battle.winner === "draw" ? "DRAW" : "DEFEAT"}</span><h1>{battle.winner === "brother" ? "ユウタの勝利！" : battle.winner === "draw" ? "引き分け！" : `${opponent.name}の勝利！`}</h1><p>{battle.winner === "brother" ? "デッキは狙い通りに仕事をしただろうか？" : "次の相手とのバトルへ進もう。"}</p><button className="primary-action" onClick={onFinish}>{finalBattle ? "結果を見る" : "次の相手へ"}<span>▶</span></button></div></div>}
   </main>;
@@ -865,7 +867,8 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
 
   const playbackComplete = !playbackBusy && visibleEventCount >= battle.events.length;
   const visibleEvents = battle.events.slice(0, Math.min(battle.events.length, visibleEventCount + (activeEvent ? 1 : 0)));
-  const dialogueEvent = [...visibleEvents].reverse().find((item) => item.dialogue);
+  const brotherDialogueEvent = [...visibleEvents].reverse().find((item) => item.side === "brother" && item.dialogue);
+  const opponentDialogueEvent = [...visibleEvents].reverse().find((item) => item.side === "opponent" && item.dialogue);
   const recent = visibleEvents.slice(-9).reverse();
   const aceEvent = [...battle.events].reverse().find((item) => item.type === "ace");
   const aceInstanceId = aceEvent?.instanceId;
@@ -934,7 +937,8 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
       <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} />
     </section>
     <aside className="battle-log"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b></div>{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{item.text}</p>)}</aside>
-    {dialogueEvent && !battle.winner && <div className="battle-speech"><Speech speaker={dialogueEvent.side === "brother" ? "ユウタ" : opponent.name} text={dialogueEvent.dialogue!} tone={dialogueEvent.side === "brother" ? "kid" : "rival"} /></div>}
+    <div className="battle-speech battle-speech-opponent" aria-live="polite">{!battle.winner && opponentDialogueEvent && <Speech speaker={opponent.name} text={opponentDialogueEvent.dialogue!} tone="rival" />}</div>
+    <div className="battle-speech battle-speech-brother" aria-live="polite">{!battle.winner && brotherDialogueEvent && <Speech speaker="ユウタ" text={brotherDialogueEvent.dialogue!} tone="kid" />}</div>
     {!battle.winner && <div className="battle-controls"><button onClick={onManualNext} disabled={auto || playbackBusy}>1往復進める</button><button className="primary-action" onClick={onAuto} disabled={auto || playbackBusy}>{auto ? "自動再生中…" : "最後まで見る"}<span>▶</span></button></div>}
     {cutIn?.visible && <BattleCutIn kind={cutIn.kind} />}
     {playbackComplete && battle.winner && <div className="result-overlay"><div className={"result-burst " + (battle.winner === "brother" ? "win" : "lose")}><span>{battle.winner === "brother" ? "VICTORY!" : battle.winner === "draw" ? "DRAW" : "DEFEAT"}</span><h1>{battle.winner === "brother" ? "ユウタの勝利！" : battle.winner === "draw" ? "引き分け！" : opponent.name + "の勝利！"}</h1><p>{battle.winner === "brother" ? "デッキは狙い通りに仕事をしただろうか？" : "次の相手とのバトルへ進もう。"}</p>{postBattleDialogue && <div className="post-battle-commentary"><Speech speaker={child.displayName} text={postBattleDialogue} /></div>}<button className="primary-action" onClick={onFinish}>{finalBattle ? "結果を見る" : "次の相手へ"}<span>▶</span></button></div></div>}
