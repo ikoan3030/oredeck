@@ -63,6 +63,7 @@ interface KidReaction {
 interface PickFlash {
   strength: "soft" | "burst";
   index: 0 | 1;
+  duration?: number;
 }
 
 const PICK_FLASH_MS: Record<PickFlash["strength"], number> = { soft: 420, burst: 700 };
@@ -74,6 +75,20 @@ interface SyncNotice {
 
 type PlaybackSpeed = "normal" | "fast" | "skip";
 type CutInKind = "ace" | "finisher";
+type AutoPickPhase = "mulling" | "deciding" | "confirming";
+
+interface BuildPickTiming {
+  mulling: number;
+  mullingPause: number;
+  decision: number;
+  confirm: number;
+}
+
+const BUILD_PICK_TIMING: Record<PlaybackSpeed, BuildPickTiming> = {
+  normal: { mulling: 1100, mullingPause: 450, decision: 900, confirm: 550 },
+  fast: { mulling: 500, mullingPause: 250, decision: 500, confirm: 250 },
+  skip: { mulling: 0, mullingPause: 0, decision: 0, confirm: 0 },
+};
 
 interface EventPlaybackTiming {
   normal: number;
@@ -443,7 +458,7 @@ function OpponentPreviewScreen({ opponent, battleNumber, onStart }: { opponent: 
   return <main className="opponent-preview-screen"><section className="opponent-preview-panel"><span className="section-kicker">BATTLE {battleNumber} / 6</span><h1>つぎの相手</h1><div className="opponent-preview-card" style={{ "--rival-color": opponent.color } as CSSProperties}><span className="opponent-mark">{opponent.title.slice(0, 1)}</span><small>{opponent.title}</small><strong>{opponent.name}</strong><p>{opponent.trait}</p></div><button className="primary-action" onClick={onStart}>デッキを組む！<span>▶</span></button></section></main>;
 }
 
-function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNotice, pickFlash, synergyConfig, onPick, onAuto, onAdvice }: {
+function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNotice, pickFlash, autoPickPhase, synergyConfig, onPick, onAdvice }: {
   draft: DraftState;
   offer: DraftOffer | null;
   cards: Card[];
@@ -452,9 +467,9 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
   reaction: KidReaction | null;
   syncNotice: SyncNotice | null;
   pickFlash: PickFlash | null;
+  autoPickPhase: AutoPickPhase | null;
   synergyConfig: SpeciesSynergyConfig;
   onPick: (index: 0 | 1) => void;
-  onAuto: () => void;
   onAdvice: (category: Exclude<AdviceCategory, "skip">, targetSpecies?: Species) => void;
 }) {
   const focus = activeAdviceFocus(draft);
@@ -476,9 +491,12 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
   const autoLine = offer
     ? child.dialogue.pick[draft.pick % child.dialogue.pick.length].replace("{name}", offer.cards[offer.decision.preferredIndex].name)
     : "";
+  const autoPick = Boolean(offer && (!offer.wantsIntervention || offer.decision.love));
   const dialogue = !offer
     ? "次のカード、どんなのかな！"
-    : crush
+    : autoPick && autoPickPhase === "mulling"
+      ? child.dialogue.mulling[draft.pick % child.dialogue.mulling.length]
+      : crush
       ? child.dialogue.love[draft.pick % child.dialogue.love.length]
       : offer.wantsIntervention
         ? child.dialogue.ask[draft.pick % child.dialogue.ask.length]
@@ -494,7 +512,8 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
           {offer ? <div className="card-choice">
             {offer.cards.map((card, index) => (
               <button
-                className={`card-choice-button ${crush && index === offer.decision.preferredIndex ? "love-lock" : ""} ${pickFlash?.index === index ? `pick-flash-${pickFlash.strength}` : ""}`}
+                className={`card-choice-button ${crush && index === offer.decision.preferredIndex ? "love-lock" : ""} ${pickFlash?.index === index ? `pick-flash-${pickFlash.strength}` : ""} ${pickFlash?.strength === "soft" && pickFlash.index !== index ? "pick-fade-out" : ""}`}
+                style={pickFlash?.strength === "soft" && pickFlash.index !== index ? { "--pick-fade-duration": `${pickFlash.duration ?? PICK_FLASH_MS.soft}ms` } as CSSProperties : undefined}
                 key={`${card.id}-${index}`}
                 disabled={!offer.wantsIntervention || offer.decision.love || Boolean(pickFlash)}
                 onClick={() => onPick(index as 0 | 1)}
@@ -507,7 +526,6 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
             ))}
             <div className="vs-burst">VS</div>
           </div> : <div className="loading-card">カードをシャッフル中…</div>}
-          {offer && (!offer.wantsIntervention || offer.decision.love) && <button className="primary-action slam" disabled={Boolean(pickFlash)} onClick={onAuto}>{crush ? "このカードで決定！" : "弟のピックを見届ける"}<span>▶</span></button>}
           <Speech speaker={child.displayName} text={dialogue} />
         </section>
         <aside><DeckMaterials draft={draft} cards={cards} /><SpeciesCounter draft={draft} cards={cards} config={synergyConfig} /></aside>
@@ -963,6 +981,7 @@ export default function Home() {
   const [syncNotice, setSyncNotice] = useState<SyncNotice | null>(null);
   const [pickFlash, setPickFlash] = useState<PickFlash | null>(null);
   const [pendingGame, setPendingGame] = useState<SavedGame | null>(null);
+  const [autoPick, setAutoPick] = useState<{ key: string; phase: AutoPickPhase } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -983,7 +1002,7 @@ export default function Home() {
       setGame(pendingGame);
       setPendingGame(null);
       setPickFlash(null);
-    }, PICK_FLASH_MS[pickFlash.strength]);
+    }, pickFlash.duration ?? PICK_FLASH_MS[pickFlash.strength]);
     return () => window.clearTimeout(timer);
   }, [pendingGame, pickFlash]);
 
@@ -992,6 +1011,9 @@ export default function Home() {
   }, [game.battle?.winner]);
 
   const byId = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
+  const autoPickOfferKey = game.phase === "draft" && game.draft && game.offer && !game.adviceOpen && !pickFlash && (!game.offer.wantsIntervention || game.offer.decision.love)
+    ? `${game.draft.seed}:${game.draft.pick}:${game.offer.cards.map((card) => card.id).join(",")}`
+    : null;
 
   function nextNormalOffer(draft: DraftState): SavedGame {
     if (!child) return game;
@@ -1004,6 +1026,7 @@ export default function Home() {
   function clearPickFlash() {
     setPickFlash(null);
     setPendingGame(null);
+    setAutoPick(null);
   }
 
   function beginArcade() {
@@ -1035,7 +1058,7 @@ export default function Home() {
     setGame({ ...game, phase: "draft", draft: generated.state, offer: generated.offer, adviceOpen: false, battle: null });
   }
 
-  function takePick(index?: 0 | 1) {
+  function takePick(index?: 0 | 1, autoConfirmDuration?: number) {
     if (!game.draft || !game.offer || !child || pickFlash) return;
     const offer = game.offer;
     const ruled = offer.source === "normal" && offer.wantsIntervention && !offer.decision.love && index !== undefined;
@@ -1055,9 +1078,34 @@ export default function Home() {
     const strength: PickFlash["strength"] | null = supported ? "burst" : kidPicked ? "soft" : null;
     const committed = nextNormalOffer(next);
     if (!strength) { setGame(committed); return; }
-    setPickFlash({ strength, index: ruled && index !== undefined ? index : offer.decision.preferredIndex });
+    setPickFlash({ strength, index: ruled && index !== undefined ? index : offer.decision.preferredIndex, ...(autoConfirmDuration !== undefined ? { duration: autoConfirmDuration } : {}) });
     setPendingGame(committed);
   }
+
+  useEffect(() => {
+    if (!autoPickOfferKey) {
+      setAutoPick(null);
+      return;
+    }
+    setAutoPick((current) => current?.key === autoPickOfferKey ? current : { key: autoPickOfferKey, phase: "mulling" });
+  }, [autoPickOfferKey]);
+
+  useEffect(() => {
+    if (!autoPick || !autoPickOfferKey || autoPick.key !== autoPickOfferKey || !game.draft || !game.offer || !child) return;
+    const timing = BUILD_PICK_TIMING[playbackSpeed];
+    const delay = autoPick.phase === "mulling"
+      ? timing.mulling + timing.mullingPause
+      : timing.decision;
+    const timer = window.setTimeout(() => {
+      if (autoPick.phase === "mulling") {
+        setAutoPick((current) => current?.key === autoPick.key ? { ...current, phase: "deciding" } : current);
+        return;
+      }
+      setAutoPick((current) => current?.key === autoPick.key ? { ...current, phase: "confirming" } : current);
+      takePick(undefined, timing.confirm);
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [autoPick, autoPickOfferKey, playbackSpeed, game.draft?.pick, game.offer?.wantsIntervention, game.offer?.decision.love, child, pickFlash]);
 
   function chooseAdvice(category: Exclude<AdviceCategory, "skip">, targetSpecies?: Species) {
     if (!game.draft || !child) return;
@@ -1145,7 +1193,7 @@ export default function Home() {
   const currentOpponentId = getCurrentOpponentId(game.run);
   const currentOpponent = currentOpponentId ? getOpponentById(opponents, currentOpponentId) : undefined;
   if (game.phase === "opponent" && currentOpponent) return <OpponentPreviewScreen opponent={currentOpponent} battleNumber={game.run.currentBattle + 1} onStart={startDraft} />;
-  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} pickFlash={pickFlash} synergyConfig={synergyConfig} onPick={takePick} onAuto={() => takePick()} onAdvice={chooseAdvice} />;
+  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} pickFlash={pickFlash} autoPickPhase={autoPick?.phase ?? null} synergyConfig={synergyConfig} onPick={takePick} onAdvice={chooseAdvice} />;
   if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} synergyConfig={synergyConfig} onBattle={prepareBattle} />;
   if (game.phase === "ace" && game.draft) return <AceSelectionScreen draft={game.draft} cards={cards} selectedCardId={game.aceCardId ?? null} onSelect={selectAceCard} onConfirm={() => startBattle()} onSkip={() => startBattle(null)} />;
   if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} child={child} opponent={currentOpponent} onNext={advanceCurrentBattle} onManualNext={advanceCurrentRound} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={changePlaybackSpeed} />;

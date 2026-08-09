@@ -182,7 +182,7 @@ export interface ChildProfile {
     attributionKeywords: Keyword[];
   };
   /** "pick" lines may carry a {name} placeholder for the chosen card. */
-  dialogue: Record<"pick" | "ask" | "support" | "reject" | "love" | "advice", string[]>;
+  dialogue: Record<"pick" | "ask" | "support" | "reject" | "love" | "advice" | "mulling", string[]>;
   battleCommentary: BattleCommentaryDefinition;
   postBattle: PostBattleDialogue;
 }
