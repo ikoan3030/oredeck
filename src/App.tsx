@@ -625,9 +625,8 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
           {offer ? <div className="card-choice">
             {offer.cards.map((card, index) => (
               <button
-                className={`card-choice-button ${crush && index === offer.decision.preferredIndex ? "love-lock" : ""} ${pickFlash?.index === index ? `pick-flash-${pickFlash.strength}` : ""} ${pickFlash?.strength === "soft" && pickFlash.index !== index ? "pick-fade-out" : ""} ${pickFlash?.hand && pickFlash.index === index ? `card-taken-${pickFlash.hand.style}` : ""}`}
+                className={`card-choice-button ${crush && index === offer.decision.preferredIndex ? "love-lock" : ""} ${pickFlash?.index === index ? `pick-flash-${pickFlash.strength}` : ""} ${pickFlash?.hand && pickFlash.index === index ? `card-taken-${pickFlash.hand.style}` : ""}`}
                 style={{
-                  ...(pickFlash?.strength === "soft" && pickFlash.index !== index ? { "--pick-fade-duration": `${pickFlash.duration ?? PICK_FLASH_MS.soft}ms` } : {}),
                   ...(pickFlash?.hand && pickFlash.index === index ? handStyleVars(pickFlash.hand.timing) : {}),
                 } as CSSProperties}
                 key={`${card.id}-${index}`}
