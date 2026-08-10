@@ -54,10 +54,12 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 
 /* 弟の手（自動ピック時のカルタ取り）。
    いまはCSSで組んだプレースホルダのシルエット。本番画像に差し替えるときは、
-   画像を public/assets/ に置いた上でこの2行を有効にするだけでよい:
-     .kid-hand-art { --hand-image: url("./assets/hand.png"); }
+   画像を public/assets/characters/tanjun-hand-open.png に置いた上で
+   この2行を有効にするだけでよい:
+     .kid-hand-art { --hand-image: url("/assets/characters/tanjun-hand-open.png"); }
      .kid-hand-art > * { display: none; }
-   マークアップと動きの時間はそのままで差し替わる。 */
+   マークアップと動きの時間はそのままで差し替わる。命名規則は
+   public/assets/README.md を参照。 */
 .kid-hand {
   position: absolute;
   z-index: 9;
