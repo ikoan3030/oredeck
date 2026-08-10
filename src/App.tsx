@@ -635,8 +635,10 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
                 aria-label={`${card.name}を選ぶ`}
               >
                 {crush && index === offer.decision.preferredIndex && <span className="love-ribbon">一目惚れ！変更不可</span>}
-                <CardFace card={card} />
-                {pickFlash?.hand && pickFlash.index === index && <KidHand hand={pickFlash.hand} />}
+                <div className="pick-card-layer">
+                  <CardFace card={card} />
+                  {pickFlash?.hand && pickFlash.index === index && <KidHand hand={pickFlash.hand} />}
+                </div>
                 {offer.wantsIntervention && !offer.decision.love && <span className="choose-label">こっちにする</span>}
               </button>
             ))}

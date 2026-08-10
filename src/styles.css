@@ -102,6 +102,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .card-choice-button:nth-child(2):not(:disabled):hover { transform: translateY(-9px) rotate(1deg); }
 .card-choice-button:disabled { cursor: default; }
 .card-choice-button .card-face { min-height: 450px; }
+.pick-card-layer { position: relative; }
 .card-choice-button .choose-label { display: inline-block; margin-top: 13px; padding: 10px 22px; color: white; background: var(--ink); border: 4px solid var(--ink); box-shadow: 4px 4px 0 var(--yellow); }
 .vs-burst { position: absolute; z-index: 5; left: 50%; top: 42%; transform: translate(-50%, -50%) rotate(-8deg); display: grid; place-items: center; width: 80px; height: 80px; color: white; background: var(--red); border: 5px solid var(--ink); clip-path: polygon(50% 0, 61% 27%, 85% 9%, 79% 39%, 100% 50%, 75% 61%, 90% 88%, 60% 76%, 50% 100%, 39% 76%, 10% 90%, 24% 60%, 0 50%, 24% 39%, 9% 10%, 39% 26%); font-size: 25px; text-shadow: 3px 3px 0 var(--ink); }
 .love-ribbon { position: absolute; z-index: 6; padding: 7px 14px; color: white; border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--yellow); top: 17px; left: -16px; background: var(--red); font-size: 15px; transform: rotate(-5deg); }
@@ -124,7 +125,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
   transform: translate(-50%, 120%);
   animation: hand-reach var(--hand-reach, 180ms) cubic-bezier(.16, .84, .32, 1) forwards;
 }
-.kid-hand.hand-carry { animation: hand-reach var(--hand-reach, 180ms) cubic-bezier(.16, .84, .32, 1) forwards, hand-carry var(--hand-exit, 300ms) cubic-bezier(.5, 0, .85, .3) var(--hand-exit-delay, 310ms) forwards; }
+.kid-hand.hand-carry { animation: hand-reach var(--hand-reach, 180ms) cubic-bezier(.16, .84, .32, 1) forwards; }
 .kid-hand.hand-cut { animation: hand-reach var(--hand-reach, 180ms) cubic-bezier(.16, .84, .32, 1) forwards, hand-cut var(--hand-exit, 120ms) linear var(--hand-exit-delay, 310ms) forwards; }
 
 .kid-hand-art {
@@ -151,19 +152,16 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
   from { transform: translate(-50%, 120%) rotate(-6deg); }
   to { transform: translate(-50%, 0) rotate(0deg); }
 }
-@keyframes hand-carry {
-  from { transform: translate(-50%, 0) rotate(0deg); }
-  to { transform: translate(-50%, 145%) rotate(7deg); }
-}
 @keyframes hand-cut {
   from { opacity: 1; }
   to { opacity: 0; }
 }
 
-/* 案1は手が抜けると同時にカードを消し、案2は手とカードを一緒に落とす */
-.card-choice-button.card-taken-carry .card-face { animation: card-taken-instant 1ms linear var(--hand-exit-delay, 310ms) forwards; }
+/* carryは手とカードを同じレイヤーで抜き、cutは手とカードを同時にフェードする。 */
+.card-choice-button.card-taken-carry { z-index: 20; }
+.card-choice-button.card-taken-carry .pick-card-layer { z-index: 20; animation: pick-card-carry var(--hand-exit, 350ms) cubic-bezier(.5, 0, .85, .3) var(--hand-exit-delay, 310ms) forwards; }
 .card-choice-button.card-taken-cut .card-face { animation: card-taken-fade var(--hand-exit, 120ms) linear var(--hand-exit-delay, 310ms) forwards; }
-@keyframes card-taken-instant { to { opacity: 0; } }
+@keyframes pick-card-carry { from { transform: translateY(0) rotate(0); } to { transform: translateY(calc((var(--stage-h) + 120px) * 1.45)) rotate(7deg); } }
 @keyframes card-taken-fade { from { opacity: 1; } to { opacity: 0; } }
 
 .card-face { position: relative; overflow: hidden; border: 6px solid var(--ink); border-radius: 12px; padding: 12px; background: #f5eee2; box-shadow: var(--shadow); text-align: left; }
@@ -1360,7 +1358,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .cut-in-rays,
   .cut-in-band,
   .kid-hand,
-  .card-choice-button.card-taken-carry .card-face,
+  .card-choice-button.card-taken-carry .pick-card-layer,
   .card-choice-button.card-taken-cut .card-face,
   .card-choice-button.pick-flash-soft .card-face,
   .card-choice-button.pick-flash-burst .card-face,
