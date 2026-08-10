@@ -112,10 +112,10 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .kid-hand {
   position: absolute;
   z-index: 9;
-  left: 76%;
+  left: 85%;
   /* 手のひらがカードの絵柄に重なり、腕は画面の下端まで届いて途中で切れない。
      横長固定なので、カードの高さ比だけで両方を満たせる。 */
-  top: 0;
+  top: 14%;
   width: 200%;
   /* The replacement art is portrait-oriented. Deliberately let the sleeve
      continue below the stage so its arm base never appears on screen. */
