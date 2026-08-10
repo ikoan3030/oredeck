@@ -865,19 +865,6 @@ function AnimatedOpponentHandCard({ instance, activeEvent = null }: { instance: 
   return <div className={className} data-event-id={left ? activeEvent.id : undefined} aria-hidden="true"><span className="opponent-card-back"><i /></span></div>;
 }
 
-/**
- * Reads the played events rather than the final battle state, so the panel never announces a
- * destiny draw the viewer has not been shown yet.
- */
-function AceStatus({ battle, cards, playedEvents }: { battle: BattleState; cards: Card[]; playedEvents: readonly BattleEvent[] }) {
-  const aceEvent = [...playedEvents].reverse().find((item) => item.type === "ace");
-  const used = Boolean(aceEvent);
-  const cardId = battle.brother.aceCard?.cardId ?? aceEvent?.cardId;
-  if (!cardId) return null;
-  const card = cards.find((item) => item.id === cardId);
-  return <div className={`ace-status ${used ? "used" : "ready"}`}><span>切り札</span>{used ? <strong>発動済み</strong> : <><strong>{card?.name ?? "指定札"}</strong><small>待機中</small></>}</div>;
-}
-
 function battleLogText(item: BattleEvent, cards: Card[]): string {
   if (item.type !== "attribution" || !item.cardId) return item.text;
   const cardName = cards.find((card) => card.id === item.cardId)?.name ?? item.cardId;
@@ -1100,7 +1087,6 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
 
   return <main className="battle-screen">
     <header className="battle-header"><div><span>{opponent.title}</span><strong>{opponent.name}</strong></div><div className="battle-turn">TURN <b>{battle.turn}</b></div><div className="brother-name"><span>単純弟</span><strong>ユウタ</strong></div></header>
-    <AceStatus battle={battle} cards={cards} playedEvents={visibleEvents} />
     <SynergyDeclaration synergies={battle.synergies} />
     <TurnTransitionBanner banner={turnBanner} />
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={arenaStyle}>

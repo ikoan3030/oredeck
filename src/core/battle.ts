@@ -187,7 +187,7 @@ function drawAtTurnStart(
 ): { player: BattlePlayer; drawn?: BattleCardInstance; ace: boolean; aceCard?: BattleCardInstance } {
   const ace = child.ace;
   const stage = syncStage(state.syncRate, child);
-  if (player.side !== "brother" || !player.aceCard || stage < ace.unlockStage || player.life > ace.lifeThreshold) {
+  if (player.side !== "brother" || !player.aceCard || stage < ace.unlockStage || (player.life > ace.lifeThreshold && player.deck.length > 0)) {
     const drawn = drawOne(player);
     return { ...drawn, ace: false };
   }

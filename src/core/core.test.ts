@@ -640,6 +640,26 @@ test("the ace card uses the 14-card deck, life threshold, and one-use turn-start
   assert.equal(noAce.brother.deck.length, 12);
 });
 
+test("the ace also triggers at deckout, while preserving the life-or-deckout gate and one-use limit", () => {
+  const opponent = getOpponent("wall");
+  const battle = createBattle(battleDeck("grim"), opponent, cards, 123, 80, "grim");
+
+  const normalDraw = advanceBattle({ ...battle, brother: { ...battle.brother, life: 20 } }, cards, child, opponent);
+  assert.equal(normalDraw.events.some((item) => item.type === "ace"), false);
+  assert.equal(normalDraw.brother.aceCard?.cardId, "grim");
+
+  const deckout = advanceBattle({ ...battle, brother: { ...battle.brother, life: 20, deck: [] } }, cards, child, opponent);
+  assert.equal(deckout.events.filter((item) => item.type === "ace").length, 1);
+  assert.equal(deckout.events.filter((item) => item.type === "draw").length, 0);
+  assert.equal(deckout.brother.aceCard, null);
+  assert.equal(deckout.brother.aceUsed, true);
+  assert.ok(deckout.brother.hand.some((item) => item.cardId === "grim" && item.grantedAtk === 2));
+
+  const afterDeckout = advanceBattle(deckout, cards, child, opponent);
+  assert.equal(afterDeckout.events.filter((item) => item.type === "ace").length, 1);
+  assert.equal(afterDeckout.brother.aceUsed, true);
+});
+
 test("attribution has no battle dialogue, while large summons may commentate", () => {
   const ids = ["judgment","judgment","followarrow","followarrow","steel-blessing","steel-blessing","balga","dolguard","grim","alvine","gaiorg","volganid","phoenixeed","valzeid","dolga"];
   const deck: DraftCard[] = ids.map((cardId, index) => ({ instanceId: `i-${index}`, cardId, intervention: index < 6, source: index < 6 ? "advice" : "auto" }));

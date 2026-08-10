@@ -43,9 +43,9 @@ test("the board renders from the identity-stable boards, keyed by instance id", 
   assert.ok(boardCards.every((usage) => usage.includes("key={item.instanceId}")), "board cards must key on the instance id");
 });
 
-test("the ace panel reads played events, never the final battle state", () => {
-  const declaration = app.slice(app.indexOf("function AceStatus("), app.indexOf("function battleLogText("));
-  assert.ok(declaration.includes("playedEvents"), "AceStatus must take the played events");
-  assert.ok(!declaration.includes("battle.events"), "AceStatus must not look ahead at the full event list");
-  assert.ok(!declaration.includes("battle.brother.aceUsed"), "the used flag must come from the played ace event");
+test("the battle does not show the held ace card before its draw", () => {
+  assert.equal(app.includes("function AceStatus("), false, "the always-on ace holder component must be removed");
+  assert.equal(app.includes('className="ace-status"'), false, "the always-on ace holder markup must be removed");
+  assert.equal(styles.includes(".ace-status"), false, "the always-on ace holder styles must be removed");
+  assert.ok(app.includes('item.type === "ace"'), "the ace event remains available for the draw cut-in and log");
 });

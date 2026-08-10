@@ -901,12 +901,6 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-log p.sync-event span { color: #006b76; }
 .battle-log p.ace-event { color: white; background: var(--pink); border: 3px solid var(--yellow); font-weight: 1000; text-shadow: 1px 1px 0 var(--ink); }
 .battle-log p.ace-event span { color: var(--yellow); }
-.ace-status { position: absolute; z-index: 12; top: 84px; left: 18px; display: grid; gap: 2px; min-width: 154px; padding: 7px 10px; color: white; background: #080d1de6; border: 3px solid var(--yellow); box-shadow: 4px 4px 0 var(--pink); font-family: "Yu Gothic", sans-serif; }
-.ace-status > span { color: var(--yellow); font-size: 10px; font-weight: 900; letter-spacing: .12em; }
-.ace-status strong { font-size: 15px; line-height: 1.1; }
-.ace-status small { color: var(--cyan); font-size: 10px; font-weight: 900; }
-.ace-status.used { border-color: var(--pink); box-shadow: 4px 4px 0 var(--ink); }
-.ace-status.used strong { color: var(--pink); }
 .ace-reaction-banner { position: fixed; z-index: 40; top: 104px; left: 50%; display: grid; gap: 3px; min-width: min(430px, calc(100% - 32px)); padding: 12px 20px 14px; color: white; background: linear-gradient(135deg, var(--pink), #9c1762); border: 5px solid var(--yellow); box-shadow: 9px 9px 0 var(--ink), 0 0 35px var(--pink); text-align: center; transform: translateX(-50%) rotate(-2deg); animation: sync-banner-pop .2s ease-out; }
 .ace-reaction-banner span { color: var(--yellow); font: 900 10px/1 Arial, sans-serif; letter-spacing: .22em; }
 .ace-reaction-banner strong { font-size: clamp(24px, calc(4 * var(--stage-vw)), 38px); line-height: 1; text-shadow: 4px 4px 0 var(--ink); }
