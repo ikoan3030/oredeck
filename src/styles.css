@@ -15,16 +15,66 @@
 }
 
 * { box-sizing: border-box; }
-html { background: #1a1720; }
-body { margin: 0; color: var(--ink); font-family: "Arial Black", "Yu Gothic", "Hiragino Kaku Gothic ProN", system-ui, sans-serif; min-height: 100vh; }
+html { height: 100%; background: #1a1720; }
+body { margin: 0; overflow: hidden; color: var(--ink); font-family: "Arial Black", "Yu Gothic", "Hiragino Kaku Gothic ProN", system-ui, sans-serif; height: 100%; }
 button { font: inherit; }
 button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 
-.game-shell { min-height: 100vh; background-color: var(--paper); background-image: radial-gradient(#ddcfc0 1.1px, transparent 1.1px); background-size: 12px 12px; }
-.game-header { min-height: 88px; display: flex; align-items: center; justify-content: space-between; gap: 28px; padding: 12px clamp(18px, 4vw, 58px); color: white; background: var(--ink); border-bottom: 8px solid var(--yellow); position: relative; z-index: 10; }
+/* 横長専用。画面は 1280x720 を設計原寸とし、それ以上の横長ビューポートでは
+   そのまま流動レイアウトで広がる。1280x720 に満たない横長（スマホ横持ちなど）は
+   1280x720 の舞台を作ってから縮小表示するので、レイアウトは決して組み替わらない。
+   舞台の実寸は App.tsx が --stage-w / --stage-h / --stage-scale に流し込む。
+   CSS内の vw / vh は舞台基準にしたいので --stage-vw / --stage-vh を経由する。 */
+:root { --stage-w: 1280px; --stage-h: 720px; --stage-scale: 1; --stage-vw: 12.8px; --stage-vh: 7.2px; }
+.landscape-stage {
+  position: fixed;
+  z-index: 0;
+  left: 50%;
+  top: 50%;
+  width: var(--stage-w);
+  height: var(--stage-h);
+  overflow: hidden auto;
+  transform: translate(-50%, -50%) scale(var(--stage-scale));
+}
+.landscape-stage > * { min-height: 100%; }
+
+/* 縦持ちのときだけ案内へ差し替える。判定はCSSのメディアクエリなので、
+   端末を横にした瞬間にゲーム画面へ戻る（JSの再計算を待たない）。 */
+.rotate-notice { display: none; }
+@media (orientation: portrait) {
+  .landscape-stage { display: none; }
+  .rotate-notice {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 26px;
+    padding: 30px;
+    text-align: center;
+    color: white;
+    background: var(--navy);
+  }
+}
+.rotate-notice strong { font-size: clamp(20px, 6vw, 30px); line-height: 1.5; letter-spacing: -.03em; }
+.rotate-notice small { font-family: "Yu Gothic", sans-serif; font-size: 13px; color: var(--yellow); }
+/* 回転を促すアイコン。縦の枠が横へ倒れる動きを繰り返すだけの図。 */
+.rotate-icon { position: relative; width: 108px; height: 108px; display: grid; place-items: center; }
+.rotate-icon i { position: relative; display: block; width: 62px; height: 98px; border: 6px solid white; border-radius: 12px; background: #ffffff1a; animation: rotate-hint 2.4s ease-in-out infinite; }
+.rotate-icon i::after { content: ""; position: absolute; left: 50%; bottom: 12px; width: 22px; height: 5px; background: white; border-radius: 3px; transform: translateX(-50%); }
+.rotate-icon b { position: absolute; right: -6px; top: 4px; color: var(--yellow); font-size: 27px; }
+@keyframes rotate-hint {
+  0%, 30% { transform: rotate(0deg); }
+  55%, 85% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.game-shell { min-height: 100%; background-color: var(--paper); background-image: radial-gradient(#ddcfc0 1.1px, transparent 1.1px); background-size: 12px 12px; }
+.game-header { min-height: 88px; display: flex; align-items: center; justify-content: space-between; gap: 28px; padding: 12px clamp(18px, calc(4 * var(--stage-vw)), 58px); color: white; background: var(--ink); border-bottom: 8px solid var(--yellow); position: relative; z-index: 10; }
 .game-header::after { content: ""; position: absolute; inset: auto 0 -16px; height: 8px; background: repeating-linear-gradient(135deg, var(--red) 0 16px, transparent 16px 28px); }
 .mini-logo { font-size: 14px; transform: rotate(-1deg); }
-.mini-logo b { display: block; color: var(--yellow); font-size: clamp(18px, 2.3vw, 27px); line-height: 1; }
+.mini-logo b { display: block; color: var(--yellow); font-size: clamp(18px, calc(2.3 * var(--stage-vw)), 27px); line-height: 1; }
 .pick-counter { display: flex; align-items: baseline; gap: 5px; transform: skew(-7deg); }
 .pick-counter span { font-size: 11px; color: var(--yellow); writing-mode: vertical-rl; }
 .pick-counter b { font-size: 42px; line-height: 1; }
@@ -37,12 +87,12 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .trust-meter i { width: 28px; height: 9px; background: #454148; transform: skew(-12deg); }
 .trust-meter i.on { background: linear-gradient(90deg, var(--orange), var(--yellow)); box-shadow: 0 0 9px #ffd92888; }
 
-.draft-layout { max-width: 1440px; margin: 0 auto; padding: 44px clamp(14px, 3vw, 44px) 28px; display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 32px; }
+.draft-layout { max-width: 1440px; margin: 0 auto; padding: 44px clamp(14px, calc(3 * var(--stage-vw)), 44px) 28px; display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 32px; }
 .choice-zone { min-width: 0; }
 .versus-label { display: flex; align-items: center; gap: 14px; margin: 0 0 18px; }
-.versus-label span { font-size: clamp(20px, 3vw, 35px); font-weight: 1000; letter-spacing: -.05em; background: var(--yellow); border: 4px solid var(--ink); padding: 4px 18px; box-shadow: 4px 4px 0 var(--ink); transform: rotate(-1deg); }
+.versus-label span { font-size: clamp(20px, calc(3 * var(--stage-vw)), 35px); font-weight: 1000; letter-spacing: -.05em; background: var(--yellow); border: 4px solid var(--ink); padding: 4px 18px; box-shadow: 4px 4px 0 var(--ink); transform: rotate(-1deg); }
 .versus-label b { background: var(--blue); color: white; border: 3px solid var(--ink); padding: 5px 12px; transform: rotate(1deg); }
-.card-choice { position: relative; display: grid; grid-template-columns: repeat(2, minmax(220px, 340px)); justify-content: center; gap: clamp(34px, 8vw, 94px); padding: 4px 24px; }
+.card-choice { position: relative; display: grid; grid-template-columns: repeat(2, minmax(220px, 340px)); justify-content: center; gap: clamp(34px, calc(8 * var(--stage-vw)), 94px); padding: 4px 24px; }
 .card-choice-button { position: relative; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; transition: transform .16s ease, filter .16s ease; }
 .card-choice-button:not(:disabled):hover { transform: translateY(-9px) rotate(-1deg); filter: drop-shadow(0 10px 10px #17151a44); }
 .card-choice-button:nth-child(2):not(:disabled):hover { transform: translateY(-9px) rotate(1deg); }
@@ -60,12 +110,12 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .kid-hand {
   position: absolute;
   z-index: 9;
-  left: 44%;
-  /* 手のひらがカード中央よりやや下に来て、カード上端は見えたままにする。
-     腕は右下へ画面外へ抜ける構図なので、カードからはみ出して構わない。 */
-  top: 4%;
-  width: 150%;
-  height: 150%;
+  left: 46%;
+  /* 手のひらがカードの絵柄に重なり、腕は画面の下端まで届いて途中で切れない。
+     横長固定なので、カードの高さ比だけで両方を満たせる。 */
+  top: -6%;
+  width: 200%;
+  height: 200%;
   pointer-events: none;
   transform: translate(-50%, 120%);
   animation: hand-reach var(--hand-reach, 180ms) cubic-bezier(.16, .84, .32, 1) forwards;
@@ -125,7 +175,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .card-art::before, .card-art::after { content: ""; position: absolute; width: 165%; height: 12px; background: #fff8; transform: rotate(-24deg); }
 .card-art::after { transform: rotate(27deg); width: 130%; }
 .card-art span { z-index: 2; display: grid; place-items: center; width: 118px; height: 118px; border-radius: 50%; color: white; background: #17151add; border: 7px solid white; outline: 5px solid var(--ink); font-size: 70px; text-shadow: 5px 5px 0 var(--blue); transform: rotate(-4deg); }
-.card-face h3 { min-height: 54px; margin: 0; font-size: clamp(18px, 2vw, 24px); line-height: 1.08; letter-spacing: -.05em; }
+.card-face h3 { min-height: 54px; margin: 0; font-size: clamp(18px, calc(2 * var(--stage-vw)), 24px); line-height: 1.08; letter-spacing: -.05em; }
 .effect-line { min-height: 44px; margin: 8px 0; padding: 7px 8px; border: 2px solid var(--ink); background: #fff9; font: 800 13px/1.45 "Yu Gothic", sans-serif; }
 .stats { display: flex; justify-content: space-between; color: white; }
 .stats b { min-width: 80px; padding: 6px 10px; text-align: center; background: var(--red); border: 3px solid var(--ink); transform: skew(-8deg); }
@@ -161,7 +211,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .primary-action:hover { transform: translate(3px, 3px) skew(-4deg); box-shadow: 3px 3px 0 var(--ink); }
 .primary-action span { margin-left: 20px; color: var(--yellow); }
 .primary-action.slam { display: block; margin: 18px auto; }
-.kid-reaction { position: fixed; z-index: 20; top: 100px; left: 50%; transform: translateX(-50%) rotate(-1deg); display: flex; gap: 12px; align-items: center; width: max-content; max-width: min(620px, calc(100vw - 32px)); padding: 10px 20px 10px 12px; color: var(--ink); background: white; border: 4px solid var(--ink); border-radius: 10px; box-shadow: 5px 5px 0 var(--yellow); font-family: "Yu Gothic", sans-serif; animation: reaction-pop .18s ease-out; }
+.kid-reaction { position: fixed; z-index: 20; top: 100px; left: 50%; transform: translateX(-50%) rotate(-1deg); display: flex; gap: 12px; align-items: center; width: max-content; max-width: min(620px, calc(100% - 32px)); padding: 10px 20px 10px 12px; color: var(--ink); background: white; border: 4px solid var(--ink); border-radius: 10px; box-shadow: 5px 5px 0 var(--yellow); font-family: "Yu Gothic", sans-serif; animation: reaction-pop .18s ease-out; }
 .kid-reaction b { flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; color: white; border: 3px solid var(--ink); border-radius: 50%; font-size: 22px; }
 .kid-reaction span { flex: 0 0 auto; color: white; background: var(--ink); border: 3px solid var(--ink); padding: 5px 8px; font-weight: 900; font-size: 13px; }
 .kid-reaction p { margin: 0; font-weight: 900; font-size: 17px; }
@@ -198,7 +248,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .modal-backdrop { position: fixed; z-index: 50; inset: 0; overflow: auto; display: grid; place-items: center; padding: 24px; background: #17151add; backdrop-filter: blur(4px); }
 .advice-modal { width: min(900px, 100%); padding: 24px; background-color: var(--paper); background-image: radial-gradient(#d8c8b8 1px, transparent 1px); background-size: 10px 10px; border: 7px solid var(--ink); box-shadow: 12px 12px 0 var(--yellow); }
 .advice-title span, .section-kicker { display: inline-block; padding: 5px 10px; color: white; background: var(--red); border: 3px solid var(--ink); transform: rotate(-2deg); font: 900 11px/1 Arial, sans-serif; letter-spacing: .12em; }
-.advice-title h2 { margin: 14px 0 2px; font-size: clamp(25px, 4vw, 42px); letter-spacing: -.06em; }
+.advice-title h2 { margin: 14px 0 2px; font-size: clamp(25px, calc(4 * var(--stage-vw)), 42px); letter-spacing: -.06em; }
 .advice-title p { margin: 0 0 18px; font: 700 13px/1.5 "Yu Gothic", sans-serif; }
 .advice-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
 .advice-options button { display: flex; align-items: center; gap: 14px; padding: 10px; text-align: left; background: white; border: 4px solid var(--ink); box-shadow: 4px 4px 0 var(--blue); cursor: pointer; }
@@ -223,7 +273,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .completion-stamp { padding: 8px 15px; color: var(--ink); background: var(--yellow); border: 3px solid white; transform: rotate(2deg); }
 .deck-review-grid { max-width: 1280px; margin: 0 auto; padding: 44px 28px 20px; display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 32px; }
 .deck-list-panel h1 { margin: 10px 0 18px; font-size: 38px; }
-.deck-list { border: 5px solid var(--ink); box-shadow: var(--shadow); background: white; }
+.deck-list { max-height: calc(50 * var(--stage-vh)); overflow-y: auto; border: 5px solid var(--ink); box-shadow: var(--shadow); background: white; }
 .deck-row { min-height: 48px; display: grid; grid-template-columns: 42px 40px minmax(180px, 1fr) minmax(140px, .8fr) auto; align-items: center; border-bottom: 2px solid var(--ink); font-family: "Yu Gothic", sans-serif; }
 .deck-row:last-child { border-bottom: 0; }
 .deck-row:nth-child(even) { background: #f1ebdf; }
@@ -248,16 +298,16 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .rival-cards button > b { padding: 6px 8px; background: var(--yellow); border: 2px solid var(--ink); }
 .battle-start { display: block; margin: 26px auto 0; font-size: 19px; }
 
-.title-screen { min-height: 100vh; overflow: hidden; display: grid; grid-template-columns: 1.05fr .95fr; position: relative; color: white; background: var(--blue); }
+.title-screen { min-height: 100%; overflow: hidden; display: grid; grid-template-columns: 1.05fr .95fr; position: relative; color: white; background: var(--blue); }
 .title-screen::before { content: ""; position: absolute; inset: 0; background: linear-gradient(118deg, transparent 0 52%, var(--yellow) 52% 68%, var(--red) 68%); }
 .halftone { position: absolute; inset: 0 42% 0 0; opacity: .28; background-image: radial-gradient(#fff 2px, transparent 2.5px); background-size: 13px 13px; mask-image: linear-gradient(90deg, black, transparent); }
-.title-copy { z-index: 2; align-self: center; padding: 55px 30px 80px clamp(30px, 7vw, 110px); }
+.title-copy { z-index: 2; align-self: center; padding: 55px 30px 80px clamp(30px, calc(7 * var(--stage-vw)), 110px); }
 .prototype-label { display: inline-block; padding: 7px 10px; color: var(--ink); background: var(--yellow); border: 3px solid var(--ink); box-shadow: 3px 3px 0 white; font: 900 10px Arial, sans-serif; letter-spacing: .1em; transform: rotate(-2deg); }
-.title-copy h1 { margin: 20px 0; font-size: clamp(60px, 8vw, 120px); line-height: .78; letter-spacing: -.11em; text-shadow: 7px 7px 0 var(--ink), -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink); transform: rotate(-2deg); }
+.title-copy h1 { margin: 20px 0; font-size: clamp(60px, calc(8 * var(--stage-vw)), 120px); line-height: .78; letter-spacing: -.11em; text-shadow: 7px 7px 0 var(--ink), -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink); transform: rotate(-2deg); }
 .title-copy h1 small { display: block; color: var(--yellow); font-size: .45em; line-height: 1; letter-spacing: -.05em; }
-.title-copy p { margin: 26px 0; font: 800 clamp(16px, 2vw, 23px)/1.5 "Yu Gothic", sans-serif; text-shadow: 2px 2px 0 var(--ink); }
+.title-copy p { margin: 26px 0; font: 800 clamp(16px, calc(2 * var(--stage-vw)), 23px)/1.5 "Yu Gothic", sans-serif; text-shadow: 2px 2px 0 var(--ink); }
 .title-copy p b { color: var(--yellow); }
-.title-start { font-size: clamp(18px, 2.3vw, 28px); background: var(--red); }
+.title-start { font-size: clamp(18px, calc(2.3 * var(--stage-vw)), 28px); background: var(--red); }
 .save-note { margin-top: 18px; font: 700 11px "Yu Gothic", sans-serif; color: #d8e8ff; }
 .title-cards { z-index: 2; position: relative; min-height: 720px; }
 .tilted-card { position: absolute; width: 310px; top: 14%; filter: drop-shadow(20px 25px 0 #17151a55); }
@@ -273,11 +323,11 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .clear-screen {
   position: relative;
   isolation: isolate;
-  min-height: 100vh;
+  min-height: 100%;
   overflow: hidden;
   display: grid;
   place-items: center;
-  padding: clamp(28px, 5vw, 68px) clamp(16px, 4vw, 52px);
+  padding: clamp(28px, calc(5 * var(--stage-vw)), 68px) clamp(16px, calc(4 * var(--stage-vw)), 52px);
   color: white;
   background: radial-gradient(circle at 50% 42%, #253a5b 0, #10192c 46%, #070b14 100%);
 }
@@ -314,7 +364,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
   position: relative;
   z-index: 1;
   width: min(940px, 100%);
-  padding: clamp(26px, 4.5vw, 54px);
+  padding: clamp(26px, calc(4.5 * var(--stage-vw)), 54px);
   text-align: center;
   color: white;
   background: linear-gradient(145deg, #182845 0, var(--navy-panel) 48%, #080e1d 100%);
@@ -342,7 +392,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
   background: var(--cyan);
   border-color: white;
   box-shadow: 4px 4px 0 var(--pink);
-  font-size: clamp(11px, 1.4vw, 15px);
+  font-size: clamp(11px, calc(1.4 * var(--stage-vw)), 15px);
 }
 .mode-select-panel h1,
 .character-select-panel h1,
@@ -350,9 +400,9 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .clear-panel h1 {
   position: relative;
   z-index: 1;
-  margin: 18px 0 clamp(26px, 4vw, 42px);
+  margin: 18px 0 clamp(26px, calc(4 * var(--stage-vw)), 42px);
   color: white;
-  font-size: clamp(42px, 7vw, 78px);
+  font-size: clamp(42px, calc(7 * var(--stage-vw)), 78px);
   line-height: .95;
   letter-spacing: -.08em;
   text-shadow: 5px 5px 0 var(--ink), -2px -2px 0 var(--cyan), 2px 2px 0 var(--pink);
@@ -368,7 +418,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
   margin: auto;
   display: grid;
   gap: 14px;
-  padding: clamp(16px, 3vw, 28px);
+  padding: clamp(16px, calc(3 * var(--stage-vw)), 28px);
   background-color: var(--paper);
   background-image: radial-gradient(#d8c8b8 1px, transparent 1px);
   background-size: 10px 10px;
@@ -378,7 +428,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
   font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
 }
 .how-to-head { position: relative; display: grid; gap: 10px; justify-items: start; padding-right: 46px; }
-.how-to-head h2 { margin: 0; font-family: "Arial Black", "Yu Gothic", sans-serif; font-size: clamp(20px, 3.4vw, 30px); letter-spacing: -.04em; }
+.how-to-head h2 { margin: 0; font-family: "Arial Black", "Yu Gothic", sans-serif; font-size: clamp(20px, calc(3.4 * var(--stage-vw)), 30px); letter-spacing: -.04em; }
 .how-to-close {
   position: absolute;
   top: -4px;
@@ -397,13 +447,13 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 }
 .how-to-close:hover { background: var(--red); }
 .how-to-body { display: grid; gap: 12px; }
-.how-to-lead { margin: 0; font-size: clamp(14px, 2.2vw, 17px); font-weight: 900; line-height: 1.7; }
+.how-to-lead { margin: 0; font-size: clamp(14px, calc(2.2 * var(--stage-vw)), 17px); font-weight: 900; line-height: 1.7; }
 .how-to-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
 .how-to-list li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: baseline; padding: 9px 12px; background: #fffdf7; border: 3px solid var(--ink); box-shadow: 3px 3px 0 #00000018; }
 .how-to-list li b { color: var(--ink); background: var(--yellow); border: 2px solid var(--ink); padding: 2px 8px; font-size: 12px; white-space: nowrap; }
-.how-to-list li span { grid-column: 2; font-size: clamp(12px, 1.9vw, 14px); font-weight: 700; line-height: 1.65; }
+.how-to-list li span { grid-column: 2; font-size: clamp(12px, calc(1.9 * var(--stage-vw)), 14px); font-weight: 700; line-height: 1.65; }
 .how-to-list li:not(:has(b)) span { grid-column: 1 / -1; }
-.how-to-note { margin: 0; padding: 11px 13px; background: var(--yellow); border: 3px dashed var(--ink); font-size: clamp(12px, 1.9vw, 14px); font-weight: 900; line-height: 1.65; }
+.how-to-note { margin: 0; padding: 11px 13px; background: var(--yellow); border: 3px dashed var(--ink); font-size: clamp(12px, calc(1.9 * var(--stage-vw)), 14px); font-weight: 900; line-height: 1.65; }
 .how-to-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
 .how-to-foot .primary-action, .how-to-foot .secondary-action { font-size: 14px; padding: 11px 18px; }
 .how-to-foot .secondary-action:disabled { opacity: .4; cursor: default; transform: none; }
@@ -420,7 +470,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
   justify-items: start;
   gap: 10px;
   margin: 0 auto;
-  padding: clamp(28px, 5vw, 48px);
+  padding: clamp(28px, calc(5 * var(--stage-vw)), 48px);
   overflow: hidden;
   text-align: left;
   color: white;
@@ -443,14 +493,14 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
   background: repeating-linear-gradient(110deg, transparent 0 16px, white 17px 25px, transparent 26px 42px);
   transform: rotate(-8deg);
 }
-.mode-card strong { position: relative; z-index: 1; color: var(--yellow); font-size: clamp(28px, 4.5vw, 48px); line-height: 1; text-shadow: 3px 3px 0 var(--ink); }
-.mode-card span { position: relative; z-index: 1; font: 900 clamp(13px, 2vw, 18px)/1.5 "Yu Gothic", sans-serif; }
+.mode-card strong { position: relative; z-index: 1; color: var(--yellow); font-size: clamp(28px, calc(4.5 * var(--stage-vw)), 48px); line-height: 1; text-shadow: 3px 3px 0 var(--ink); }
+.mode-card span { position: relative; z-index: 1; font: 900 clamp(13px, calc(2 * var(--stage-vw)), 18px)/1.5 "Yu Gothic", sans-serif; }
 .mode-card b { position: relative; z-index: 1; margin-top: 15px; padding: 8px 15px; color: var(--navy); background: var(--cyan); border: 3px solid white; box-shadow: 3px 3px 0 var(--pink); }
 .mode-card:hover,
 .mode-card:focus-visible { transform: translateY(-8px) scale(1.025) skew(-2deg); box-shadow: 0 0 28px #2bd9dcaa, 13px 15px 0 var(--cyan), -7px -7px 0 var(--pink); filter: brightness(1.12); }
 
 .character-select-panel { width: min(1120px, 100%); }
-.character-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(12px, 2vw, 22px); }
+.character-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(12px, calc(2 * var(--stage-vw)), 22px); }
 .character-slot {
   position: relative;
   min-width: 0;
@@ -468,7 +518,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
   box-shadow: 6px 7px 0 #050810;
 }
 .character-slot::before { content: ""; position: absolute; inset: 0; opacity: .22; background: repeating-linear-gradient(135deg, transparent 0 12px, #fff 13px 15px, transparent 16px 27px); pointer-events: none; }
-.character-slot strong { position: relative; font-size: clamp(21px, 2.3vw, 29px); line-height: 1; }
+.character-slot strong { position: relative; font-size: clamp(21px, calc(2.3 * var(--stage-vw)), 29px); line-height: 1; }
 .character-slot small { position: relative; min-height: 54px; color: #dce7f7; font: 800 12px/1.55 "Yu Gothic", sans-serif; }
 .character-slot b { position: relative; padding: 7px 10px; color: var(--navy); background: var(--yellow); border: 3px solid white; box-shadow: 3px 3px 0 var(--pink); font-size: 12px; }
 .character-portrait { position: relative; display: grid; place-items: center; width: 118px; height: 118px; color: white; background: linear-gradient(145deg, var(--blue), #16306f); border: 6px solid white; outline: 5px solid var(--ink); border-radius: 50%; font-size: 66px; text-shadow: 4px 4px 0 var(--pink); }
@@ -488,7 +538,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   justify-items: center;
   gap: 8px;
   margin-bottom: 34px;
-  padding: clamp(24px, 4vw, 42px);
+  padding: clamp(24px, calc(4 * var(--stage-vw)), 42px);
   overflow: hidden;
   color: white;
   background: linear-gradient(145deg, #080d19, #18243b 58%, #0a0e18);
@@ -500,17 +550,17 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .opponent-preview-card::after { content: ""; position: absolute; width: 145%; height: 8px; background: var(--rival-color); opacity: .42; transform: rotate(-18deg); pointer-events: none; }
 .opponent-preview-card::after { width: 120%; transform: rotate(22deg); }
 .opponent-mark { position: relative; z-index: 1; display: grid; place-items: center; width: 108px; height: 108px; color: white; background: var(--rival-color); border: 6px solid white; outline: 5px solid var(--ink); border-radius: 50%; font-size: 58px; text-shadow: 4px 4px 0 var(--ink); box-shadow: 0 0 24px var(--rival-color); }
-.opponent-preview-card small { position: relative; z-index: 1; margin-top: 8px; padding: 5px 12px; color: white; background: var(--rival-color); border: 2px solid white; font-size: clamp(12px, 1.7vw, 16px); font-weight: 1000; letter-spacing: .12em; text-shadow: 1px 1px 0 var(--ink); transform: skew(-7deg); }
-.opponent-preview-card strong { position: relative; z-index: 1; color: white; font-size: clamp(48px, 8vw, 82px); line-height: .95; letter-spacing: -.07em; text-shadow: 5px 5px 0 var(--ink), 0 0 18px var(--rival-color); }
-.opponent-preview-card p { position: relative; z-index: 1; margin: 14px 0 0; padding: 10px 20px; color: white; background: #050810d9; border-top: 3px solid var(--rival-color); border-bottom: 3px solid var(--rival-color); font: 1000 clamp(16px, 2.2vw, 22px)/1.45 "Yu Gothic", sans-serif; letter-spacing: .04em; transform: skew(-3deg); }
-.opponent-preview-panel .primary-action { font-size: clamp(16px, 2vw, 21px); box-shadow: 6px 6px 0 var(--rival-color, var(--pink)); }
+.opponent-preview-card small { position: relative; z-index: 1; margin-top: 8px; padding: 5px 12px; color: white; background: var(--rival-color); border: 2px solid white; font-size: clamp(12px, calc(1.7 * var(--stage-vw)), 16px); font-weight: 1000; letter-spacing: .12em; text-shadow: 1px 1px 0 var(--ink); transform: skew(-7deg); }
+.opponent-preview-card strong { position: relative; z-index: 1; color: white; font-size: clamp(48px, calc(8 * var(--stage-vw)), 82px); line-height: .95; letter-spacing: -.07em; text-shadow: 5px 5px 0 var(--ink), 0 0 18px var(--rival-color); }
+.opponent-preview-card p { position: relative; z-index: 1; margin: 14px 0 0; padding: 10px 20px; color: white; background: #050810d9; border-top: 3px solid var(--rival-color); border-bottom: 3px solid var(--rival-color); font: 1000 clamp(16px, calc(2.2 * var(--stage-vw)), 22px)/1.45 "Yu Gothic", sans-serif; letter-spacing: .04em; transform: skew(-3deg); }
+.opponent-preview-panel .primary-action { font-size: clamp(16px, calc(2 * var(--stage-vw)), 21px); box-shadow: 6px 6px 0 var(--rival-color, var(--pink)); }
 
 .clear-screen::before { opacity: .4; background: repeating-conic-gradient(from 4deg at 50% 45%, transparent 0 7deg, #ffd928 8deg 9deg, transparent 10deg 17deg, #ff2f8e 18deg 19deg, transparent 20deg 29deg); }
 .clear-panel { width: min(980px, 100%); border-color: var(--yellow); box-shadow: 0 0 38px #ffd92888, 14px 14px 0 var(--pink); }
 .clear-panel .section-kicker { background: var(--yellow); box-shadow-color: var(--pink); }
 .clear-panel h1 { color: var(--yellow); text-shadow: 5px 5px 0 var(--ink), -2px -2px 0 white, 2px 2px 0 var(--pink); }
 .run-results { position: relative; z-index: 1; display: grid; gap: 10px; margin-bottom: 24px; padding: 18px; text-align: left; background: #070c18cc; border: 4px solid white; box-shadow: 6px 6px 0 var(--cyan); }
-.run-results h2 { margin: 0 0 5px; color: var(--yellow); font-size: clamp(21px, 3vw, 30px); letter-spacing: -.04em; }
+.run-results h2 { margin: 0 0 5px; color: var(--yellow); font-size: clamp(21px, calc(3 * var(--stage-vw)), 30px); letter-spacing: -.04em; }
 .run-result-row { min-height: 70px; display: grid; grid-template-columns: 90px 88px minmax(0, 1fr); align-items: center; gap: 12px; padding: 7px 16px; color: white; background: linear-gradient(90deg, #172641, #0c1322); border: 3px solid #526580; transform: skew(-2deg); }
 .run-result-row > * { transform: skew(2deg); }
 .run-result-row span { color: #a9bdd8; font-size: 13px; }
@@ -518,23 +568,23 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .run-result-row strong.win { color: var(--cyan); box-shadow: 0 0 16px #2bd9dc88; }
 .run-result-row strong.loss { color: var(--pink); box-shadow: 0 0 16px #ff2f8e88; }
 .run-result-row strong.draw { color: var(--yellow); box-shadow: 0 0 16px #ffd92888; }
-.run-result-row b { overflow-wrap: anywhere; font-size: clamp(17px, 2.4vw, 25px); }
+.run-result-row b { overflow-wrap: anywhere; font-size: clamp(17px, calc(2.4 * var(--stage-vw)), 25px); }
 .run-facts { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 28px; }
 .run-fact { min-width: 0; min-height: 175px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 18px 14px; color: white; background: linear-gradient(155deg, #1b2c49, #0a101d); border: 3px solid var(--cyan); box-shadow: 5px 5px 0 var(--ink); }
 .run-fact:nth-child(2) { border-color: var(--pink); }
 .run-fact:nth-child(3) { border-color: var(--yellow); }
 .run-fact > span { color: #a9bdd8; font: 900 12px/1.4 "Yu Gothic", sans-serif; }
-.run-fact > strong { color: var(--yellow); font-size: clamp(25px, 3.6vw, 40px); line-height: 1.1; overflow-wrap: anywhere; }
+.run-fact > strong { color: var(--yellow); font-size: clamp(25px, calc(3.6 * var(--stage-vw)), 40px); line-height: 1.1; overflow-wrap: anywhere; }
 .run-fact small { color: white; font: 800 12px/1.45 "Yu Gothic", sans-serif; }
 .run-fact ul { width: 100%; max-height: 108px; overflow: auto; margin: 0; padding-left: 22px; text-align: left; color: white; font: 800 12px/1.55 "Yu Gothic", sans-serif; }
 .clear-panel > .primary-action { position: relative; z-index: 1; font-size: 18px; background: linear-gradient(180deg, #ffdf62, #f5a800); color: var(--ink); }
 
-.boot-screen { min-height: 100vh; display: grid; place-items: center; color: white; background: var(--blue); }
+.boot-screen { min-height: calc(100 * var(--stage-vh)); display: grid; place-items: center; color: white; background: var(--blue); }
 .logo-burst { width: 330px; height: 330px; display: grid; place-content: center; text-align: center; background: var(--red); border: 8px solid var(--ink); clip-path: polygon(50% 0, 61% 22%, 82% 8%, 80% 34%, 100% 50%, 77% 61%, 91% 87%, 63% 78%, 50% 100%, 39% 77%, 10% 90%, 23% 62%, 0 50%, 22% 39%, 9% 11%, 39% 24%); }
 .logo-burst span, .logo-burst b { display: block; }
 .logo-burst b { color: var(--yellow); font-size: 25px; }
 
-.battle-screen { min-height: 100vh; position: relative; overflow: hidden; color: white; background: radial-gradient(circle at 50% 46%, #34485f, #151922 65%); }
+.battle-screen { height: calc(100 * var(--stage-vh)); display: flex; flex-direction: column; position: relative; overflow: hidden; color: white; background: radial-gradient(circle at 50% 46%, #34485f, #151922 65%); }
 .battle-screen::before { content: ""; position: absolute; inset: 0; opacity: .15; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 10px 10px; }
 .battle-header { position: relative; z-index: 4; min-height: 72px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 8px 28px; background: var(--ink); border-bottom: 5px solid var(--yellow); }
 .battle-header > div:first-child, .brother-name { display: grid; }
@@ -542,7 +592,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-header strong { font-size: 22px; }
 .brother-name { text-align: right; }
 .battle-turn { padding: 7px 16px; color: var(--ink); background: var(--yellow); border: 3px solid white; transform: skew(-8deg); }
-.arena { --attack-reach: clamp(180px, 26vh, 260px); --attack-leader-reach: clamp(220px, 32vh, 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, 16vw, 190px); position: relative; z-index: 2; min-height: calc(100vh - 72px); margin-right: 300px; padding: 20px 100px 165px; display: grid; grid-template-rows: auto minmax(120px, 1fr) 26px minmax(120px, 1fr) auto; gap: 8px; }
+.arena { --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 300px; padding: 20px 100px 165px; display: grid; grid-template-rows: auto minmax(120px, 1fr) 26px minmax(120px, 1fr) auto; gap: 8px; }
 .fighter { display: flex; align-items: center; gap: 12px; }
 .opponent-fighter { justify-content: space-between; }
 .opponent-leader-info { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
@@ -584,7 +634,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .hand-card { margin-left: -15px; transition: transform .15s; }
 .hand-card:hover { transform: translateY(-35px); z-index: 5; }
 .battle-log { position: absolute; z-index: 3; right: 0; top: 72px; bottom: 0; width: 300px; overflow: auto; color: var(--ink); background: #fffaf0eb; border-left: 5px solid var(--ink); }
-.battle-log.collapsed { top: auto; bottom: 88px; width: min(420px, calc(100vw - 24px)); max-height: 64px; }
+.battle-log.collapsed { top: auto; bottom: 88px; width: min(420px, calc(calc(100 * var(--stage-vw)) - 24px)); max-height: 64px; }
 .battle-log.collapsed .panel-heading { padding: 5px 9px; }
 .battle-log.collapsed p { display: flex; gap: 7px; align-items: baseline; overflow: hidden; padding: 6px 9px; white-space: nowrap; text-overflow: ellipsis; }
 .battle-log.collapsed p span { display: inline; flex: 0 0 auto; }
@@ -605,183 +655,15 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .result-burst.win { box-shadow: 12px 12px 0 var(--yellow); }
 .result-burst > span { display: inline-block; padding: 6px 13px; color: white; background: var(--red); border: 3px solid var(--ink); font: 900 16px Arial, sans-serif; letter-spacing: .14em; }
 .result-burst.win > span { background: var(--blue); }
-.result-burst h1 { margin: 18px 0 6px; font-size: clamp(38px, 7vw, 74px); letter-spacing: -.08em; }
+.result-burst h1 { margin: 18px 0 6px; font-size: clamp(38px, calc(7 * var(--stage-vw)), 74px); letter-spacing: -.08em; }
 .result-burst p { margin: 0 0 26px; font: 800 14px/1.6 "Yu Gothic", sans-serif; }
 .post-battle-commentary { max-width: 560px; margin: 20px auto 26px; text-align: left; }
 .post-battle-commentary .speech { margin: 0; box-shadow: 4px 4px 0 var(--cyan); }
 
-@media (max-width: 1050px) {
-  .draft-layout, .deck-review-grid { grid-template-columns: 1fr; }
-  .draft-layout aside .materials-panel, .deck-review-grid aside .materials-panel { position: static; }
-  .title-screen { grid-template-columns: 1fr; }
-  .title-screen::before { opacity: .6; }
-  .title-copy { padding-bottom: 620px; }
-  .title-cards { position: absolute; inset: auto 0 35px; height: 590px; min-height: 0; }
-  .tilted-card.one { left: calc(50% - 270px); }
-  .tilted-card.two { left: calc(50% - 10px); }
-  .arena { margin-right: 0; padding-left: 40px; padding-right: 40px; }
-  .battle-log.expanded { width: min(300px, 42vw); }
-  .battle-log.collapsed { right: 12px; }
-  .battle-controls { right: 24px; }
-  .battle-speech { width: calc(100% - 40px); }
-  .character-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .character-slot { min-height: 250px; }
-}
 
-@media (max-height: 800px) and (min-width: 721px) {
-  .opponent-preview-screen { padding-top: 24px; padding-bottom: 24px; }
-  .opponent-preview-panel { padding-top: 26px; padding-bottom: 26px; }
-  .opponent-preview-panel h1 { margin: 12px 0 20px; font-size: clamp(44px, 6vw, 62px); }
-  .opponent-preview-card { gap: 5px; margin-bottom: 22px; padding: 18px; }
-  .opponent-mark { width: 82px; height: 82px; border-width: 4px; outline-width: 3px; font-size: 44px; }
-  .opponent-preview-card small { margin-top: 4px; }
-  .opponent-preview-card strong { font-size: clamp(44px, 6vw, 64px); }
-  .opponent-preview-card p { margin-top: 8px; padding: 7px 18px; font-size: 17px; }
-}
 
-@media (max-width: 720px) {
-  .mode-select-screen,
-  .character-select-screen,
-  .opponent-preview-screen,
-  .clear-screen { padding: 24px 13px; }
-  .mode-select-panel,
-  .character-select-panel,
-  .opponent-preview-panel,
-  .clear-panel { padding: 25px 16px; border-width: 4px; outline-width: 3px; box-shadow: 0 0 24px #2bd9dc55, 7px 8px 0 var(--pink); }
-  .mode-select-panel::before,
-  .character-select-panel::before,
-  .opponent-preview-panel::before,
-  .clear-panel::before { inset: 6px; }
-  .mode-select-panel h1,
-  .character-select-panel h1,
-  .opponent-preview-panel h1,
-  .clear-panel h1 { margin: 15px 0 25px; font-size: clamp(36px, 11vw, 52px); text-shadow: 4px 4px 0 var(--ink), -1px -1px 0 var(--cyan), 1px 1px 0 var(--pink); }
-  .mode-card { min-height: 190px; padding: 27px 20px; box-shadow: 6px 7px 0 var(--cyan); }
-  .mode-card strong { font-size: clamp(25px, 8vw, 35px); }
-  .mode-card b { margin-top: 8px; }
-  .character-grid { gap: 10px; }
-  .character-slot { min-height: 205px; gap: 7px; padding: 15px 7px; border-width: 3px; }
-  .character-portrait { width: 78px; height: 78px; border-width: 4px; outline-width: 3px; font-size: 43px; }
-  .character-slot strong { font-size: 18px; }
-  .character-slot small { min-height: 48px; font-size: 9px; line-height: 1.4; }
-  .character-slot b { padding: 5px 7px; font-size: 9px; }
-  button.character-slot.active:hover,
-  button.character-slot.active:focus-visible { transform: translateY(-5px) scale(1.025); }
-  .opponent-preview-card { margin-bottom: 28px; padding: 23px 13px; border-width: 4px; outline-width: 3px; box-shadow: 7px 7px 0 var(--rival-color), 0 0 24px var(--rival-color); }
-  .opponent-mark { width: 82px; height: 82px; border-width: 4px; outline-width: 3px; font-size: 43px; }
-  .opponent-preview-card strong { font-size: clamp(43px, 15vw, 62px); }
-  .opponent-preview-card p { width: 100%; padding: 8px 7px; font-size: 15px; }
-  .opponent-preview-panel .primary-action { font-size: 15px; }
-  .run-results { padding: 12px 9px; border-width: 3px; box-shadow: 4px 4px 0 var(--cyan); }
-  .run-result-row { min-height: 60px; grid-template-columns: 55px 52px minmax(0, 1fr); gap: 7px; padding: 6px 8px; border-width: 2px; }
-  .run-result-row span { font-size: 10px; }
-  .run-result-row strong { width: 43px; height: 43px; border-width: 2px; font-size: 32px; }
-  .run-result-row b { font-size: 15px; }
-  .run-facts { grid-template-columns: 1fr; gap: 10px; }
-  .run-fact { min-height: 118px; padding: 14px 10px; }
-  .run-fact > strong { font-size: 29px; }
-  .run-fact ul { max-height: 84px; }
-  .game-header { gap: 10px; padding: 10px 12px; }
-  .mini-logo b { font-size: 16px; }
-  .trust-box { min-width: 130px; }
-  .trust-meter i { width: 14px; }
-  .trust-box > span, .trust-box strong { font-size: 9px; }
-  .pick-counter b { font-size: 29px; }
-  .draft-layout { padding-top: 34px; }
-  .card-choice { grid-template-columns: 1fr 1fr; gap: 20px; padding: 0; }
-  .card-choice-button .card-face { min-height: 310px; padding: 7px; border-width: 4px; box-shadow: 4px 4px 0 var(--ink); }
-  .card-choice-button .card-art { height: 130px; }
-  .card-art span { width: 76px; height: 76px; font-size: 42px; border-width: 4px; outline-width: 3px; }
-  .card-face h3 { min-height: 46px; font-size: 14px; }
-  .effect-line { min-height: 42px; font-size: 10px; }
-  .stats b { min-width: 58px; font-size: 11px; }
-  .vs-burst { width: 54px; height: 54px; font-size: 17px; }
-  .love-ribbon { font-size: 9px; padding: 5px; left: -5px; top: 9px; }
-  /* 手の大きさはカード比で決めているので、狭い画面でも基本の比率をそのまま使う。 */
-  .kid-hand-palm { border-width: 3px; border-radius: 16px 16px 22px 22px; }
-  .kid-hand-finger { border-width: 3px; border-radius: 10px 10px 4px 4px; }
-  .kid-hand-sleeve { border-width: 3px; }
-  .speech { padding: 10px; }
-  .speech p { font-size: 13px; }
-  .advice-options, .rival-cards, .species-advice-options { grid-template-columns: 1fr; }
-  .deck-review-grid { padding: 38px 12px 20px; }
-  .deck-row { grid-template-columns: 34px 36px 1fr auto; }
-  .deck-row small { display: none; }
-  .rival-cards button { grid-template-columns: 68px 1fr; }
-  .rival-cards button > i { width: 62px; height: 62px; }
-  .rival-cards button > b { display: none; }
-  .title-copy { padding: 45px 20px 490px; }
-  .title-copy h1 { font-size: 65px; }
-  .title-cards { height: 460px; }
-  .tilted-card { width: 220px; }
-  .tilted-card .card-face { min-height: 360px; }
-  .tilted-card.one { left: calc(50% - 205px); }
-  .tilted-card.two { left: calc(50% - 35px); top: 20%; }
-  .title-shout { width: 135px; height: 135px; font-size: 12px; }
-  .battle-header { padding: 6px 10px; }
-  .battle-header strong { font-size: 15px; }
-  .arena { padding: 12px 8px 150px; }
-  .board-zone { gap: 4px; padding: 6px; }
-  .board-card { width: 65px; height: 90px; padding: 3px; border-width: 2px; }
-  .board-card > b { font-size: 25px; }
-  .board-card > div span { min-width: 24px; font-size: 10px; }
-  .fighter { gap: 5px; }
-  .opponent-leader-info { gap: 5px; }
-  .opponent-hand-zone { gap: 4px; padding: 2px 0; }
-  .opponent-hand-label { font-size: 7px; }
-  .opponent-hand-label b { width: 21px; height: 21px; border-width: 2px; font-size: 11px; }
-  .opponent-hand-cards { gap: 0; }
-  .opponent-hand-card { width: 25px; height: 36px; }
-  .opponent-hand-card + .opponent-hand-card { margin-left: -9px; }
-  .opponent-card-back { border-width: 2px; border-radius: 4px; box-shadow: 2px 2px 0 #0008, inset 0 0 0 1px #84d9ff77; }
-  .opponent-card-back::before { width: 13px; height: 13px; border-width: 2px; }
-  .opponent-card-back::after { width: 5px; height: 5px; border-width: 1px; }
-  .opponent-card-back i { width: 3px; height: 19px; }
-  .avatar { width: 46px; height: 46px; border-width: 3px; font-size: 21px; }
-  .life b { font-size: 22px; }
-  .battle-speech { display: block; left: 8px; width: calc(100% - 16px); }
-  .battle-speech-opponent { top: 82px; }
-  .battle-speech-brother { bottom: 52px; }
-  .battle-speech .speech { gap: 5px; padding: 6px 8px; border-width: 2px; box-shadow: 3px 3px 0 var(--yellow); }
-  .battle-speech .speech::after { top: -8px; left: 22px; width: 11px; height: 11px; border-width: 2px; }
-  .battle-speech .speech span { padding: 3px 5px; border-width: 2px; font-size: 9px; }
-  .battle-speech .speech p { font-size: 11px; }
-  .battle-controls { right: 10px; bottom: 8px; }
-  .battle-controls button { font-size: 11px; }
-  .battle-controls .battle-speed-controls { gap: 2px; padding: 3px; box-shadow: 3px 3px 0 var(--ink); }
-  .kid-reaction { top: 84px; gap: 8px; padding: 7px 12px 7px 8px; }
-  .kid-reaction b { width: 28px; height: 28px; font-size: 15px; }
-  .kid-reaction span { font-size: 10px; padding: 4px 6px; }
-  .kid-reaction p { font-size: 13px; }
-}
 
-@media (max-width: 480px) {
-  .how-to-panel { border-width: 5px; box-shadow: 8px 8px 0 var(--yellow); gap: 10px; }
-  .how-to-backdrop { padding: 8px; }
-  .how-to-head { padding-right: 40px; }
-  .how-to-list li { padding: 7px 9px; gap: 3px 7px; }
-  .how-to-list li b { font-size: 10px; padding: 2px 6px; }
-  .how-to-foot { gap: 7px; }
-  .how-to-foot .primary-action, .how-to-foot .secondary-action { font-size: 12px; padding: 9px 12px; }
-  .how-to-dots i { width: 8px; height: 8px; }
-  .mode-card.how-to-card { min-height: 96px; margin-top: 14px; }
-}
 
-@media (max-width: 390px) {
-  .mode-select-screen,
-  .character-select-screen,
-  .opponent-preview-screen,
-  .clear-screen { padding-left: 10px; padding-right: 10px; }
-  .mode-select-panel,
-  .character-select-panel,
-  .opponent-preview-panel,
-  .clear-panel { padding-left: 11px; padding-right: 11px; }
-  .character-grid { gap: 7px; }
-  .character-slot { min-height: 190px; padding-left: 4px; padding-right: 4px; }
-  .character-portrait { width: 67px; height: 67px; font-size: 36px; }
-  .character-slot small { font-size: 8px; }
-  .clear-panel > .primary-action { font-size: 15px; }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .mode-card,
@@ -860,7 +742,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .build-summary {
   max-width: 1180px;
   margin: 22px auto 0;
-  padding: 14px clamp(14px, 3vw, 26px);
+  padding: 14px clamp(14px, calc(3 * var(--stage-vw)), 26px);
   display: grid;
   gap: 6px;
   background: var(--ink);
@@ -870,10 +752,10 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   font-family: "Yu Gothic", sans-serif;
   transform: rotate(-.4deg);
 }
-.build-mood { margin: 0; color: white; font-size: clamp(15px, 2.2vw, 21px); font-weight: 900; }
+.build-mood { margin: 0; color: white; font-size: clamp(15px, calc(2.2 * var(--stage-vw)), 21px); font-weight: 900; }
 .build-stage { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
 .build-stage span { color: var(--ink); background: var(--yellow); border: 3px solid var(--ink); padding: 3px 9px; font-size: 11px; font-weight: 900; }
-.build-stage strong { color: var(--yellow); font-size: clamp(14px, 2vw, 19px); }
+.build-stage strong { color: var(--yellow); font-size: clamp(14px, calc(2 * var(--stage-vw)), 19px); }
 .build-stage small { color: #cfc9d6; font-size: 12px; font-weight: 700; }
 
 /* Species synergy: build counter, card tags, opening declaration. */
@@ -907,7 +789,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   z-index: 9;
   margin: 0 auto;
   width: max-content;
-  max-width: calc(100vw - 24px);
+  max-width: calc(calc(100 * var(--stage-vw)) - 24px);
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
@@ -929,7 +811,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   left: 50%;
   display: grid;
   gap: 2px;
-  min-width: min(390px, calc(100vw - 32px));
+  min-width: min(390px, calc(100% - 32px));
   padding: 10px 20px 12px;
   color: white;
   background: var(--blue);
@@ -940,19 +822,19 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   animation: sync-banner-pop .24s ease-out;
 }
 .sync-stage-banner span { color: var(--yellow); font: 900 11px/1 Arial, sans-serif; letter-spacing: .2em; }
-.sync-stage-banner strong { font-size: clamp(18px, 3vw, 28px); text-shadow: 3px 3px 0 var(--ink); }
+.sync-stage-banner strong { font-size: clamp(18px, calc(3 * var(--stage-vw)), 28px); text-shadow: 3px 3px 0 var(--ink); }
 .sync-stage-banner.unlock { background: var(--pink); box-shadow: 8px 8px 0 var(--yellow), 0 0 34px var(--pink); }
-.sync-stage-banner.unlock b { color: var(--yellow); font-size: clamp(18px, 3vw, 27px); text-shadow: 3px 3px 0 var(--ink); }
+.sync-stage-banner.unlock b { color: var(--yellow); font-size: clamp(18px, calc(3 * var(--stage-vw)), 27px); text-shadow: 3px 3px 0 var(--ink); }
 @keyframes sync-banner-pop { from { opacity: 0; transform: translate(-50%, -18px) rotate(-5deg) scale(.88); } to { opacity: 1; transform: translateX(-50%) rotate(-2deg) scale(1); } }
 
 .ace-selection-screen {
   position: relative;
   isolation: isolate;
-  min-height: 100vh;
+  min-height: 100%;
   overflow: auto;
   display: grid;
   place-items: center;
-  padding: 36px clamp(12px, 3vw, 42px) 54px;
+  padding: 36px clamp(12px, calc(3 * var(--stage-vw)), 42px) 54px;
   color: white;
   background: radial-gradient(circle at 50% 36%, #523d25 0, #1b1830 30%, #080a14 78%);
 }
@@ -970,7 +852,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   position: relative;
   z-index: 1;
   width: min(1240px, 100%);
-  padding: clamp(24px, 4vw, 46px);
+  padding: clamp(24px, calc(4 * var(--stage-vw)), 46px);
   text-align: center;
   background: linear-gradient(145deg, #322747, #11182c 55%, #080c17);
   border: 7px solid var(--yellow);
@@ -979,8 +861,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 }
 .ace-selection-panel::before { content: ""; position: absolute; inset: 11px; border: 2px solid #fff5; pointer-events: none; }
 .ace-selection-panel .section-kicker { position: relative; z-index: 1; color: var(--ink); background: var(--yellow); border-color: white; box-shadow: 4px 4px 0 var(--pink); }
-.ace-selection-panel h1 { position: relative; z-index: 1; margin: 17px 0 5px; color: var(--yellow); font-size: clamp(40px, 7vw, 78px); line-height: .95; letter-spacing: -.08em; text-shadow: 5px 5px 0 var(--ink), -2px -2px 0 white, 2px 2px 0 var(--pink); transform: skew(-4deg); }
-.ace-flavor { position: relative; z-index: 1; margin: 0 0 25px; color: #fff4be; font: 900 clamp(13px, 2vw, 19px)/1.5 "Yu Gothic", sans-serif; }
+.ace-selection-panel h1 { position: relative; z-index: 1; margin: 17px 0 5px; color: var(--yellow); font-size: clamp(40px, calc(7 * var(--stage-vw)), 78px); line-height: .95; letter-spacing: -.08em; text-shadow: 5px 5px 0 var(--ink), -2px -2px 0 white, 2px 2px 0 var(--pink); transform: skew(-4deg); }
+.ace-flavor { position: relative; z-index: 1; margin: 0 0 25px; color: #fff4be; font: 900 clamp(13px, calc(2 * var(--stage-vw)), 19px)/1.5 "Yu Gothic", sans-serif; }
 .ace-deck-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; }
 .ace-card-option { position: relative; min-width: 0; padding: 0 0 9px; overflow: visible; color: var(--ink); background: #0e1627; border: 4px solid #667795; box-shadow: 5px 6px 0 var(--ink); cursor: pointer; transition: transform .14s ease, border-color .14s ease, box-shadow .14s ease, filter .14s ease; }
 .ace-card-option .card-face,
@@ -1023,63 +905,12 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .ace-status small { color: var(--cyan); font-size: 10px; font-weight: 900; }
 .ace-status.used { border-color: var(--pink); box-shadow: 4px 4px 0 var(--ink); }
 .ace-status.used strong { color: var(--pink); }
-.ace-reaction-banner { position: fixed; z-index: 40; top: 104px; left: 50%; display: grid; gap: 3px; min-width: min(430px, calc(100vw - 32px)); padding: 12px 20px 14px; color: white; background: linear-gradient(135deg, var(--pink), #9c1762); border: 5px solid var(--yellow); box-shadow: 9px 9px 0 var(--ink), 0 0 35px var(--pink); text-align: center; transform: translateX(-50%) rotate(-2deg); animation: sync-banner-pop .2s ease-out; }
+.ace-reaction-banner { position: fixed; z-index: 40; top: 104px; left: 50%; display: grid; gap: 3px; min-width: min(430px, calc(100% - 32px)); padding: 12px 20px 14px; color: white; background: linear-gradient(135deg, var(--pink), #9c1762); border: 5px solid var(--yellow); box-shadow: 9px 9px 0 var(--ink), 0 0 35px var(--pink); text-align: center; transform: translateX(-50%) rotate(-2deg); animation: sync-banner-pop .2s ease-out; }
 .ace-reaction-banner span { color: var(--yellow); font: 900 10px/1 Arial, sans-serif; letter-spacing: .22em; }
-.ace-reaction-banner strong { font-size: clamp(24px, 4vw, 38px); line-height: 1; text-shadow: 4px 4px 0 var(--ink); }
+.ace-reaction-banner strong { font-size: clamp(24px, calc(4 * var(--stage-vw)), 38px); line-height: 1; text-shadow: 4px 4px 0 var(--ink); }
 .ace-reaction-banner small { font: 900 11px/1.3 "Yu Gothic", sans-serif; }
 
-@media (max-width: 720px) {
-  .sync-box { min-width: 130px; gap: 2px 6px; }
-  .sync-box > span, .sync-box strong { font-size: 9px; }
-  .sync-meter { gap: 3px; }
-  .sync-meter i { width: 15px; height: 11px; border-width: 2px; }
-  .build-summary { margin-top: 14px; padding: 10px 12px; box-shadow: 5px 5px 0 var(--yellow); }
-  .species-counter { margin-top: 12px; padding: 8px; border-width: 4px; box-shadow: 4px 4px 0 var(--ink); }
-  .species-grid { grid-template-columns: repeat(3, 1fr); gap: 4px; }
-  .species-cell span { font-size: 8px; }
-  .species-cell strong { font-size: 15px; }
-  .card-choice-button .species-tag { top: 40px; font-size: 9px; padding: 2px 5px; }
-  .synergy-declaration { padding: 5px 8px; gap: 4px; }
-  .synergy-declaration b { font-size: 10px; padding: 2px 5px; }
-  .build-mood { font-size: 14px; }
-  .build-stage small { font-size: 10px; }
-  .sync-stage-banner { top: 88px; padding: 8px 12px 10px; }
-  .ace-selection-screen { place-items: start center; padding: 22px 10px 36px; }
-  .ace-selection-panel { padding: 24px 10px 18px; border-width: 4px; outline-width: 3px; box-shadow: 0 0 26px #ff2f8e99, 8px 9px 0 var(--pink); }
-  .ace-selection-panel::before { inset: 6px; }
-  .ace-selection-panel h1 { margin-top: 14px; font-size: clamp(38px, 12vw, 56px); }
-  .ace-flavor { margin-bottom: 16px; font-size: 12px; }
-  .ace-deck-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .ace-card-option { border-width: 3px; box-shadow: 3px 4px 0 var(--ink); }
-  .ace-card-option .card-face { padding: 5px; }
-  .ace-card-option .card-topline { min-height: 26px; }
-  .ace-card-option .cost-gem { width: 30px; height: 30px; border-width: 3px; font-size: 15px; }
-  .ace-card-option .card-kind { padding: 3px 4px; font-size: 7px; }
-  .ace-card-option .card-art { height: 74px; margin: 4px 0 6px; border-width: 3px; }
-  .ace-card-option .card-art span { width: 43px; height: 43px; border-width: 3px; outline-width: 2px; font-size: 25px; }
-  .ace-card-option .card-face h3 { min-height: 31px; font-size: 11px; }
-  .ace-card-option .effect-line { min-height: 31px; margin: 4px 0; padding: 3px; font-size: 7px; line-height: 1.2; }
-  .ace-card-option .stats b { min-width: 30px; padding: 3px 2px; border-width: 2px; font-size: 8px; }
-  .ace-card-option > span { padding-top: 4px; font-size: 8px; }
-  .ace-selection-actions { gap: 10px; margin-top: 20px; }
-  .secondary-action, .ace-selection-actions .primary-action { padding: 10px 11px; border-width: 3px; font-size: 11px; }
-  .ace-status { top: 76px; left: 8px; min-width: 126px; padding: 5px 7px; }
-  .ace-status strong { font-size: 11px; }
-  .ace-status small, .ace-status > span { font-size: 8px; }
-  .ace-reaction-banner { top: 84px; padding: 9px 12px 11px; }
-  .ace-reaction-banner strong { font-size: 25px; }
-}
 
-@media (max-width: 390px) {
-  .ace-selection-screen { padding-left: 7px; padding-right: 7px; }
-  .ace-selection-panel { padding-left: 7px; padding-right: 7px; }
-  .ace-deck-grid { gap: 6px; }
-  .ace-card-option .card-face { padding: 3px; }
-  .ace-card-option .card-art { height: 65px; }
-  .ace-card-option .card-art span { width: 37px; height: 37px; font-size: 21px; }
-  .ace-card-option .card-face h3 { font-size: 10px; }
-  .ace-card-option .effect-line { font-size: 6px; }
-}
 
 /* Timed battle presentation */
 .battle-speed-controls {
@@ -1114,7 +945,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   z-index: 24;
   top: 92px;
   left: 50%;
-  width: min(360px, calc(100vw - 32px));
+  width: min(360px, calc(100% - 32px));
   padding: 8px 22px;
   color: white;
   border: 3px solid white;
@@ -1130,7 +961,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 }
 .turn-transition-banner.brother { background: linear-gradient(100deg, transparent, var(--orange) 16%, var(--red) 50%, var(--orange) 84%, transparent); }
 .turn-transition-banner.opponent { background: linear-gradient(100deg, transparent, var(--blue) 16%, #2368ba 50%, var(--blue) 84%, transparent); }
-.turn-transition-banner span { display: block; font: 1000 clamp(17px, 3vw, 25px)/1 "Yu Gothic", sans-serif; letter-spacing: .04em; text-shadow: 3px 3px 0 var(--ink); transform: skew(8deg); }
+.turn-transition-banner span { display: block; font: 1000 clamp(17px, calc(3 * var(--stage-vw)), 25px)/1 "Yu Gothic", sans-serif; letter-spacing: .04em; text-shadow: 3px 3px 0 var(--ink); transform: skew(8deg); }
 
 .battle-target {
   border-color: var(--yellow);
@@ -1179,8 +1010,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   z-index: 4;
   top: 50%;
   left: 50%;
-  width: var(--attack-impact-size, clamp(115px, 16vw, 190px));
-  height: var(--attack-impact-size, clamp(115px, 16vw, 190px));
+  width: var(--attack-impact-size, clamp(115px, calc(16 * var(--stage-vw)), 190px));
+  height: var(--attack-impact-size, clamp(115px, calc(16 * var(--stage-vw)), 190px));
   border-radius: 50%;
   background: radial-gradient(circle, #fff 0 7%, var(--yellow) 8% 13%, transparent 14% 100%), repeating-conic-gradient(from 5deg, transparent 0 7deg, #fff 8deg 10deg, transparent 11deg 19deg);
   filter: drop-shadow(0 0 12px var(--yellow)) drop-shadow(0 0 22px white);
@@ -1191,7 +1022,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .damage-pop {
   position: absolute;
   color: white;
-  font-size: clamp(33px, 5vw, 64px);
+  font-size: clamp(33px, calc(5 * var(--stage-vw)), 64px);
   line-height: 1;
   text-shadow: 4px 4px 0 var(--ink), 0 0 14px var(--red);
   animation: damage-pop var(--event-duration, .72s) ease-out both;
@@ -1306,7 +1137,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .cut-in-band strong {
   display: block;
   margin-top: 5px;
-  font-size: clamp(34px, 7vw, 86px);
+  font-size: clamp(34px, calc(7 * var(--stage-vw)), 86px);
   line-height: .95;
   letter-spacing: -.08em;
   text-shadow: 6px 6px 0 var(--ink), -2px -2px 0 white;
@@ -1493,43 +1324,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   100% { opacity: 0; transform: translate(-50%, 2px) skew(-8deg) scaleX(1); }
 }
 
-@media (max-width: 1050px) {
-  .battle-speed-controls { right: 24px; }
-}
 
-@media (max-width: 720px) {
-  .arena { --attack-reach: clamp(105px, 22vh, 180px); }
-  .turn-transition-banner { top: 112px; width: min(300px, calc(100vw - 24px)); padding: 7px 14px; border-width: 2px; box-shadow: 3px 3px 0 var(--ink); }
-  .turn-transition-banner span { font-size: clamp(15px, 5vw, 21px); }
-  .battle-speed-controls {
-    top: 76px;
-    right: 8px;
-    gap: 2px;
-    padding: 3px;
-    border-width: 2px;
-    box-shadow: 3px 3px 0 var(--ink);
-  }
-  .battle-log.expanded { top: auto; right: 8px; bottom: 88px; left: 8px; width: auto; max-height: 38vh; border-left-width: 3px; }
-  .battle-log.collapsed { right: 8px; bottom: 72px; left: 8px; width: auto; max-height: 58px; }
-  .battle-speed-controls > span { display: none; }
-  .battle-speed-controls button { padding: 4px 5px; font-size: 8px; border-width: 1px; }
-  .damage-pop.opponent { top: 21%; left: 64%; }
-  .damage-pop.brother { bottom: 29%; left: 64%; }
-  .damage-pop.attack-retaliation.brother { left: 34%; bottom: 29%; }
-  .damage-pop.attack-retaliation.opponent { left: 34%; top: 21%; }
-  .effect-hit-label.opponent { top: 25%; left: 72%; }
-  .effect-hit-label.brother { bottom: 25%; left: 72%; }
-  .effect-source-label { max-width: 44%; font-size: 8px; }
-  .effect-source-label.opponent { top: 17%; left: 20%; }
-  .effect-source-label.brother { bottom: 17%; left: 20%; }
-  .summon-pop { font-size: 14px; }
-  .destruction-pop { min-width: 110px; padding: 7px 9px; border-width: 3px; }
-  .destruction-pop b { font-size: 18px; }
-  .destruction-pop small { font-size: 8px; }
-  .cut-in-band { padding-top: 15px; padding-bottom: 15px; border-width: 5px; }
-  .cut-in-band span { font-size: 9px; }
-  .cut-in-band strong { font-size: clamp(26px, 8vw, 42px); text-shadow: 3px 3px 0 var(--ink), -1px -1px 0 white; }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .battle-speed-controls,
@@ -1573,4 +1368,74 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .sync-box.sync-flash-soft .sync-meter i.on,
   .sync-box.sync-flash-burst .sync-meter i.on,
   .sync-box.sync-flash-burst strong { animation: none; }
+}
+
+/* 背の低い横長（設計原寸の 1280x720 を含む）。パネル系の画面は縦に余裕がある
+   前提で組んであるので、ここで一段詰めて1画面に収める。組み替えはしない。 */
+@media (max-height: 820px) {
+  .mode-select-screen,
+  .character-select-screen,
+  .opponent-preview-screen,
+  .clear-screen { padding-top: 20px; padding-bottom: 20px; }
+  .mode-select-panel,
+  .character-select-panel,
+  .opponent-preview-panel,
+  .clear-panel { padding-top: 24px; padding-bottom: 24px; }
+  .mode-select-panel h1,
+  .character-select-panel h1,
+  .opponent-preview-panel h1,
+  .clear-panel h1 { margin: 12px 0 20px; font-size: clamp(38px, calc(5 * var(--stage-vw)), 58px); }
+  .mode-card { min-height: 150px; padding: 20px clamp(24px, calc(4 * var(--stage-vw)), 40px); gap: 6px; }
+  .mode-card b { margin-top: 9px; }
+  .mode-card.how-to-card { min-height: 104px; margin-top: 14px; }
+  .character-slot { min-height: 232px; gap: 8px; padding: 14px 10px; }
+  .character-portrait { width: 88px; height: 88px; border-width: 5px; outline-width: 4px; font-size: 48px; }
+  .character-slot small { min-height: 44px; font-size: 11px; }
+  .run-results { padding: 12px; }
+  .run-result-row { min-height: 54px; }
+  .run-facts { gap: 12px; }
+  .run-fact { min-height: 112px; padding: 14px; }
+  .run-fact ul { max-height: 74px; }
+  .ace-selection-panel { padding-top: 22px; padding-bottom: 20px; }
+  .ace-selection-panel h1 { margin-top: 12px; }
+  .ace-flavor { margin-bottom: 14px; }
+  .ace-selection-actions { margin-top: 16px; }
+  /* ビルド画面: 提示・DECK DATA・SPECIES を同じ視界に収める。 */
+  .draft-layout { padding-top: 22px; padding-bottom: 6px; gap: 24px; }
+  .card-choice { padding-top: 0; }
+  .card-choice-button .card-face { min-height: 278px; }
+  .card-choice-button .card-art { height: 124px; margin: 5px 0 7px; }
+  .card-choice-button .card-art span { width: 88px; height: 88px; border-width: 5px; outline-width: 4px; font-size: 52px; }
+  .card-choice-button .card-face h3 { min-height: 40px; font-size: 17px; }
+  .card-choice-button .effect-line { min-height: 38px; }
+  .card-choice-button .choose-label { margin-top: 8px; padding: 8px 18px; }
+  .speech { padding: 9px 12px; }
+  /* デッキ確認: 15行は1画面に入らないので、リストの中だけを送る。 */
+  .deck-screen { padding-bottom: 20px; }
+  .deck-review-grid { padding-top: 22px; padding-bottom: 14px; gap: 24px; }
+  .deck-list-panel h1 { margin: 4px 0 9px; font-size: 25px; }
+  .deck-list { max-height: 232px; overflow-y: auto; }
+  .curve { height: 70px; padding: 6px 10px; }
+  .curve > div { height: 54px; }
+  .species-counter { margin-top: 12px; padding: 9px; }
+  .species-grid { margin-top: 6px; gap: 5px; }
+  .species-cell { padding: 4px 3px; }
+  .species-cell strong { font-size: 17px; }
+  .no-verdict { margin-top: 12px; padding: 11px; }
+  .deck-row { min-height: 40px; }
+  .build-summary { margin-top: 8px; padding: 9px 14px; }
+  .build-mood { font-size: 17px; }
+  .result-burst { padding: 18px 28px; }
+  .result-burst h1 { font-size: clamp(34px, calc(5.5 * var(--stage-vw)), 58px); }
+  .result-burst p { margin-bottom: 18px; }
+  .post-battle-commentary { margin: 10px auto 12px; }
+  .result-burst > span { padding: 4px 10px; }
+  .opponent-preview-screen { padding-top: 24px; padding-bottom: 24px; }
+  .opponent-preview-panel { padding-top: 26px; padding-bottom: 26px; }
+  .opponent-preview-panel h1 { margin: 12px 0 20px; font-size: clamp(44px, calc(6 * var(--stage-vw)), 62px); }
+  .opponent-preview-card { gap: 5px; margin-bottom: 22px; padding: 18px; }
+  .opponent-mark { width: 82px; height: 82px; border-width: 4px; outline-width: 3px; font-size: 44px; }
+  .opponent-preview-card small { margin-top: 4px; }
+  .opponent-preview-card strong { font-size: clamp(44px, calc(6 * var(--stage-vw)), 64px); }
+  .opponent-preview-card p { margin-top: 8px; padding: 7px 18px; font-size: 17px; }
 }

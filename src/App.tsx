@@ -106,6 +106,49 @@ function handTotal(timing: HandTiming): number {
   return timing.reach + timing.hold + timing.exit;
 }
 
+// 横長専用。設計原寸は 1280x720 で、これを下回る横長ビューポートでは
+// 舞台の大きさを保ったまま縮小する。レイアウトが組み替わらないので、
+// 画面ごとの縦積みフォールバックを持たなくてよい。
+const STAGE_WIDTH = 1280;
+const STAGE_HEIGHT = 720;
+
+function useLandscapeStage() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const apply = () => {
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      // 縦長のときはCSS側が案内へ差し替えるので、寸法計算はしない。
+      if (viewportHeight > viewportWidth) return;
+      const scale = Math.min(viewportWidth / STAGE_WIDTH, viewportHeight / STAGE_HEIGHT, 1);
+      const width = scale < 1 ? STAGE_WIDTH : viewportWidth;
+      const height = scale < 1 ? STAGE_HEIGHT : viewportHeight;
+      root.style.setProperty("--stage-w", `${width}px`);
+      root.style.setProperty("--stage-h", `${height}px`);
+      root.style.setProperty("--stage-scale", `${scale}`);
+      root.style.setProperty("--stage-vw", `${width / 100}px`);
+      root.style.setProperty("--stage-vh", `${height / 100}px`);
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    window.addEventListener("orientationchange", apply);
+    return () => {
+      window.removeEventListener("resize", apply);
+      window.removeEventListener("orientationchange", apply);
+    };
+  }, []);
+}
+
+function RotateNotice() {
+  return (
+    <div className="rotate-notice">
+      <div className="rotate-icon"><i /><b>↻</b></div>
+      <strong>このゲームは横画面専用です。<br />端末を横にしてください</strong>
+      <small>横向きにすると、そのまま続きから始まります</small>
+    </div>
+  );
+}
+
 interface SyncNotice {
   stage: number;
   label: string;
@@ -1098,6 +1141,8 @@ export default function Home() {
   const [autoPick, setAutoPick] = useState<{ key: string; phase: AutoPickPhase } | null>(null);
   const [handStyle] = useState<HandStyle>(loadHandStyle);
 
+  useLandscapeStage();
+
   useEffect(() => {
     Promise.all([
       fetch("./data/cards.json").then((response) => response.json()),
@@ -1310,12 +1355,14 @@ export default function Home() {
     setGame(createDefaultSave(child.sync.initial));
   }
 
+  const currentOpponentId = getCurrentOpponentId(game.run);
+  const currentOpponent = currentOpponentId ? getOpponentById(opponents, currentOpponentId) : undefined;
+
+  function renderScreen() {
   if (!hydrated || !child || !synergyConfig || cards.length !== 96 || opponents.length === 0) return <main className="boot-screen"><div className="logo-burst"><span>NOW LOADING</span><b>カードをまぜてるぞ！</b></div></main>;
   if (game.phase === "title") return <main className="title-screen"><div className="halftone" /><section className="title-copy"><span className="prototype-label">DECK BUILD SUPPORT GAME / PROTOTYPE</span><h1><small>兄ちゃん！</small>俺のデッキ<br />作って！</h1><p>好きなカードは、変えたくない。<br /><b>だから兄ちゃん、勝てる形にしてくれよ！</b></p><button className="primary-action title-start" onClick={beginArcade}>ゲームを始める！<span>▶</span></button><div className="save-note">途中経過はこのブラウザに自動保存</div></section><section className="title-cards"><div className="tilted-card one"><CardFace card={byId.get("zexvain")!} /></div><div className="tilted-card two"><CardFace card={byId.get("dolguard")!} intervention /></div><div className="title-shout">「カッコいい」で<br />勝ちたいんだ！</div></section><footer>15 PICKS · 2 ADVICES · 1 AUTO BATTLE</footer></main>;
   if (game.phase === "mode") return <ModeSelectScreen onSelect={selectMode} />;
   if (game.phase === "character") return <CharacterSelectScreen onSelect={selectCharacter} />;
-  const currentOpponentId = getCurrentOpponentId(game.run);
-  const currentOpponent = currentOpponentId ? getOpponentById(opponents, currentOpponentId) : undefined;
   if (game.phase === "opponent" && currentOpponent) return <OpponentPreviewScreen opponent={currentOpponent} battleNumber={game.run.currentBattle + 1} onStart={startDraft} />;
   if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} pickFlash={pickFlash} autoPickPhase={autoPick?.phase ?? null} synergyConfig={synergyConfig} onPick={takePick} onAdvice={chooseAdvice} />;
   if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} synergyConfig={synergyConfig} onBattle={prepareBattle} />;
@@ -1323,4 +1370,12 @@ export default function Home() {
   if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} child={child} opponent={currentOpponent} onNext={advanceCurrentBattle} onManualNext={advanceCurrentRound} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={changePlaybackSpeed} />;
   if (game.phase === "clear") return <ClearScreen run={game.run} cards={cards} child={child} opponents={opponents} onTitle={returnToTitle} />;
   return <main className="boot-screen"><button className="primary-action" onClick={returnToTitle}>タイトルへ</button></main>;
+  }
+
+  return (
+    <>
+      <div className="landscape-stage">{renderScreen()}</div>
+      <RotateNotice />
+    </>
+  );
 }
