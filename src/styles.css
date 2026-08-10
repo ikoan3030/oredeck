@@ -119,9 +119,9 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
      横長固定なので、カードの高さ比だけで両方を満たせる。 */
   top: -6%;
   width: 200%;
-  /* The replacement art is portrait-oriented; fit it to the stage so the
-     extended sleeve reaches the bottom edge without being clipped. */
-  height: 140%;
+  /* The replacement art is portrait-oriented. Deliberately let the sleeve
+     continue below the stage so its arm base never appears on screen. */
+  height: max(200%, calc(var(--stage-h) + 120px));
   pointer-events: none;
   transform: translate(-50%, 120%);
   animation: hand-reach var(--hand-reach, 180ms) cubic-bezier(.16, .84, .32, 1) forwards;
