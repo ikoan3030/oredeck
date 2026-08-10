@@ -89,7 +89,10 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 
 .draft-screen { position: relative; }
 .draft-speed-slot { position: absolute; z-index: 16; right: 18px; bottom: 34px; }
+.draft-evaluation-controls { display: flex; align-items: center; gap: 6px; }
 .draft-speed-slot .battle-speed-controls { position: static; }
+.handstyle-toggle { min-height: 30px; padding: 5px 8px; color: white; background: #29344b; border: 2px solid #71809b; cursor: pointer; font: 900 10px/1 "Yu Gothic", sans-serif; white-space: nowrap; }
+.handstyle-toggle:hover { color: var(--ink); background: var(--yellow); border-color: white; }
 .draft-layout { max-width: 1440px; margin: 0 auto; padding: 44px clamp(14px, calc(3 * var(--stage-vw)), 44px) 28px; display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 32px; }
 .choice-zone { min-width: 0; }
 .versus-label { display: flex; align-items: center; gap: 14px; margin: 0 0 18px; }

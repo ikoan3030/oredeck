@@ -90,6 +90,7 @@ const HAND_TIMING: Record<PlaybackSpeed, Record<HandStyle, HandTiming>> = {
 };
 
 const HAND_STYLE_KEY = "oredeck-hand-style";
+const HAND_STYLE_LABELS: Record<HandStyle, string> = { carry: "持ち去り", cut: "被せ切り" };
 
 /** Development switch: ?handstyle=carry|cut wins, then the stored choice, then carry. */
 function loadHandStyle(): HandStyle {
@@ -574,7 +575,7 @@ function OpponentPreviewScreen({ opponent, battleNumber, onStart }: { opponent: 
   return <main className="opponent-preview-screen"><section className="opponent-preview-panel"><span className="section-kicker">BATTLE {battleNumber} / 6</span><h1>つぎの相手</h1><div className="opponent-preview-card" style={{ "--rival-color": opponent.color } as CSSProperties}><span className="opponent-mark">{opponent.title.slice(0, 1)}</span><small>{opponent.title}</small><strong>{opponent.name}</strong><p>{opponent.trait}</p></div><button className="primary-action" onClick={onStart}>デッキを組む！<span>▶</span></button></section></main>;
 }
 
-function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNotice, pickFlash, autoPickPhase, synergyConfig, speed, onSpeedChange, onPick, onAdvice }: {
+function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNotice, pickFlash, autoPickPhase, synergyConfig, speed, onSpeedChange, handStyle, onHandStyleChange, onPick, onAdvice }: {
   draft: DraftState;
   offer: DraftOffer | null;
   cards: Card[];
@@ -587,6 +588,8 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
   synergyConfig: SpeciesSynergyConfig;
   speed: PlaybackSpeed;
   onSpeedChange: (speed: PlaybackSpeed) => void;
+  handStyle: HandStyle;
+  onHandStyleChange: (style: HandStyle) => void;
   onPick: (index: 0 | 1) => void;
   onAdvice: (category: Exclude<AdviceCategory, "skip">, targetSpecies?: Species) => void;
 }) {
@@ -621,7 +624,13 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
         : autoLine;
   return (
     <main className="game-shell draft-screen">
-      <div className="draft-speed-slot"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /></div>
+      <div className="draft-speed-slot">
+        <div className="draft-evaluation-controls">
+          <BattleSpeedControls speed={speed} onChange={onSpeedChange} />
+          {/* Temporary evaluation UI: remove this handstyle toggle after the handstyle judgment is complete. */}
+          <HandStyleToggle style={handStyle} onChange={onHandStyleChange} />
+        </div>
+      </div>
       <header className="game-header"><div className="mini-logo">兄ちゃん！<b>俺のデッキ作って！</b></div><div className="pick-counter"><span>PICK</span><b>{String(draft.pick + 1).padStart(2, "0")}</b><em>/15</em></div><SyncMeter sync={draft.syncRate} child={child} flash={pickFlash} /></header>
       {reaction && <ReactionBanner reaction={reaction} speaker={child.displayName} />}
       <SyncStageBanner notice={syncNotice} />
@@ -903,6 +912,11 @@ function BattleSpeedControls({ speed, onChange }: { speed: PlaybackSpeed; onChan
   return <div className="battle-speed-controls" aria-label="バトル演出速度"><span>演出</span>{(["normal", "fast", "skip"] as PlaybackSpeed[]).map((item) => <button key={item} type="button" className={speed === item ? "active" : ""} aria-pressed={speed === item} onClick={() => onChange(item)}>{PLAYBACK_SPEED_LABELS[item]}</button>)}</div>;
 }
 
+function HandStyleToggle({ style, onChange }: { style: HandStyle; onChange: (style: HandStyle) => void }) {
+  const next = style === "carry" ? "cut" : "carry";
+  return <button className="handstyle-toggle" type="button" aria-label="手の演出を切り替え" title={`クリックで${HAND_STYLE_LABELS[next]}へ`} onClick={() => onChange(next)}>{`手: ${HAND_STYLE_LABELS[style]}`}</button>;
+}
+
 function TurnTransitionBanner({ banner }: { banner: { side: BattleEvent["side"]; text: string; duration: number } | null }) {
   if (!banner) return null;
   const side = banner.side === "brother" ? "brother" : "opponent";
@@ -1145,7 +1159,7 @@ export default function Home() {
   const [pickFlash, setPickFlash] = useState<PickFlash | null>(null);
   const [pendingGame, setPendingGame] = useState<SavedGame | null>(null);
   const [autoPick, setAutoPick] = useState<{ key: string; phase: AutoPickPhase } | null>(null);
-  const [handStyle] = useState<HandStyle>(loadHandStyle);
+  const [handStyle, setHandStyle] = useState<HandStyle>(loadHandStyle);
 
   useLandscapeStage();
 
@@ -1356,6 +1370,11 @@ export default function Home() {
     }
   }
 
+  function changeHandStyle(next: HandStyle) {
+    setHandStyle(next);
+    window.localStorage.setItem(HAND_STYLE_KEY, next);
+  }
+
   function returnToTitle() {
     if (!child) return;
     setAutoBattle(false);
@@ -1374,7 +1393,7 @@ export default function Home() {
   if (game.phase === "mode") return <ModeSelectScreen onSelect={selectMode} />;
   if (game.phase === "character") return <CharacterSelectScreen onSelect={selectCharacter} />;
   if (game.phase === "opponent" && currentOpponent) return <OpponentPreviewScreen opponent={currentOpponent} battleNumber={game.run.currentBattle + 1} onStart={startDraft} />;
-  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} pickFlash={pickFlash} autoPickPhase={autoPick?.phase ?? null} synergyConfig={synergyConfig} speed={playbackSpeed} onSpeedChange={(speed) => changePlaybackSpeed(speed)} onPick={takePick} onAdvice={chooseAdvice} />;
+  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} pickFlash={pickFlash} autoPickPhase={autoPick?.phase ?? null} synergyConfig={synergyConfig} speed={playbackSpeed} onSpeedChange={(speed) => changePlaybackSpeed(speed)} handStyle={handStyle} onHandStyleChange={changeHandStyle} onPick={takePick} onAdvice={chooseAdvice} />;
   if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} synergyConfig={synergyConfig} onBattle={prepareBattle} />;
   if (game.phase === "ace" && game.draft) return <AceSelectionScreen draft={game.draft} cards={cards} selectedCardId={game.aceCardId ?? null} onSelect={selectAceCard} onConfirm={() => startBattle()} onSkip={() => startBattle(null)} />;
   if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} child={child} opponent={currentOpponent} onNext={advanceCurrentBattle} onManualNext={advanceCurrentRound} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={(speed) => changePlaybackSpeed(speed, true)} />;
