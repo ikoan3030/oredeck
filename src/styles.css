@@ -595,7 +595,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-header strong { font-size: 22px; }
 .brother-name { text-align: right; }
 .battle-turn { padding: 7px 16px; color: var(--ink); background: var(--yellow); border: 3px solid white; transform: skew(-8deg); }
-.arena { --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 300px; padding: 20px 100px 165px; display: grid; grid-template-rows: auto minmax(120px, 1fr) 26px minmax(120px, 1fr) auto; gap: 8px; }
+.arena { --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 300px; padding: 20px 100px 165px 260px; display: grid; grid-template-rows: auto minmax(120px, 1fr) 26px minmax(120px, 1fr) auto; gap: 8px; }
 .fighter { display: flex; align-items: center; gap: 12px; }
 .opponent-fighter { justify-content: space-between; }
 .opponent-leader-info { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
@@ -646,9 +646,18 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-log p span { display: block; color: var(--blue); font-size: 9px; }
 .battle-log.collapsed p > span { display: inline; flex: 0 0 auto; }
 .battle-log p.highlight { background: var(--yellow); border: 3px solid var(--ink); font-weight: 1000; }
-.battle-speech { position: absolute; z-index: 8; left: 20px; width: min(620px, calc(100% - 350px)); }
-.battle-speech-opponent { top: 84px; }
-.battle-speech-brother { bottom: 26px; }
+.battle-dialogue-group { position: absolute; z-index: 8; left: 20px; width: min(760px, calc(100% - 350px)); display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 14px; align-items: center; pointer-events: none; }
+.battle-dialogue-opponent { top: 84px; }
+.battle-dialogue-brother { bottom: 94px; }
+.battle-portrait { width: 180px; height: 190px; padding: 7px; color: white; background: #626a78; border: 5px solid var(--ink); box-shadow: 7px 7px 0 #0009, inset 0 0 0 3px #ffffff55; }
+.battle-portrait-placeholder { width: 100%; height: 100%; display: grid; align-content: center; justify-items: center; gap: 6px; padding: 10px; text-align: center; background: repeating-linear-gradient(135deg, #7c8490 0 12px, #68717f 12px 24px); border: 3px dashed #d8dde4; }
+.battle-portrait-placeholder > span { display: grid; place-items: center; width: 76px; height: 76px; color: var(--ink); background: #d5d9df; border: 4px solid var(--ink); border-radius: 50%; font-size: 44px; line-height: 1; }
+.battle-portrait-placeholder strong { font-size: 17px; line-height: 1; text-shadow: 2px 2px 0 #0008; }
+.battle-portrait-placeholder small { color: #e9edf2; font: 900 8px/1 Arial, sans-serif; letter-spacing: .08em; }
+.battle-portrait-brother { border-color: var(--blue); box-shadow: 7px 7px 0 var(--ink), inset 0 0 0 3px #ffffff55; }
+.battle-portrait-opponent { border-color: var(--red); box-shadow: 7px 7px 0 var(--ink), inset 0 0 0 3px #ffffff55; }
+.battle-speech { position: relative; z-index: 1; left: auto; top: auto; bottom: auto; width: auto; min-width: 0; }
+.battle-speech .speech { max-width: none; margin: 0; }
 .battle-controls { position: absolute; z-index: 9; right: 322px; bottom: 24px; display: flex; align-items: center; gap: 12px; }
 .battle-controls .battle-speed-controls { position: static; top: auto; right: auto; flex: 0 0 auto; }
 .battle-controls > button:first-child { padding: 10px 14px; color: white; background: #303542; border: 4px solid white; cursor: pointer; }

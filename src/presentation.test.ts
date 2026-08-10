@@ -49,3 +49,10 @@ test("the battle does not show the held ace card before its draw", () => {
   assert.equal(styles.includes(".ace-status"), false, "the always-on ace holder styles must be removed");
   assert.ok(app.includes('item.type === "ace"'), "the ace event remains available for the draw cut-in and log");
 });
+
+test("battle dialogue reserves persistent portrait slots on both sides", () => {
+  assert.ok(app.includes("function BattlePortrait("), "the portrait slot should be a replaceable component");
+  assert.ok(app.includes("battle-dialogue-group battle-dialogue-opponent"), "the opponent dialogue group must include its portrait");
+  assert.ok(app.includes("battle-dialogue-group battle-dialogue-brother"), "the brother dialogue group must include its portrait");
+  assert.ok(styles.includes(".battle-portrait"), "portrait slots must have a dedicated layout style");
+});

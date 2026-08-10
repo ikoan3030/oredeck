@@ -439,6 +439,13 @@ function Speech({ speaker, text, tone = "kid" }: { speaker: string; text: string
   return <div className={`speech ${tone}`}><span>{speaker}</span><p>{text}</p></div>;
 }
 
+/** Reserved portrait slot. Replace the placeholder contents with the character art when assets arrive. */
+function BattlePortrait({ side, name, marker }: { side: "brother" | "opponent"; name: string; marker: string }) {
+  return <div className={`battle-portrait battle-portrait-${side}`} role="img" aria-label={`${name}の顔グラフィック（プレースホルダ）`}>
+    <div className="battle-portrait-placeholder"><span aria-hidden="true">{marker}</span><strong>{name}</strong><small>PORTRAIT / PLACEHOLDER</small></div>
+  </div>;
+}
+
 function ReactionBanner({ reaction, speaker }: { reaction: KidReaction; speaker: string }) {
   return <div className={`kid-reaction ${reaction.tone}`} role="status">
     <b aria-hidden="true">！</b>
@@ -1099,8 +1106,14 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
       <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} />
     </section>
     <aside className={`battle-log ${logExpanded ? "expanded" : "collapsed"}`} aria-label="バトルログ"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b><button className="battle-log-toggle" type="button" aria-expanded={logExpanded} onClick={() => setLogExpanded((expanded) => !expanded)}>{logExpanded ? "収納" : "展開"}</button></div>{(logExpanded ? recent : recent.slice(0, 1)).map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{battleLogText(item, cards)}</p>)}</aside>
-    <div className="battle-speech battle-speech-opponent" aria-live="polite">{!battle.winner && opponentDialogueEvent && <Speech speaker={opponent.name} text={opponentDialogueEvent.dialogue!} tone="rival" />}</div>
-    <div className="battle-speech battle-speech-brother" aria-live="polite">{!battle.winner && brotherDialogueEvent && <Speech speaker="ユウタ" text={brotherDialogueEvent.dialogue!} tone="kid" />}</div>
+    <div className="battle-dialogue-group battle-dialogue-opponent">
+      <BattlePortrait side="opponent" name={opponent.name} marker={opponent.name.slice(0, 1)} />
+      <div className="battle-speech" aria-live="polite">{!battle.winner && opponentDialogueEvent && <Speech speaker={opponent.name} text={opponentDialogueEvent.dialogue!} tone="rival" />}</div>
+    </div>
+    <div className="battle-dialogue-group battle-dialogue-brother">
+      <BattlePortrait side="brother" name="ユウタ" marker="ユ" />
+      <div className="battle-speech" aria-live="polite">{!battle.winner && brotherDialogueEvent && <Speech speaker="ユウタ" text={brotherDialogueEvent.dialogue!} tone="kid" />}</div>
+    </div>
     {!battle.winner && <div className="battle-controls"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /><button onClick={onManualNext} disabled={auto || playbackBusy}>ターンを進める</button><button className="primary-action" onClick={onAuto} disabled={auto || playbackBusy}>{auto ? "自動再生中…" : "最後までスキップ"}<span>▶</span></button></div>}
     {cutIn?.visible && <BattleCutIn kind={cutIn.kind} />}
     {playbackComplete && battle.winner && <div className="result-overlay"><div className={"result-burst " + (battle.winner === "brother" ? "win" : "lose")}><span>{battle.winner === "brother" ? "VICTORY!" : battle.winner === "draw" ? "DRAW" : "DEFEAT"}</span><h1>{battle.winner === "brother" ? "ユウタの勝利！" : battle.winner === "draw" ? "引き分け！" : opponent.name + "の勝利！"}</h1><p>{battle.winner === "brother" ? "デッキは狙い通りに仕事をしただろうか？" : "次の相手とのバトルへ進もう。"}</p>{postBattleDialogue && <div className="post-battle-commentary"><Speech speaker={child.displayName} text={postBattleDialogue} /></div>}<button className="primary-action" onClick={onFinish}>{finalBattle ? "結果を見る" : "次の相手へ"}<span>▶</span></button></div></div>}
