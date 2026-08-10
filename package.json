@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.app.json --noEmit && vite build",
     "preview": "vite preview",
-    "test": "node --import tsx --test src/core/*.test.ts",
+    "test": "node --import tsx --test src/core/*.test.ts src/*.test.ts",
     "simulate": "node --import tsx scripts/simulate.ts"
   },
   "dependencies": {
