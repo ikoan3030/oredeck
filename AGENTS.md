@@ -41,6 +41,10 @@ UIとの接続は `src/App.tsx` 側で行います。`src/core/` は `data/` の
 
 開発サーバ起動中にJSONを編集すると `public/data/` へ自動同期され、画面が再読み込みされます（`vite.config.ts` の `externalGameData` プラグイン）。`public/data/` は生成物なのでgit管理外です。
 
+### 画像アセットの配置
+
+コードから参照する画像は `src/assets/` に置き、TypeScript の `import` で読み込んでください。`public/` の画像はゲームコードから参照しないでください（`base: "./"` 設定の都合でパス解決が壊れるためです）。
+
 ### 既知の例外: opponents.ts
 
 `src/core/opponents.ts` だけは対戦相手データ（デッキ構成・台詞・faceBias）がコード直書きのままです。これは移行時点からの既知の負債で、**次の実装時に `data/opponents.json` へ外出しする予定**です。それまでの間、新しい対戦相手を増やす場合もここに追記して構いませんが、外出し前提の形を崩さないでください。

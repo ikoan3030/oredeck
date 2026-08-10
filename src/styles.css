@@ -108,10 +108,8 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .vs-burst { position: absolute; z-index: 5; left: 50%; top: 42%; transform: translate(-50%, -50%) rotate(-8deg); display: grid; place-items: center; width: 80px; height: 80px; color: white; background: var(--red); border: 5px solid var(--ink); clip-path: polygon(50% 0, 61% 27%, 85% 9%, 79% 39%, 100% 50%, 75% 61%, 90% 88%, 60% 76%, 50% 100%, 39% 76%, 10% 90%, 24% 60%, 0 50%, 24% 39%, 9% 10%, 39% 26%); font-size: 25px; text-shadow: 3px 3px 0 var(--ink); }
 .love-ribbon { position: absolute; z-index: 6; padding: 7px 14px; color: white; border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--yellow); top: 17px; left: -16px; background: var(--red); font-size: 15px; transform: rotate(-5deg); }
 
-/* 弟の手（自動ピック時のカルタ取り）。
-   画像は public/assets/characters/tanjun-hand-open.png。別の絵に差し替えるときは
-   .kid-hand-art の --hand-image を差し替えるだけでよく、マークアップと動きの時間は
-   そのまま使える。命名規則は public/assets/README.md を参照。
+/* 弟の手（自動ピック時のカルタ取り）。画像は App.tsx が
+   src/assets/characters/tanjun-hand-open.png を import して渡す。
    .kid-hand-art の子要素はCSSで組んだシルエットで、画像が無いときの控えとして残してある。 */
 .kid-hand {
   position: absolute;
@@ -121,7 +119,9 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
      横長固定なので、カードの高さ比だけで両方を満たせる。 */
   top: -6%;
   width: 200%;
-  height: 200%;
+  /* The replacement art is portrait-oriented; fit it to the stage so the
+     extended sleeve reaches the bottom edge without being clipped. */
+  height: 140%;
   pointer-events: none;
   transform: translate(-50%, 120%);
   animation: hand-reach var(--hand-reach, 180ms) cubic-bezier(.16, .84, .32, 1) forwards;
