@@ -52,6 +52,56 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 .vs-burst { position: absolute; z-index: 5; left: 50%; top: 42%; transform: translate(-50%, -50%) rotate(-8deg); display: grid; place-items: center; width: 80px; height: 80px; color: white; background: var(--red); border: 5px solid var(--ink); clip-path: polygon(50% 0, 61% 27%, 85% 9%, 79% 39%, 100% 50%, 75% 61%, 90% 88%, 60% 76%, 50% 100%, 39% 76%, 10% 90%, 24% 60%, 0 50%, 24% 39%, 9% 10%, 39% 26%); font-size: 25px; text-shadow: 3px 3px 0 var(--ink); }
 .love-ribbon { position: absolute; z-index: 6; padding: 7px 14px; color: white; border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--yellow); top: 17px; left: -16px; background: var(--red); font-size: 15px; transform: rotate(-5deg); }
 
+/* 弟の手（自動ピック時のカルタ取り）。
+   いまはCSSで組んだプレースホルダのシルエット。本番画像に差し替えるときは、
+   画像を public/assets/ に置いた上でこの2行を有効にするだけでよい:
+     .kid-hand-art { --hand-image: url("./assets/hand.png"); }
+     .kid-hand-art > * { display: none; }
+   マークアップと動きの時間はそのままで差し替わる。 */
+.kid-hand {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  /* カード中央よりやや下に被さり、カード上端は見えたままにする */
+  top: 26%;
+  width: 74%;
+  height: 82%;
+  pointer-events: none;
+  transform: translate(-50%, 120%);
+  animation: hand-reach var(--hand-reach, 180ms) cubic-bezier(.16, .84, .32, 1) forwards;
+}
+.kid-hand.hand-carry { animation: hand-reach var(--hand-reach, 180ms) cubic-bezier(.16, .84, .32, 1) forwards, hand-carry var(--hand-exit, 300ms) cubic-bezier(.5, 0, .85, .3) var(--hand-exit-delay, 310ms) forwards; }
+.kid-hand.hand-cut { animation: hand-reach var(--hand-reach, 180ms) cubic-bezier(.16, .84, .32, 1) forwards, hand-cut var(--hand-exit, 120ms) linear var(--hand-exit-delay, 310ms) forwards; }
+
+.kid-hand-art { position: absolute; inset: 0; background-image: var(--hand-image, none); background-size: contain; background-position: center top; background-repeat: no-repeat; }
+.kid-hand-palm, .kid-hand-finger, .kid-hand-sleeve { position: absolute; background: #f7c9a4; border: 4px solid var(--ink); }
+.kid-hand-palm { left: 8%; right: 8%; top: 22%; height: 52%; border-radius: 22px 22px 30px 30px; box-shadow: inset 0 -10px 0 #e0a87f; }
+.kid-hand-finger { width: 17%; height: 34%; top: 2%; border-radius: 14px 14px 6px 6px; }
+.kid-hand-finger.one { left: 10%; height: 30%; }
+.kid-hand-finger.two { left: 30%; }
+.kid-hand-finger.three { left: 50%; height: 32%; }
+.kid-hand-finger.four { left: 70%; height: 26%; }
+.kid-hand-sleeve { left: 2%; right: 2%; top: 68%; height: 34%; background: var(--red); border-radius: 14px; box-shadow: inset 0 8px 0 #ffffff33; }
+
+@keyframes hand-reach {
+  from { transform: translate(-50%, 120%) rotate(-6deg); }
+  to { transform: translate(-50%, 0) rotate(0deg); }
+}
+@keyframes hand-carry {
+  from { transform: translate(-50%, 0) rotate(0deg); }
+  to { transform: translate(-50%, 145%) rotate(7deg); }
+}
+@keyframes hand-cut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* 案1は手が抜けると同時にカードを消し、案2は手とカードを一緒に落とす */
+.card-choice-button.card-taken-carry .card-face { animation: card-taken-instant 1ms linear var(--hand-exit-delay, 310ms) forwards; }
+.card-choice-button.card-taken-cut .card-face { animation: card-taken-fade var(--hand-exit, 120ms) linear var(--hand-exit-delay, 310ms) forwards; }
+@keyframes card-taken-instant { to { opacity: 0; } }
+@keyframes card-taken-fade { from { opacity: 1; } to { opacity: 0; } }
+
 .card-face { position: relative; overflow: hidden; border: 6px solid var(--ink); border-radius: 12px; padding: 12px; background: #f5eee2; box-shadow: var(--shadow); text-align: left; }
 .card-face.has-keywords { padding-bottom: 47px; }
 .card-face.cool { background: linear-gradient(145deg, #e4f2ff 0 32%, #a8caff 32% 36%, #f4f7ff 36%); }
@@ -638,6 +688,10 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .stats b { min-width: 58px; font-size: 11px; }
   .vs-burst { width: 54px; height: 54px; font-size: 17px; }
   .love-ribbon { font-size: 9px; padding: 5px; left: -5px; top: 9px; }
+  .kid-hand { width: 84%; height: 78%; top: 28%; }
+  .kid-hand-palm { border-width: 3px; border-radius: 16px 16px 22px 22px; }
+  .kid-hand-finger { border-width: 3px; border-radius: 10px 10px 4px 4px; }
+  .kid-hand-sleeve { border-width: 3px; }
   .speech { padding: 10px; }
   .speech p { font-size: 13px; }
   .advice-options, .rival-cards, .species-advice-options { grid-template-columns: 1fr; }
@@ -1501,6 +1555,9 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .destruction-pop,
   .cut-in-rays,
   .cut-in-band,
+  .kid-hand,
+  .card-choice-button.card-taken-carry .card-face,
+  .card-choice-button.card-taken-cut .card-face,
   .card-choice-button.pick-flash-soft .card-face,
   .card-choice-button.pick-flash-burst .card-face,
   .card-choice-button.pick-flash-burst::after,

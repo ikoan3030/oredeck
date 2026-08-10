@@ -64,9 +64,47 @@ interface PickFlash {
   strength: "soft" | "burst";
   index: 0 | 1;
   duration?: number;
+  /** Set only for picks the kid made himself; rulings stay hand-free. */
+  hand?: { style: HandStyle; timing: HandTiming };
 }
 
 const PICK_FLASH_MS: Record<PickFlash["strength"], number> = { soft: 420, burst: 700 };
+
+/**
+ * The kid's hand snatching a card he picked himself, karuta style.
+ * "carry" takes the card off the bottom of the screen; "cut" drops hand and card together.
+ */
+type HandStyle = "carry" | "cut";
+
+interface HandTiming {
+  reach: number;
+  hold: number;
+  exit: number;
+}
+
+const HAND_TIMING: Record<PlaybackSpeed, Record<HandStyle, HandTiming>> = {
+  normal: { carry: { reach: 180, hold: 130, exit: 300 }, cut: { reach: 180, hold: 130, exit: 120 } },
+  fast: { carry: { reach: 90, hold: 65, exit: 150 }, cut: { reach: 90, hold: 65, exit: 60 } },
+  skip: { carry: { reach: 0, hold: 0, exit: 0 }, cut: { reach: 0, hold: 0, exit: 0 } },
+};
+
+const HAND_STYLE_KEY = "oredeck-hand-style";
+
+/** Development switch: ?handstyle=carry|cut wins, then the stored choice, then carry. */
+function loadHandStyle(): HandStyle {
+  if (typeof window === "undefined") return "carry";
+  const requested = new URLSearchParams(window.location.search).get("handstyle");
+  if (requested === "carry" || requested === "cut") {
+    window.localStorage.setItem(HAND_STYLE_KEY, requested);
+    return requested;
+  }
+  const saved = window.localStorage.getItem(HAND_STYLE_KEY);
+  return saved === "cut" ? "cut" : "carry";
+}
+
+function handTotal(timing: HandTiming): number {
+  return timing.reach + timing.hold + timing.exit;
+}
 
 interface SyncNotice {
   stage: number;
@@ -290,6 +328,30 @@ function SyncMeter({ sync, child, flash = null }: { sync: number; child: ChildPr
 function SyncStageBanner({ notice }: { notice: SyncNotice | null }) {
   if (!notice) return null;
   return <div className={`sync-stage-banner ${notice.stage === 5 ? "unlock" : ""}`} role="status"><span>SYNC UP!</span><strong>{notice.label}</strong>{notice.stage === 5 && <b>切り札解禁！！</b>}</div>;
+}
+
+function handStyleVars(timing: HandTiming): Record<string, string> {
+  return {
+    "--hand-reach": `${timing.reach}ms`,
+    "--hand-exit": `${timing.exit}ms`,
+    "--hand-exit-delay": `${timing.reach + timing.hold}ms`,
+  };
+}
+
+/**
+ * The placeholder art is pure CSS. Dropping in the real picture means pointing
+ * --hand-image at it in styles.css; the markup and timing stay as they are.
+ */
+function KidHand({ hand }: { hand: { style: HandStyle; timing: HandTiming } }) {
+  return (
+    <span className={`kid-hand hand-${hand.style}`} style={handStyleVars(hand.timing) as CSSProperties} aria-hidden="true">
+      <span className="kid-hand-art">
+        <i className="kid-hand-finger one" /><i className="kid-hand-finger two" /><i className="kid-hand-finger three" /><i className="kid-hand-finger four" />
+        <b className="kid-hand-palm" />
+        <em className="kid-hand-sleeve" />
+      </span>
+    </span>
+  );
 }
 
 function DeckMaterials({ draft, cards, small = false }: { draft: DraftState; cards: Card[]; small?: boolean }) {
@@ -520,8 +582,11 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
           {offer ? <div className="card-choice">
             {offer.cards.map((card, index) => (
               <button
-                className={`card-choice-button ${crush && index === offer.decision.preferredIndex ? "love-lock" : ""} ${pickFlash?.index === index ? `pick-flash-${pickFlash.strength}` : ""} ${pickFlash?.strength === "soft" && pickFlash.index !== index ? "pick-fade-out" : ""}`}
-                style={pickFlash?.strength === "soft" && pickFlash.index !== index ? { "--pick-fade-duration": `${pickFlash.duration ?? PICK_FLASH_MS.soft}ms` } as CSSProperties : undefined}
+                className={`card-choice-button ${crush && index === offer.decision.preferredIndex ? "love-lock" : ""} ${pickFlash?.index === index ? `pick-flash-${pickFlash.strength}` : ""} ${pickFlash?.strength === "soft" && pickFlash.index !== index ? "pick-fade-out" : ""} ${pickFlash?.hand && pickFlash.index === index ? `card-taken-${pickFlash.hand.style}` : ""}`}
+                style={{
+                  ...(pickFlash?.strength === "soft" && pickFlash.index !== index ? { "--pick-fade-duration": `${pickFlash.duration ?? PICK_FLASH_MS.soft}ms` } : {}),
+                  ...(pickFlash?.hand && pickFlash.index === index ? handStyleVars(pickFlash.hand.timing) : {}),
+                } as CSSProperties}
                 key={`${card.id}-${index}`}
                 disabled={!offer.wantsIntervention || offer.decision.love || Boolean(pickFlash)}
                 onClick={() => onPick(index as 0 | 1)}
@@ -529,6 +594,7 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
               >
                 {crush && index === offer.decision.preferredIndex && <span className="love-ribbon">一目惚れ！変更不可</span>}
                 <CardFace card={card} />
+                {pickFlash?.hand && pickFlash.index === index && <KidHand hand={pickFlash.hand} />}
                 {offer.wantsIntervention && !offer.decision.love && <span className="choose-label">こっちにする</span>}
               </button>
             ))}
@@ -1030,6 +1096,7 @@ export default function Home() {
   const [pickFlash, setPickFlash] = useState<PickFlash | null>(null);
   const [pendingGame, setPendingGame] = useState<SavedGame | null>(null);
   const [autoPick, setAutoPick] = useState<{ key: string; phase: AutoPickPhase } | null>(null);
+  const [handStyle] = useState<HandStyle>(loadHandStyle);
 
   useEffect(() => {
     Promise.all([
@@ -1106,7 +1173,7 @@ export default function Home() {
     setGame({ ...game, phase: "draft", draft: generated.state, offer: generated.offer, adviceOpen: false, battle: null });
   }
 
-  function takePick(index?: 0 | 1, autoConfirmDuration?: number) {
+  function takePick(index?: 0 | 1, autoConfirmDuration?: number, hand?: { style: HandStyle; timing: HandTiming }) {
     if (!game.draft || !game.offer || !child || pickFlash) return;
     const offer = game.offer;
     const ruled = offer.source === "normal" && offer.wantsIntervention && !offer.decision.love && index !== undefined;
@@ -1126,7 +1193,13 @@ export default function Home() {
     const strength: PickFlash["strength"] | null = supported ? "burst" : kidPicked ? "soft" : null;
     const committed = nextNormalOffer(next);
     if (!strength) { setGame(committed); return; }
-    setPickFlash({ strength, index: ruled && index !== undefined ? index : offer.decision.preferredIndex, ...(autoConfirmDuration !== undefined ? { duration: autoConfirmDuration } : {}) });
+    setPickFlash({
+      strength,
+      index: ruled && index !== undefined ? index : offer.decision.preferredIndex,
+      ...(autoConfirmDuration !== undefined ? { duration: autoConfirmDuration } : {}),
+      // Only the kid's own picks get the hand: a ruling is the brother's call, not his grab.
+      ...(hand && strength === "soft" ? { hand } : {}),
+    });
     setPendingGame(committed);
   }
 
@@ -1150,10 +1223,13 @@ export default function Home() {
         return;
       }
       setAutoPick((current) => current?.key === autoPick.key ? { ...current, phase: "confirming" } : current);
-      takePick(undefined, timing.confirm);
+      const handTiming = HAND_TIMING[playbackSpeed][handStyle];
+      const handPlays = handTotal(handTiming) > 0;
+      // Hold the offer until the hand has finished, so the grab is never cut off by the next pick.
+      takePick(undefined, handPlays ? Math.max(timing.confirm, handTotal(handTiming)) : timing.confirm, handPlays ? { style: handStyle, timing: handTiming } : undefined);
     }, delay);
     return () => window.clearTimeout(timer);
-  }, [autoPick, autoPickOfferKey, playbackSpeed, game.draft?.pick, game.offer?.wantsIntervention, game.offer?.decision.love, child, pickFlash]);
+  }, [autoPick, autoPickOfferKey, playbackSpeed, handStyle, game.draft?.pick, game.offer?.wantsIntervention, game.offer?.decision.love, child, pickFlash]);
 
   function chooseAdvice(category: Exclude<AdviceCategory, "skip">, targetSpecies?: Species) {
     if (!game.draft || !child) return;
