@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import handImage from "./assets/characters/tanjun-hand-open.png";
 import {
   advanceBattle,
   advanceRun,
@@ -382,13 +383,15 @@ function handStyleVars(timing: HandTiming): Record<string, string> {
 }
 
 /**
- * The placeholder art is pure CSS. Dropping in the real picture means pointing
- * --hand-image at it in styles.css; the markup and timing stay as they are.
+ * The hand art is a Vite-managed image. If it cannot load, KidHand reveals the
+ * CSS silhouette so the pick remains visible instead of silently disappearing.
  */
 function KidHand({ hand }: { hand: { style: HandStyle; timing: HandTiming } }) {
+  const [imageFailed, setImageFailed] = useState(false);
   return (
     <span className={`kid-hand hand-${hand.style}`} style={handStyleVars(hand.timing) as CSSProperties} aria-hidden="true">
-      <span className="kid-hand-art">
+      <span className={`kid-hand-art ${imageFailed ? "hand-art-fallback" : ""}`}>
+        {!imageFailed && <img className="kid-hand-image" src={handImage} alt="" onError={() => setImageFailed(true)} />}
         <i className="kid-hand-finger one" /><i className="kid-hand-finger two" /><i className="kid-hand-finger three" /><i className="kid-hand-finger four" />
         <b className="kid-hand-palm" />
         <em className="kid-hand-sleeve" />
@@ -571,7 +574,7 @@ function OpponentPreviewScreen({ opponent, battleNumber, onStart }: { opponent: 
   return <main className="opponent-preview-screen"><section className="opponent-preview-panel"><span className="section-kicker">BATTLE {battleNumber} / 6</span><h1>つぎの相手</h1><div className="opponent-preview-card" style={{ "--rival-color": opponent.color } as CSSProperties}><span className="opponent-mark">{opponent.title.slice(0, 1)}</span><small>{opponent.title}</small><strong>{opponent.name}</strong><p>{opponent.trait}</p></div><button className="primary-action" onClick={onStart}>デッキを組む！<span>▶</span></button></section></main>;
 }
 
-function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNotice, pickFlash, autoPickPhase, synergyConfig, onPick, onAdvice }: {
+function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNotice, pickFlash, autoPickPhase, synergyConfig, speed, onSpeedChange, onPick, onAdvice }: {
   draft: DraftState;
   offer: DraftOffer | null;
   cards: Card[];
@@ -582,6 +585,8 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
   pickFlash: PickFlash | null;
   autoPickPhase: AutoPickPhase | null;
   synergyConfig: SpeciesSynergyConfig;
+  speed: PlaybackSpeed;
+  onSpeedChange: (speed: PlaybackSpeed) => void;
   onPick: (index: 0 | 1) => void;
   onAdvice: (category: Exclude<AdviceCategory, "skip">, targetSpecies?: Species) => void;
 }) {
@@ -616,6 +621,7 @@ function DraftScreen({ draft, offer, cards, child, adviceOpen, reaction, syncNot
         : autoLine;
   return (
     <main className="game-shell draft-screen">
+      <div className="draft-speed-slot"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /></div>
       <header className="game-header"><div className="mini-logo">兄ちゃん！<b>俺のデッキ作って！</b></div><div className="pick-counter"><span>PICK</span><b>{String(draft.pick + 1).padStart(2, "0")}</b><em>/15</em></div><SyncMeter sync={draft.syncRate} child={child} flash={pickFlash} /></header>
       {reaction && <ReactionBanner reaction={reaction} speaker={child.displayName} />}
       <SyncStageBanner notice={syncNotice} />
@@ -1339,11 +1345,15 @@ export default function Home() {
     });
   }
 
-  function changePlaybackSpeed(next: PlaybackSpeed) {
+  function changePlaybackSpeed(next: PlaybackSpeed, startBattle = false) {
     setPlaybackSpeed(next);
-    localStorage.setItem(PLAYBACK_SPEED_KEY, next);
-    if (next === "skip") setAutoBattle(true);
-    else if (playbackSpeed === "skip") setAutoBattle(false);
+    window.localStorage.setItem(PLAYBACK_SPEED_KEY, next);
+    if (startBattle) {
+      if (next === "skip") setAutoBattle(true);
+      else if (playbackSpeed === "skip") setAutoBattle(false);
+    } else {
+      setAutoBattle(false);
+    }
   }
 
   function returnToTitle() {
@@ -1364,10 +1374,10 @@ export default function Home() {
   if (game.phase === "mode") return <ModeSelectScreen onSelect={selectMode} />;
   if (game.phase === "character") return <CharacterSelectScreen onSelect={selectCharacter} />;
   if (game.phase === "opponent" && currentOpponent) return <OpponentPreviewScreen opponent={currentOpponent} battleNumber={game.run.currentBattle + 1} onStart={startDraft} />;
-  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} pickFlash={pickFlash} autoPickPhase={autoPick?.phase ?? null} synergyConfig={synergyConfig} onPick={takePick} onAdvice={chooseAdvice} />;
+  if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} pickFlash={pickFlash} autoPickPhase={autoPick?.phase ?? null} synergyConfig={synergyConfig} speed={playbackSpeed} onSpeedChange={(speed) => changePlaybackSpeed(speed)} onPick={takePick} onAdvice={chooseAdvice} />;
   if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} synergyConfig={synergyConfig} onBattle={prepareBattle} />;
   if (game.phase === "ace" && game.draft) return <AceSelectionScreen draft={game.draft} cards={cards} selectedCardId={game.aceCardId ?? null} onSelect={selectAceCard} onConfirm={() => startBattle()} onSkip={() => startBattle(null)} />;
-  if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} child={child} opponent={currentOpponent} onNext={advanceCurrentBattle} onManualNext={advanceCurrentRound} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={changePlaybackSpeed} />;
+  if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} child={child} opponent={currentOpponent} onNext={advanceCurrentBattle} onManualNext={advanceCurrentRound} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={(speed) => changePlaybackSpeed(speed, true)} />;
   if (game.phase === "clear") return <ClearScreen run={game.run} cards={cards} child={child} opponents={opponents} onTitle={returnToTitle} />;
   return <main className="boot-screen"><button className="primary-action" onClick={returnToTitle}>タイトルへ</button></main>;
   }
