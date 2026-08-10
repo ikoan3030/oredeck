@@ -227,7 +227,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 
 @keyframes reaction-pop { from { opacity: 0; transform: translate(-50%, -12px) scale(.94); } }
 
-.speech { position: relative; display: flex; gap: 13px; align-items: center; max-width: 760px; margin: 17px auto 0; padding: 12px 20px; color: var(--ink); background: white; border: 4px solid var(--ink); border-radius: 10px; box-shadow: 4px 4px 0 var(--yellow); font-family: "Yu Gothic", sans-serif; }
+.speech { position: relative; display: flex; gap: 13px; align-items: center; box-sizing: border-box; min-height: 62px; max-width: 760px; margin: 17px auto 0; padding: 12px 20px; color: var(--ink); background: white; border: 4px solid var(--ink); border-radius: 10px; box-shadow: 4px 4px 0 var(--yellow); font-family: "Yu Gothic", sans-serif; }
 .speech::after { content: ""; position: absolute; top: -14px; left: 35px; width: 20px; height: 20px; background: white; border-left: 4px solid var(--ink); border-top: 4px solid var(--ink); transform: rotate(45deg); }
 .speech span { flex: 0 0 auto; color: white; background: var(--blue); border: 3px solid var(--ink); padding: 6px 9px; font-weight: 900; transform: rotate(-3deg); }
 .speech p { margin: 0; font-weight: 900; font-size: 17px; }
@@ -646,7 +646,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-log.collapsed p > span { display: inline; flex: 0 0 auto; }
 .battle-log p.highlight { background: var(--yellow); border: 3px solid var(--ink); font-weight: 1000; }
 .battle-dialogue-group { position: absolute; z-index: 8; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; pointer-events: none; }
-.battle-dialogue-opponent { top: 84px; right: 320px; width: 360px; justify-items: end; }
+.battle-dialogue-opponent { top: 84px; right: 320px; width: 320px; justify-items: end; }
 .battle-dialogue-brother { bottom: 20px; left: 20px; width: 300px; justify-items: start; }
 .battle-portrait { width: 180px; height: 190px; padding: 7px; color: white; background: #626a78; border: 5px solid var(--ink); box-shadow: 7px 7px 0 #0009, inset 0 0 0 3px #ffffff55; }
 .battle-portrait-placeholder { width: 100%; height: 100%; display: grid; align-content: center; justify-items: center; gap: 6px; padding: 10px; text-align: center; background: repeating-linear-gradient(135deg, #7c8490 0 12px, #68717f 12px 24px); border: 3px dashed #d8dde4; }
@@ -655,8 +655,11 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-portrait-placeholder small { color: #e9edf2; font: 900 8px/1 Arial, sans-serif; letter-spacing: .08em; }
 .battle-portrait-brother { border-color: var(--blue); box-shadow: 7px 7px 0 var(--ink), inset 0 0 0 3px #ffffff55; }
 .battle-portrait-opponent { border-color: var(--red); box-shadow: 7px 7px 0 var(--ink), inset 0 0 0 3px #ffffff55; }
-.battle-speech { position: relative; z-index: 1; left: auto; top: auto; bottom: auto; width: 100%; min-width: 0; }
-.battle-speech .speech { max-width: none; margin: 0; }
+.battle-speech { position: relative; z-index: 1; left: auto; top: auto; bottom: auto; width: 100%; height: 62px; min-width: 0; }
+.battle-speech .speech { width: 100%; height: 100%; max-width: none; margin: 0; overflow: hidden; }
+.battle-speech .speech p { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.battle-dialogue-opponent .battle-speech .speech::after { left: auto; right: 35px; }
+.speech-empty { min-height: 62px; }
 .battle-controls { position: absolute; z-index: 9; right: 322px; bottom: 24px; display: flex; align-items: center; gap: 12px; }
 .battle-controls .battle-speed-controls { position: static; top: auto; right: auto; flex: 0 0 auto; }
 .battle-controls > button:first-child { padding: 10px 14px; color: white; background: #303542; border: 4px solid white; cursor: pointer; }

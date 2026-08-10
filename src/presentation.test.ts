@@ -54,7 +54,10 @@ test("battle dialogue reserves persistent portrait slots on both sides", () => {
   assert.ok(app.includes("function BattlePortrait("), "the portrait slot should be a replaceable component");
   assert.ok(app.includes("battle-dialogue-group battle-dialogue-opponent"), "the opponent dialogue group must include its portrait");
   assert.ok(app.includes("battle-dialogue-group battle-dialogue-brother"), "the brother dialogue group must include its portrait");
+  assert.ok(app.includes("function BattleSpeechSlot("), "both dialogue groups should keep a persistent speech slot");
+  assert.ok(app.includes("speech-empty"), "empty dialogue should retain its speech frame");
   assert.ok(styles.includes(".battle-portrait"), "portrait slots must have a dedicated layout style");
+  assert.ok(styles.includes(".battle-dialogue-opponent .battle-speech .speech::after"), "the opponent speech tail should point back toward the portrait");
   assert.equal(app.includes('className="avatar"'), false, "the old circular leader icons must be removed");
   assert.equal(app.includes('className="avatar kid"'), false, "the old brother leader icon must be removed");
 });

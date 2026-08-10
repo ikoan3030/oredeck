@@ -439,6 +439,12 @@ function Speech({ speaker, text, tone = "kid" }: { speaker: string; text: string
   return <div className={`speech ${tone}`}><span>{speaker}</span><p>{text}</p></div>;
 }
 
+function BattleSpeechSlot({ speaker, text, tone }: { speaker: string; text?: string; tone: "kid" | "rival" }) {
+  return <div className="battle-speech" aria-live="polite">
+    {text ? <Speech speaker={speaker} text={text} tone={tone} /> : <div className="speech speech-empty" aria-hidden="true" />}
+  </div>;
+}
+
 /** Reserved portrait slot. Replace the placeholder contents with the character art when assets arrive. */
 function BattlePortrait({ side, name, marker }: { side: "brother" | "opponent"; name: string; marker: string }) {
   return <div className={`battle-portrait battle-portrait-${side}`} role="img" aria-label={`${name}の顔グラフィック（プレースホルダ）`}>
@@ -1108,12 +1114,12 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
     <div className="battle-dialogue-group battle-dialogue-opponent">
       <BattlePortrait side="opponent" name={opponent.name} marker={opponent.name.slice(0, 1)} />
       <div className={"battle-leader-info opponent-leader-info " + (leaderHitSide === "opponent" ? "life-target" : "")}><div className="life"><span>LIFE</span><b>{lifeOpponent.life}</b></div><div className="pp">PP {lifeOpponent.pp}/{lifeOpponent.maxPp}</div></div>
-      <div className="battle-speech" aria-live="polite">{!battle.winner && opponentDialogueEvent && <Speech speaker={opponent.name} text={opponentDialogueEvent.dialogue!} tone="rival" />}</div>
+      <BattleSpeechSlot speaker={opponent.name} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} tone="rival" />
     </div>
     <div className="battle-dialogue-group battle-dialogue-brother">
       <BattlePortrait side="brother" name="ユウタ" marker="ユ" />
       <div className={"battle-leader-info brother-leader-info " + (leaderHitSide === "brother" ? "life-target" : "")}><div className="life"><span>LIFE</span><b>{lifeBrother.life}</b></div><div className="pp">PP {lifeBrother.pp}/{lifeBrother.maxPp}</div></div>
-      <div className="battle-speech" aria-live="polite">{!battle.winner && brotherDialogueEvent && <Speech speaker="ユウタ" text={brotherDialogueEvent.dialogue!} tone="kid" />}</div>
+      <BattleSpeechSlot speaker="ユウタ" text={!battle.winner ? brotherDialogueEvent?.dialogue : undefined} tone="kid" />
     </div>
     {!battle.winner && <div className="battle-controls"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /><button onClick={onManualNext} disabled={auto || playbackBusy}>ターンを進める</button><button className="primary-action" onClick={onAuto} disabled={auto || playbackBusy}>{auto ? "自動再生中…" : "最後までスキップ"}<span>▶</span></button></div>}
     {cutIn?.visible && <BattleCutIn kind={cutIn.kind} />}
