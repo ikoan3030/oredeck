@@ -123,10 +123,10 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
   height: max(200%, calc(var(--stage-h) + 120px));
   pointer-events: none;
   transform: translate(-50%, 120%);
-  animation: hand-reach var(--hand-reach, 180ms) cubic-bezier(.16, .84, .32, 1) forwards;
+  animation: hand-reach var(--hand-reach, 350ms) cubic-bezier(.16, .84, .32, 1) forwards;
 }
-.kid-hand.hand-carry { animation: hand-reach var(--hand-reach, 180ms) cubic-bezier(.16, .84, .32, 1) forwards; }
-.kid-hand.hand-cut { animation: hand-reach var(--hand-reach, 180ms) cubic-bezier(.16, .84, .32, 1) forwards, hand-cut var(--hand-exit, 120ms) linear var(--hand-exit-delay, 310ms) forwards; }
+.kid-hand.hand-carry { animation: hand-reach var(--hand-reach, 350ms) cubic-bezier(.16, .84, .32, 1) forwards; }
+.kid-hand.hand-cut { animation: hand-reach var(--hand-reach, 350ms) cubic-bezier(.16, .84, .32, 1) forwards, hand-cut var(--hand-exit, 150ms) linear var(--hand-exit-delay, 900ms) forwards; }
 
 .kid-hand-art {
   position: absolute;
@@ -159,8 +159,8 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
 
 /* carryは手とカードを同じレイヤーで抜き、cutは手とカードを同時にフェードする。 */
 .card-choice-button.card-taken-carry { z-index: 20; }
-.card-choice-button.card-taken-carry .pick-card-layer { z-index: 20; animation: pick-card-carry var(--hand-exit, 350ms) cubic-bezier(.5, 0, .85, .3) var(--hand-exit-delay, 310ms) forwards; }
-.card-choice-button.card-taken-cut .card-face { animation: card-taken-fade var(--hand-exit, 120ms) linear var(--hand-exit-delay, 310ms) forwards; }
+.card-choice-button.card-taken-carry .pick-card-layer { z-index: 20; animation: pick-card-carry var(--hand-exit, 550ms) cubic-bezier(.5, 0, .85, .3) var(--hand-exit-delay, 900ms) forwards; }
+.card-choice-button.card-taken-cut .card-face { animation: card-taken-fade var(--hand-exit, 150ms) linear var(--hand-exit-delay, 900ms) forwards; }
 @keyframes pick-card-carry { from { transform: translateY(0) rotate(0); } to { transform: translateY(calc((var(--stage-h) + 120px) * 1.45)) rotate(7deg); } }
 @keyframes card-taken-fade { from { opacity: 1; } to { opacity: 0; } }
 

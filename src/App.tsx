@@ -84,9 +84,9 @@ interface HandTiming {
 }
 
 const HAND_TIMING: Record<PlaybackSpeed, Record<HandStyle, HandTiming>> = {
-  // 判定済み: じっくりは伸び250ms / 止め450ms / 抜け350ms。さくさくは全時間を半減。
-  normal: { carry: { reach: 250, hold: 450, exit: 350 }, cut: { reach: 250, hold: 450, exit: 150 } },
-  fast: { carry: { reach: 125, hold: 225, exit: 175 }, cut: { reach: 125, hold: 225, exit: 75 } },
+  // 判定済み・再調整: じっくりは伸び350ms / 止め550ms / 抜け550ms。さくさくは全時間を半減。
+  normal: { carry: { reach: 350, hold: 550, exit: 550 }, cut: { reach: 350, hold: 550, exit: 150 } },
+  fast: { carry: { reach: 175, hold: 275, exit: 275 }, cut: { reach: 175, hold: 275, exit: 75 } },
   skip: { carry: { reach: 0, hold: 0, exit: 0 }, cut: { reach: 0, hold: 0, exit: 0 } },
 };
 
