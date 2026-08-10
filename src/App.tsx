@@ -84,8 +84,8 @@ interface HandTiming {
 }
 
 const HAND_TIMING: Record<PlaybackSpeed, Record<HandStyle, HandTiming>> = {
-  normal: { carry: { reach: 180, hold: 130, exit: 300 }, cut: { reach: 180, hold: 130, exit: 120 } },
-  fast: { carry: { reach: 90, hold: 65, exit: 150 }, cut: { reach: 90, hold: 65, exit: 60 } },
+  normal: { carry: { reach: 250, hold: 450, exit: 350 }, cut: { reach: 250, hold: 450, exit: 150 } },
+  fast: { carry: { reach: 125, hold: 225, exit: 175 }, cut: { reach: 125, hold: 225, exit: 75 } },
   skip: { carry: { reach: 0, hold: 0, exit: 0 }, cut: { reach: 0, hold: 0, exit: 0 } },
 };
 
