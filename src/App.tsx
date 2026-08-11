@@ -967,7 +967,7 @@ function postBattleLine(battle: BattleState, cards: Card[], child: ChildProfile)
   return choose(child.postBattle.victory);
 }
 
-function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, onAuto, auto, onFinish, finalBattle, speed, onSpeedChange }: { battle: BattleState; cards: Card[]; child: ChildProfile; opponent: OpponentDefinition; onNext: () => void; onManualNext: () => void; onAuto: () => void; auto: boolean; onFinish: () => void; finalBattle: boolean; speed: PlaybackSpeed; onSpeedChange: (speed: PlaybackSpeed) => void }) {
+function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, auto, onFinish, finalBattle, speed, onSpeedChange }: { battle: BattleState; cards: Card[]; child: ChildProfile; opponent: OpponentDefinition; onNext: () => void; onAutoToggle: () => void; auto: boolean; onFinish: () => void; finalBattle: boolean; speed: PlaybackSpeed; onSpeedChange: (speed: PlaybackSpeed) => void }) {
   // A fresh battle restarts identity tracking; within one battle the boards must stay continuous.
   const battleIdentity = `${opponent.id}-${battle.seed}`;
   const [visibleEventCount, setVisibleEventCount] = useState(0);
@@ -987,7 +987,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
   }, []);
 
   useEffect(() => {
-    if (logOpen) return;
+    if (logOpen || !auto) return;
     if (visibleEventCount >= battle.events.length) {
       setPlaybackBusy(false);
       setActiveEvent(null);
@@ -1054,7 +1054,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
       timers.push(window.setTimeout(finishEvent, preludeDuration + timing[speed] + attackAfterglowDuration));
     }
     return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [battle.events.length, cards, logOpen, opponent.name, speed, visibleEventCount]);
+  }, [auto, battle.events.length, cards, logOpen, opponent.name, speed, visibleEventCount]);
 
   const playbackComplete = !playbackBusy && visibleEventCount >= battle.events.length;
   const visibleEvents = battle.events.slice(0, Math.min(battle.events.length, visibleEventCount + (activeEvent ? 1 : 0)));
@@ -1115,7 +1115,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
     return () => window.clearTimeout(timer);
   }, [auto, battle.winner, onNext, playbackComplete]);
 
-  return <main className="battle-screen">
+  return <main className={`battle-screen ${auto ? "" : "playback-paused"}`}>
     {/* 常時表示のシナジー帯はHUD整理のため一時停止。開戦時の宣言演出は別レイヤーで維持する。 */}
     <TurnTransitionBanner banner={turnBanner} />
     <div className="battle-turn-center" aria-label={`現在のターン ${battle.turn}`}>TURN <b>{battle.turn}</b></div>
@@ -1131,7 +1131,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
     </section>
     <BattleMessageWindow side="brother" name="ユウタ" marker="ユ" text={!battle.winner ? brotherDialogueEvent?.dialogue : undefined} leader={lifeBrother} hit={leaderHitSide === "brother"} portraitSrc={tanjunBustSmile} />
     {/* The battle log is modal-only; the launcher and pause surface are rendered below. */}
-    {!battle.winner && <div className="battle-controls"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /><button onClick={onManualNext} disabled={auto || playbackBusy}>ターンを進める</button><button className="primary-action" onClick={onAuto} disabled={auto || playbackBusy}>{auto ? "自動再生中…" : "最後までスキップ"}<span>▶</span></button></div>}
+    {!battle.winner && <div className="battle-controls"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /><button className="battle-pause-toggle" type="button" onClick={onAutoToggle} aria-pressed={!auto}>{auto ? "一時停止" : "再開"}</button></div>}
     <BattleLogModal open={logOpen} recent={recent} cards={cards} opponentName={opponent.name} onOpen={() => setLogOpen(true)} onClose={() => setLogOpen(false)} />
     {cutIn?.visible && <BattleCutIn kind={cutIn.kind} />}
     {playbackComplete && battle.winner && <div className="result-overlay"><div className={"result-burst " + (battle.winner === "brother" ? "win" : "lose")}><span>{battle.winner === "brother" ? "VICTORY!" : battle.winner === "draw" ? "DRAW" : "DEFEAT"}</span><h1>{battle.winner === "brother" ? "ユウタの勝利！" : battle.winner === "draw" ? "引き分け！" : opponent.name + "の勝利！"}</h1><p>{battle.winner === "brother" ? "デッキは狙い通りに仕事をしただろうか？" : "次の相手とのバトルへ進もう。"}</p>{postBattleDialogue && <div className="post-battle-commentary"><Speech speaker={child.displayName} text={postBattleDialogue} /></div>}<button className="primary-action" onClick={onFinish}>{finalBattle ? "結果を見る" : "次の相手へ"}<span>▶</span></button></div></div>}
@@ -1169,6 +1169,10 @@ export default function Home() {
       .then(([cardData, childData, opponentData, speciesData]) => { setCards(cardData); setChild(childData); setOpponents(opponentData); setSynergyConfig(speciesData); setGame(loadSavedGame(localStorage.getItem(SAVE_KEY)) ?? createDefaultSave(childData.sync.initial)); setHydrated(true); });
   }, []);
 
+  useEffect(() => {
+    if (hydrated && game.phase === "battle" && game.battle) setAutoBattle(true);
+  }, [hydrated, game.phase, game.battle?.seed]);
+
   useEffect(() => { if (hydrated) localStorage.setItem(SAVE_KEY, JSON.stringify(game)); }, [game, hydrated]);
 
   // Hold the taken card on screen just long enough for its glow, then swap in the next offer.
@@ -1181,10 +1185,6 @@ export default function Home() {
     }, pickFlash.duration ?? PICK_FLASH_MS[pickFlash.strength]);
     return () => window.clearTimeout(timer);
   }, [pendingGame, pickFlash]);
-
-  useEffect(() => {
-    if (game.battle?.winner) setAutoBattle(false);
-  }, [game.battle?.winner]);
 
   const byId = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
   const autoPickOfferKey = game.phase === "draft" && game.draft && game.offer && !game.adviceOpen && !pickFlash && (!game.offer.wantsIntervention || game.offer.decision.love)
@@ -1324,6 +1324,7 @@ export default function Home() {
     const opponent = opponentId ? getOpponentById(opponents, opponentId) : undefined;
     if (!opponent) return;
     const battle = createBattle(game.draft.deck, opponent, cards, game.draft.seed ^ 0xa5a5a5a5, game.draft.syncRate, aceCardId, synergyConfig);
+    setAutoBattle(true);
     setGame({ ...game, phase: "battle", battle, aceCardId });
   }
 
@@ -1343,27 +1344,9 @@ export default function Home() {
     });
   }
 
-  function advanceCurrentRound() {
-    setGame((current) => {
-      if (!current.battle || !child) return current;
-      const opponentId = getCurrentOpponentId(current.run);
-      const opponent = opponentId ? getOpponentById(opponents, opponentId) : undefined;
-      if (!opponent) return current;
-      let battle = advanceBattle(current.battle, cards, child, opponent);
-      if (!battle.winner) battle = advanceBattle(battle, cards, child, opponent);
-      return { ...current, battle };
-    });
-  }
-
-  function changePlaybackSpeed(next: PlaybackSpeed, startBattle = false) {
+  function changePlaybackSpeed(next: PlaybackSpeed) {
     setPlaybackSpeed(next);
     window.localStorage.setItem(PLAYBACK_SPEED_KEY, next);
-    if (startBattle) {
-      if (next === "skip") setAutoBattle(true);
-      else if (playbackSpeed === "skip") setAutoBattle(false);
-    } else {
-      setAutoBattle(false);
-    }
   }
 
   function returnToTitle() {
@@ -1387,7 +1370,7 @@ export default function Home() {
   if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} pickFlash={pickFlash} autoPickPhase={autoPick?.phase ?? null} synergyConfig={synergyConfig} speed={playbackSpeed} onSpeedChange={(speed) => changePlaybackSpeed(speed)} onPick={takePick} onAdvice={chooseAdvice} />;
   if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} synergyConfig={synergyConfig} onBattle={prepareBattle} />;
   if (game.phase === "ace" && game.draft) return <AceSelectionScreen draft={game.draft} cards={cards} selectedCardId={game.aceCardId ?? null} onSelect={selectAceCard} onConfirm={() => startBattle()} onSkip={() => startBattle(null)} />;
-  if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} child={child} opponent={currentOpponent} onNext={advanceCurrentBattle} onManualNext={advanceCurrentRound} onAuto={() => setAutoBattle(true)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={(speed) => changePlaybackSpeed(speed, true)} />;
+  if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} child={child} opponent={currentOpponent} onNext={advanceCurrentBattle} onAutoToggle={() => setAutoBattle((value) => !value)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={(speed) => changePlaybackSpeed(speed)} />;
   if (game.phase === "clear") return <ClearScreen run={game.run} cards={cards} child={child} opponents={opponents} onTitle={returnToTitle} />;
   return <main className="boot-screen"><button className="primary-action" onClick={returnToTitle}>タイトルへ</button></main>;
   }
