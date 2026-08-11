@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import handImage from "./assets/characters/tanjun-hand-open.png";
+import tanjunBustSmile from "./assets/characters/tanjun-bust-smile.png";
 import {
   advanceBattle,
   advanceRun,
@@ -443,18 +444,18 @@ function Speech({ speaker, text, tone = "kid" }: { speaker: string; text: string
  * 顔グラと台詞を一体にした横長のメッセージウィンドウ。左端が顔グラ（正方形・枠の高さいっぱい、
  * 現状はプレースホルダ）、右が上段に話者名・下段に台詞。台詞が無い間も枠は残り、台詞欄だけが空になる。
  */
-function BattleMessageWindow({ side, name, marker, text, leader, hit }: {
+function BattleMessageWindow({ side, name, marker, text, leader, hit, portraitSrc }: {
   side: "brother" | "opponent";
   name: string;
   marker: string;
   text?: string;
   leader: { life: number; pp: number; maxPp: number };
   hit: boolean;
+  portraitSrc?: string;
 }) {
   return <div className={`battle-message battle-message-${side}`}>
-    <div className="battle-message-face" role="img" aria-label={`${name}の顔グラフィック（プレースホルダ）`}>
-      <span aria-hidden="true">{marker}</span>
-      <small>PORTRAIT</small>
+    <div className="battle-message-face" role="img" aria-label={`${name}の顔グラフィック${portraitSrc ? "" : "（プレースホルダ）"}`}>
+      {portraitSrc ? <img className="battle-message-portrait-image" src={portraitSrc} alt="" /> : <><span aria-hidden="true">{marker}</span><small>PORTRAIT</small></>}
     </div>
     <div className="battle-message-body">
       <span className="battle-message-name">{name}</span>
@@ -1126,7 +1127,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
       <div className="hand-zone">{brotherHand.map((item) => <AnimatedBattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}</div>
       <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} />
     </section>
-    <BattleMessageWindow side="brother" name="ユウタ" marker="ユ" text={!battle.winner ? brotherDialogueEvent?.dialogue : undefined} leader={lifeBrother} hit={leaderHitSide === "brother"} />
+    <BattleMessageWindow side="brother" name="ユウタ" marker="ユ" text={!battle.winner ? brotherDialogueEvent?.dialogue : undefined} leader={lifeBrother} hit={leaderHitSide === "brother"} portraitSrc={tanjunBustSmile} />
     <aside className={`battle-log ${logExpanded ? "expanded" : "collapsed"}`} aria-label="バトルログ"><div className="panel-heading"><span>BATTLE LOG</span><b>LIVE</b><button className="battle-log-toggle" type="button" aria-expanded={logExpanded} onClick={() => setLogExpanded((expanded) => !expanded)}>{logExpanded ? "収納" : "展開"}</button></div>{(logExpanded ? recent : recent.slice(0, 1)).map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponent.name}</span>{battleLogText(item, cards)}</p>)}</aside>
     {!battle.winner && <div className="battle-controls"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /><button onClick={onManualNext} disabled={auto || playbackBusy}>ターンを進める</button><button className="primary-action" onClick={onAuto} disabled={auto || playbackBusy}>{auto ? "自動再生中…" : "最後までスキップ"}<span>▶</span></button></div>}
     {cutIn?.visible && <BattleCutIn kind={cutIn.kind} />}
