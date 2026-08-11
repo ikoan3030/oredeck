@@ -594,24 +594,6 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .deck-case-meter { position: absolute; z-index: 8; right: 230px; bottom: 104px; width: 160px; aspect-ratio: 1; pointer-events: none; }
 .deck-case-art { position: relative; width: 100%; height: 100%; filter: drop-shadow(5px 6px 0 #0009); }
 .deck-case-art img { position: relative; z-index: 0; display: block; width: 100%; height: 100%; object-fit: contain; }
-/* Temporary fallback for the currently lit artwork; deck-case-off.png needs no image filter. */
-.deck-case-art-fallback img { filter: brightness(.46) saturate(.72); }
-.deck-case-meter.stage-5 .deck-case-art-fallback img { filter: none; }
-.deck-case-art::after { content: ""; position: absolute; z-index: 2; left: 29%; top: 29%; width: 42%; height: 42%; border-radius: 50%; opacity: 0; pointer-events: none; }
-.deck-case-glow { position: absolute; z-index: 2; display: block; opacity: 0; border: 2px solid #fff1a1; background: linear-gradient(90deg, #ff2f8eaa, #ff4a34ee, #ff2f8eaa); box-shadow: 0 0 12px #ff3344, 0 0 22px #ff334488; mix-blend-mode: screen; }
-.deck-case-glow-bottom { left: 46%; top: 63%; width: 9%; height: 17%; border-radius: 45% 45% 35% 35%; }
-.deck-case-glow-left { left: 24%; top: 46%; width: 17%; height: 10%; border-radius: 45% 25% 25% 45%; }
-.deck-case-glow-right { left: 59%; top: 46%; width: 17%; height: 10%; border-radius: 25% 45% 45% 25%; }
-.deck-case-glow-top { left: 46%; top: 21%; width: 9%; height: 17%; border-radius: 35% 35% 45% 45%; }
-.deck-case-meter.stage-1 .deck-case-glow-bottom,
-.deck-case-meter.stage-2 .deck-case-glow-bottom,
-.deck-case-meter.stage-2 .deck-case-glow-left,
-.deck-case-meter.stage-3 .deck-case-glow-bottom,
-.deck-case-meter.stage-3 .deck-case-glow-left,
-.deck-case-meter.stage-3 .deck-case-glow-right,
-.deck-case-meter.stage-4 .deck-case-glow,
-.deck-case-meter.stage-5 .deck-case-glow { opacity: 1; }
-.deck-case-meter.stage-5 .deck-case-art::after { opacity: 1; box-shadow: 0 0 18px 5px #ffd928aa, inset 0 0 14px #ffd92855; }
 .deck-case-window { position: absolute; z-index: 3; left: 38%; top: 39%; width: 24%; height: 22%; display: grid; place-items: center; color: white; background: #080c15dd; border: 3px solid #ffd92899; border-radius: 12%; font: 1000 25px/1 Arial, sans-serif; text-shadow: 2px 2px 0 var(--ink); }
 .deck-case-meter.stage-5 .deck-case-window { box-shadow: 0 0 12px 3px #ffd928aa; }
 .deck-case-meter.deck-out .deck-case-window { color: var(--red); border-color: var(--red); box-shadow: 0 0 14px 4px #ee3342cc; }

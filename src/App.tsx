@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import deckCaseImage from "./assets/deck-case.png";
+import deckCase0 from "./assets/deck-case-0.png";
+import deckCase1 from "./assets/deck-case-1.png";
+import deckCase2 from "./assets/deck-case-2.png";
+import deckCase3 from "./assets/deck-case-3.png";
+import deckCase4 from "./assets/deck-case-4.png";
+import deckCase5 from "./assets/deck-case-5.png";
 import handImage from "./assets/characters/tanjun-hand-open.png";
 import tanjunBustSmile from "./assets/characters/tanjun-bust-smile.png";
 import {
@@ -38,6 +43,8 @@ import {
   type Species,
   type SpeciesSynergyConfig,
 } from "@/src/core";
+
+const DECK_CASE_IMAGES = [deckCase0, deckCase1, deckCase2, deckCase3, deckCase4, deckCase5];
 
 type Phase = "title" | "mode" | "character" | "opponent" | "draft" | "deck" | "ace" | "battle" | "clear";
 
@@ -909,15 +916,11 @@ function BattleSpeedControls({ speed, onChange }: { speed: PlaybackSpeed; onChan
 }
 
 function DeckCaseMeter({ stage, deckCount }: { stage: number; deckCount: number }) {
-  const visualStage = Math.max(0, stage);
+  const visualStage = Math.min(5, Math.max(0, stage));
+  const deckCaseImage = DECK_CASE_IMAGES[visualStage];
   return <div className={`deck-case-meter stage-${visualStage}${deckCount === 0 ? " deck-out" : ""}`} aria-label={`シンクロ段階${visualStage}、山札の残り${deckCount}枚`}>
-    {/* Replace deck-case.png with deck-case-off.png when the processed unlit asset arrives. */}
-    <div className="deck-case-art deck-case-art-fallback">
+    <div className="deck-case-art">
       <img src={deckCaseImage} alt="" />
-      <i className="deck-case-glow deck-case-glow-bottom" aria-hidden="true" />
-      <i className="deck-case-glow deck-case-glow-left" aria-hidden="true" />
-      <i className="deck-case-glow deck-case-glow-right" aria-hidden="true" />
-      <i className="deck-case-glow deck-case-glow-top" aria-hidden="true" />
       <strong className="deck-case-window">{deckCount}</strong>
     </div>
   </div>;
