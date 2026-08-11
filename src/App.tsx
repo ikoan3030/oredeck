@@ -1116,7 +1116,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onManualNext, on
 
   return <main className="battle-screen">
     <header className="battle-header"><div><span>{opponent.title}</span><strong>{opponent.name}</strong></div><div className="battle-turn">TURN <b>{battle.turn}</b></div><div className="brother-name"><span>単純弟</span><strong>ユウタ</strong></div></header>
-    <SynergyDeclaration synergies={battle.synergies} />
+    {/* 常時表示のシナジー帯はHUD整理のため一時停止。開戦時の宣言演出は別レイヤーで維持する。 */}
     <TurnTransitionBanner banner={turnBanner} />
     <BattleMessageWindow side="opponent" name={opponent.name} marker={opponent.name.slice(0, 1)} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} leader={lifeOpponent} hit={leaderHitSide === "opponent"} />
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={arenaStyle}>
