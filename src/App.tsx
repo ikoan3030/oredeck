@@ -437,9 +437,10 @@ function Speech({ speaker, text, tone = "kid" }: { speaker: string; text: string
  * 顔グラと台詞を一体にした横長のメッセージウィンドウ。左端が顔グラ（正方形・枠の高さいっぱい、
  * 現状はプレースホルダ）、右が上段に話者名・下段に台詞。台詞が無い間も枠は残り、台詞欄だけが空になる。
  */
-function BattleMessageWindow({ side, name, marker, text, leader, hit, portraitSrc }: {
+function BattleMessageWindow({ side, name, title, marker, text, leader, hit, portraitSrc }: {
   side: "brother" | "opponent";
   name: string;
+  title?: string;
   marker: string;
   text?: string;
   leader: { life: number; pp: number; maxPp: number };
@@ -451,7 +452,7 @@ function BattleMessageWindow({ side, name, marker, text, leader, hit, portraitSr
       {portraitSrc ? <img className="battle-message-portrait-image" src={portraitSrc} alt="" /> : <><span aria-hidden="true">{marker}</span><small>PORTRAIT</small></>}
     </div>
     <div className="battle-message-body">
-      <span className="battle-message-name">{name}</span>
+      <div className="battle-message-heading"><span className="battle-message-name">{name}</span>{title && <small className="battle-message-title">{title}</small>}</div>
       <p className="battle-message-line" aria-live="polite">{text ?? ""}</p>
     </div>
     <div className={`battle-leader-info ${side}-leader-info ` + (hit ? "life-target" : "")}>
@@ -910,12 +911,13 @@ function BattleSpeedControls({ speed, onChange }: { speed: PlaybackSpeed; onChan
 function DeckCaseMeter({ stage, deckCount }: { stage: number; deckCount: number }) {
   const visualStage = Math.max(0, stage);
   return <div className={`deck-case-meter stage-${visualStage}${deckCount === 0 ? " deck-out" : ""}`} aria-label={`シンクロ段階${visualStage}、山札の残り${deckCount}枚`}>
-    <div className="deck-case-art">
+    {/* Replace deck-case.png with deck-case-off.png when the processed unlit asset arrives. */}
+    <div className="deck-case-art deck-case-art-fallback">
       <img src={deckCaseImage} alt="" />
-      <i className="deck-case-arm deck-case-arm-bottom" aria-hidden="true" />
-      <i className="deck-case-arm deck-case-arm-left" aria-hidden="true" />
-      <i className="deck-case-arm deck-case-arm-right" aria-hidden="true" />
-      <i className="deck-case-arm deck-case-arm-top" aria-hidden="true" />
+      <i className="deck-case-glow deck-case-glow-bottom" aria-hidden="true" />
+      <i className="deck-case-glow deck-case-glow-left" aria-hidden="true" />
+      <i className="deck-case-glow deck-case-glow-right" aria-hidden="true" />
+      <i className="deck-case-glow deck-case-glow-top" aria-hidden="true" />
       <strong className="deck-case-window">{deckCount}</strong>
     </div>
   </div>;
@@ -1135,8 +1137,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
     {/* 常時表示のシナジー帯はHUD整理のため一時停止。開戦時の宣言演出は別レイヤーで維持する。 */}
     <TurnTransitionBanner banner={turnBanner} />
     <div className="battle-turn-center" aria-label={`現在のターン ${battle.turn}`}>TURN <b>{battle.turn}</b></div>
-    <span className="battle-opponent-title-label">{opponent.title}</span>
-    <BattleMessageWindow side="opponent" name={opponent.name} marker={opponent.name.slice(0, 1)} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} leader={lifeOpponent} hit={leaderHitSide === "opponent"} />
+    <BattleMessageWindow side="opponent" name={opponent.name} title={opponent.title} marker={opponent.name.slice(0, 1)} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} leader={lifeOpponent} hit={leaderHitSide === "opponent"} />
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={arenaStyle}>
       <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" ? "battle-target" : "")}><div className="opponent-hand-zone" aria-label={`相手の手札 ${opponentHand.length}枚`}><div className="opponent-hand-label"><span>相手の手札</span><b>{opponentHand.length}</b></div><div className="opponent-hand-cards">{opponentHand.map((item) => <AnimatedOpponentHandCard key={item.instanceId} instance={item} activeEvent={activeEvent} />)}</div></div></div>
       <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{stableBoards.opponent.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!stableBoards.opponent.length && <span className="empty-board">相手の場は空</span>}</div>

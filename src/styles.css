@@ -593,28 +593,28 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-turn-center b { font-size: 1.2em; }
 .deck-case-meter { position: absolute; z-index: 8; right: 230px; bottom: 104px; width: 160px; aspect-ratio: 1; pointer-events: none; }
 .deck-case-art { position: relative; width: 100%; height: 100%; filter: drop-shadow(5px 6px 0 #0009); }
-.deck-case-art::before { content: ""; position: absolute; z-index: 1; inset: 0; background: rgba(4, 8, 18, .68); border-radius: 14%; pointer-events: none; }
+.deck-case-art img { position: relative; z-index: 0; display: block; width: 100%; height: 100%; object-fit: contain; }
+/* Temporary fallback for the currently lit artwork; deck-case-off.png needs no image filter. */
+.deck-case-art-fallback img { filter: brightness(.46) saturate(.72); }
+.deck-case-meter.stage-5 .deck-case-art-fallback img { filter: none; }
 .deck-case-art::after { content: ""; position: absolute; z-index: 2; left: 29%; top: 29%; width: 42%; height: 42%; border-radius: 50%; opacity: 0; pointer-events: none; }
-.deck-case-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.deck-case-arm { position: absolute; z-index: 2; display: block; opacity: 0; border: 2px solid #fff1a1; background: linear-gradient(90deg, #ff7a18aa, #ffd928ee, #ff7a18aa); box-shadow: 0 0 12px #ffd928; mix-blend-mode: screen; }
-.deck-case-arm-bottom { left: 46%; top: 63%; width: 9%; height: 17%; border-radius: 45% 45% 35% 35%; }
-.deck-case-arm-left { left: 24%; top: 46%; width: 17%; height: 10%; border-radius: 45% 25% 25% 45%; }
-.deck-case-arm-right { left: 59%; top: 46%; width: 17%; height: 10%; border-radius: 25% 45% 45% 25%; }
-.deck-case-arm-top { left: 46%; top: 21%; width: 9%; height: 17%; border-radius: 35% 35% 45% 45%; }
-.deck-case-meter.stage-1 .deck-case-arm-bottom,
-.deck-case-meter.stage-2 .deck-case-arm-bottom,
-.deck-case-meter.stage-2 .deck-case-arm-left,
-.deck-case-meter.stage-3 .deck-case-arm-bottom,
-.deck-case-meter.stage-3 .deck-case-arm-left,
-.deck-case-meter.stage-3 .deck-case-arm-right,
-.deck-case-meter.stage-4 .deck-case-arm,
-.deck-case-meter.stage-5 .deck-case-arm { opacity: 1; }
-.deck-case-meter.stage-5 .deck-case-art::before { opacity: 0; }
+.deck-case-glow { position: absolute; z-index: 2; display: block; opacity: 0; border: 2px solid #fff1a1; background: linear-gradient(90deg, #ff2f8eaa, #ff4a34ee, #ff2f8eaa); box-shadow: 0 0 12px #ff3344, 0 0 22px #ff334488; mix-blend-mode: screen; }
+.deck-case-glow-bottom { left: 46%; top: 63%; width: 9%; height: 17%; border-radius: 45% 45% 35% 35%; }
+.deck-case-glow-left { left: 24%; top: 46%; width: 17%; height: 10%; border-radius: 45% 25% 25% 45%; }
+.deck-case-glow-right { left: 59%; top: 46%; width: 17%; height: 10%; border-radius: 25% 45% 45% 25%; }
+.deck-case-glow-top { left: 46%; top: 21%; width: 9%; height: 17%; border-radius: 35% 35% 45% 45%; }
+.deck-case-meter.stage-1 .deck-case-glow-bottom,
+.deck-case-meter.stage-2 .deck-case-glow-bottom,
+.deck-case-meter.stage-2 .deck-case-glow-left,
+.deck-case-meter.stage-3 .deck-case-glow-bottom,
+.deck-case-meter.stage-3 .deck-case-glow-left,
+.deck-case-meter.stage-3 .deck-case-glow-right,
+.deck-case-meter.stage-4 .deck-case-glow,
+.deck-case-meter.stage-5 .deck-case-glow { opacity: 1; }
 .deck-case-meter.stage-5 .deck-case-art::after { opacity: 1; box-shadow: 0 0 18px 5px #ffd928aa, inset 0 0 14px #ffd92855; }
 .deck-case-window { position: absolute; z-index: 3; left: 38%; top: 39%; width: 24%; height: 22%; display: grid; place-items: center; color: white; background: #080c15dd; border: 3px solid #ffd92899; border-radius: 12%; font: 1000 25px/1 Arial, sans-serif; text-shadow: 2px 2px 0 var(--ink); }
 .deck-case-meter.stage-5 .deck-case-window { box-shadow: 0 0 12px 3px #ffd928aa; }
 .deck-case-meter.deck-out .deck-case-window { color: var(--red); border-color: var(--red); box-shadow: 0 0 14px 4px #ee3342cc; }
-.battle-opponent-title-label { position: absolute; z-index: 10; top: 19px; left: 270px; padding: 4px 8px; color: white; background: #7e2332; border: 2px solid var(--yellow); box-shadow: 3px 3px 0 var(--ink); font: 900 11px/1 "Yu Gothic", sans-serif; }
 .arena { --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 200px; padding: 6px 100px 130px; display: grid; grid-template-rows: auto minmax(120px, 1fr) 26px minmax(120px, 1fr) auto; gap: 8px; }
 .fighter { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 .opponent-fighter { justify-content: space-between; }
@@ -690,7 +690,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   box-shadow: 6px 6px 0 #0009, inset 0 0 0 3px #ffffff2b;
   pointer-events: none;
 }
-.battle-message-opponent { margin-top: 6px; border-color: var(--red); }
+.battle-message-opponent { margin-top: 6px; margin-left: auto; margin-right: 20px; flex-direction: row-reverse; border-color: var(--red); }
 .battle-message-brother { margin-bottom: 12px; border-color: var(--blue); }
 /* 顔グラは正方形。差し替えるときはこの枠の中身だけを入れ替える。 */
 .battle-message-face {
@@ -706,16 +706,22 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   background: repeating-linear-gradient(135deg, #7c8490 0 10px, #68717f 10px 20px);
   border-right: 4px solid var(--ink);
 }
+.battle-message-opponent .battle-message-face { border-right: 0; border-left: 4px solid var(--ink); }
 .battle-message-portrait-image { position: absolute; left: -35%; top: -3%; width: 170%; height: 170%; max-width: none; object-fit: cover; object-position: 50% 0%; }
 .battle-message-face > span { display: grid; place-items: center; width: 38px; height: 38px; color: var(--ink); background: #d5d9df; border: 3px solid var(--ink); border-radius: 50%; font-size: 22px; line-height: 1; }
 .battle-message-face > small { color: #e9edf2; font: 900 6px/1 Arial, sans-serif; letter-spacing: .08em; }
 .battle-message-body { flex: 1 1 auto; min-width: 0; display: grid; align-content: center; gap: 7px; padding: 12px 22px 12px 20px; font-family: "Yu Gothic", sans-serif; }
-.battle-message-name { justify-self: start; padding: 4px 11px; color: var(--ink); background: var(--yellow); font: 900 18px/1 "Yu Gothic", sans-serif; letter-spacing: .04em; }
+.battle-message-heading { display: flex; align-items: center; justify-self: start; gap: 8px; min-width: 0; }
+.battle-message-name { padding: 4px 11px; color: var(--ink); background: var(--yellow); font: 900 18px/1 "Yu Gothic", sans-serif; letter-spacing: .04em; }
+.battle-message-title { color: #ffe77d; font: 900 12px/1.2 "Yu Gothic", sans-serif; white-space: nowrap; }
 .battle-message-opponent .battle-message-name { background: var(--red); color: white; }
 .battle-message-brother .battle-message-name { background: var(--cyan); }
+.battle-message-opponent .battle-message-body { justify-items: end; padding-left: 22px; padding-right: 20px; text-align: right; }
+.battle-message-opponent .battle-message-heading { justify-self: end; justify-content: flex-end; }
 /* 台詞は1行に収めて枠の高さを固定する（空でも高さが変わらないよう min-height を持たせる）。 */
 .battle-message-line { margin: 0; min-height: 40px; line-height: 40px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 900; font-size: 26px; }
 .battle-message .battle-leader-info { flex: 0 0 auto; align-self: center; gap: 10px; padding-right: 16px; }
+.battle-message-opponent .battle-leader-info { justify-content: flex-start; padding-right: 0; padding-left: 16px; }
 
 .battle-controls { position: absolute; z-index: 9; right: 222px; bottom: 14px; width: 320px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; align-items: center; justify-items: end; gap: 8px; }
 .battle-controls .battle-speed-controls { position: static; top: auto; right: auto; grid-column: 1 / -1; grid-row: 1; flex: 0 0 auto; }
@@ -1496,7 +1502,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   /* 背の低い横長では、上下のメッセージウィンドウと盤面・手札が同居できるよう、
      ウィンドウと余白を一段詰める。盤面の枠はカードが収まる高さを優先する。 */
   .battle-message { height: 126px; margin-left: 16px; }
-  .battle-message-opponent { margin-top: 4px; }
+  .battle-message-opponent { margin-top: 4px; margin-left: auto; margin-right: 16px; }
   .battle-message-brother { margin-bottom: 8px; }
   .battle-message-face { width: 140px; }
   .battle-message-face > span { width: 64px; height: 64px; font-size: 30px; }
