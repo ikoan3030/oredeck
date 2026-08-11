@@ -589,7 +589,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 
 .battle-screen { height: calc(100 * var(--stage-vh)); display: flex; flex-direction: column; position: relative; overflow: hidden; color: white; background: radial-gradient(circle at 50% 46%, #34485f, #151922 65%); }
 .battle-screen::before { content: ""; position: absolute; inset: 0; opacity: .15; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 10px 10px; }
-.battle-turn-center { position: absolute; z-index: 3; top: calc(44.444 * var(--stage-vh) + 27px); left: 50%; padding: 5px 18px; color: var(--ink); background: var(--yellow); border: 3px solid var(--ink); box-shadow: 4px 4px 0 white; font: 1000 15px/1 Arial, sans-serif; letter-spacing: .12em; pointer-events: none; transform: translate(-50%, -50%) skew(-8deg); }
+.battle-turn-center { position: absolute; z-index: 3; top: calc(44.444 * var(--stage-vh) + 27px); left: calc(16 * var(--stage-vw)); padding: 5px 18px; color: var(--ink); background: var(--yellow); border: 3px solid var(--ink); box-shadow: 4px 4px 0 white; font: 1000 15px/1 Arial, sans-serif; letter-spacing: .12em; pointer-events: none; transform: translate(-50%, -50%) skew(-8deg); }
 .battle-turn-center b { font-size: 1.2em; }
 .battle-opponent-title-label { position: absolute; z-index: 10; top: 19px; left: 270px; padding: 4px 8px; color: white; background: #7e2332; border: 2px solid var(--yellow); box-shadow: 3px 3px 0 var(--ink); font: 900 11px/1 "Yu Gothic", sans-serif; }
 .arena { --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 200px; padding: 6px 100px 130px; display: grid; grid-template-rows: auto minmax(120px, 1fr) 26px minmax(120px, 1fr) auto; gap: 8px; }
@@ -633,7 +633,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .hand-zone { position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); display: flex; align-items: end; gap: 2px; }
 .hand-card { margin-left: -15px; transition: transform .15s; }
 .hand-card:hover { transform: translateY(-35px); z-index: 5; }
-.battle-log-launcher { position: absolute; z-index: 16; right: 358px; bottom: 74px; padding: 10px 14px; color: white; background: #303542; border: 4px solid white; box-shadow: 4px 4px 0 var(--ink); cursor: pointer; font: 900 13px/1 "Yu Gothic", sans-serif; }
+.battle-log-launcher { position: absolute; z-index: 16; right: 358px; bottom: 14px; padding: 10px 14px; color: white; background: #303542; border: 4px solid white; box-shadow: 4px 4px 0 var(--ink); cursor: pointer; font: 900 13px/1 "Yu Gothic", sans-serif; }
 .battle-log-launcher:hover, .battle-log-launcher:focus-visible { color: var(--ink); background: var(--yellow); }
 .battle-log-modal-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 24px; background: #080d1dd9; }
 .battle-log-modal { width: min(720px, calc(100 * var(--stage-vw) - 80px)); max-height: calc(100 * var(--stage-vh) - 80px); overflow: auto; color: var(--ink); background: #fffaf0; border: 6px solid var(--ink); box-shadow: 12px 12px 0 #000b; }
@@ -694,10 +694,9 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-message-line { margin: 0; min-height: 40px; line-height: 40px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 900; font-size: 26px; }
 .battle-message .battle-leader-info { flex: 0 0 auto; align-self: center; gap: 10px; padding-right: 16px; }
 
-.battle-controls { position: absolute; z-index: 9; right: 222px; bottom: 14px; width: 320px; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
-.battle-controls .battle-speed-controls { position: static; top: auto; right: auto; flex: 0 0 auto; }
-.battle-controls > button:first-child { padding: 10px 14px; color: white; background: #303542; border: 4px solid white; cursor: pointer; }
-.battle-controls .battle-pause-toggle { min-width: 112px; }
+.battle-controls { position: absolute; z-index: 9; right: 222px; bottom: 14px; width: 320px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; align-items: center; justify-items: end; gap: 8px; }
+.battle-controls .battle-speed-controls { position: static; top: auto; right: auto; grid-column: 1 / -1; grid-row: 1; flex: 0 0 auto; }
+.battle-controls .battle-pause-toggle { grid-column: 2; grid-row: 2; min-width: 112px; padding: 10px 14px; color: white; background: #303542; border: 4px solid white; cursor: pointer; }
 .battle-controls .battle-pause-toggle[aria-pressed="true"] { color: var(--ink); background: var(--yellow); }
 .battle-controls .primary-action { padding: 10px 17px; }
 .result-overlay { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 20px; background: #17151adc; }
