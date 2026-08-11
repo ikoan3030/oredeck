@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import deckCaseImage from "./assets/deck-case.png";
 import handImage from "./assets/characters/tanjun-hand-open.png";
 import tanjunBustSmile from "./assets/characters/tanjun-bust-smile.png";
 import {
@@ -906,6 +907,20 @@ function BattleSpeedControls({ speed, onChange }: { speed: PlaybackSpeed; onChan
   return <div className="battle-speed-controls" aria-label="バトル演出速度"><span>演出</span>{(["normal", "fast", "skip"] as PlaybackSpeed[]).map((item) => <button key={item} type="button" className={speed === item ? "active" : ""} aria-pressed={speed === item} onClick={() => onChange(item)}>{PLAYBACK_SPEED_LABELS[item]}</button>)}</div>;
 }
 
+function DeckCaseMeter({ stage, deckCount }: { stage: number; deckCount: number }) {
+  const visualStage = Math.max(0, stage);
+  return <div className={`deck-case-meter stage-${visualStage}${deckCount === 0 ? " deck-out" : ""}`} aria-label={`シンクロ段階${visualStage}、山札の残り${deckCount}枚`}>
+    <div className="deck-case-art">
+      <img src={deckCaseImage} alt="" />
+      <i className="deck-case-arm deck-case-arm-bottom" aria-hidden="true" />
+      <i className="deck-case-arm deck-case-arm-left" aria-hidden="true" />
+      <i className="deck-case-arm deck-case-arm-right" aria-hidden="true" />
+      <i className="deck-case-arm deck-case-arm-top" aria-hidden="true" />
+      <strong className="deck-case-window">{deckCount}</strong>
+    </div>
+  </div>;
+}
+
 function TurnTransitionBanner({ banner }: { banner: { side: BattleEvent["side"]; text: string; duration: number } | null }) {
   if (!banner) return null;
   const side = banner.side === "brother" ? "brother" : "opponent";
@@ -1077,6 +1092,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
   const lifeSnapshot = playbackEvent?.snapshot;
   const lifeOpponent = lifeSnapshot?.opponent ?? battle.opponent;
   const lifeBrother = lifeSnapshot?.brother ?? battle.brother;
+  const brotherDeckCount = lifeSnapshot?.brother.deckCount ?? battle.brother.deck.length;
   const leaderHitSide = activeEvent && isDamageEvent(activeEvent) && activeEvent.targetLeader ? activeEvent.side === "brother" ? "opponent" : "brother" : null;
   const activeTiming = activeEvent ? EVENT_PLAYBACK_TIMING[activeEvent.type] : null;
   const visualDuration = activeEvent ? `${activeTiming!.visual?.[speed] ?? activeTiming![speed]}ms` : undefined;
@@ -1130,6 +1146,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
       <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} />
     </section>
     <BattleMessageWindow side="brother" name="ユウタ" marker="ユ" text={!battle.winner ? brotherDialogueEvent?.dialogue : undefined} leader={lifeBrother} hit={leaderHitSide === "brother"} portraitSrc={tanjunBustSmile} />
+    <DeckCaseMeter stage={battle.syncRate === 0 ? 0 : syncStage(battle.syncRate, child)} deckCount={brotherDeckCount} />
     {/* The battle log is modal-only; the launcher and pause surface are rendered below. */}
     {!battle.winner && <div className="battle-controls"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /><button className="battle-pause-toggle" type="button" onClick={onAutoToggle} aria-pressed={!auto}>{auto ? "一時停止" : "再開"}</button></div>}
     <BattleLogModal open={logOpen} recent={recent} cards={cards} opponentName={opponent.name} onOpen={() => setLogOpen(true)} onClose={() => setLogOpen(false)} />
