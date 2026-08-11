@@ -50,14 +50,18 @@ test("the battle does not show the held ace card before its draw", () => {
   assert.ok(app.includes('item.type === "ace"'), "the ace event remains available for the draw cut-in and log");
 });
 
-test("battle dialogue reserves persistent portrait slots on both sides", () => {
-  assert.ok(app.includes("function BattlePortrait("), "the portrait slot should be a replaceable component");
-  assert.ok(app.includes("battle-dialogue-group battle-dialogue-opponent"), "the opponent dialogue group must include its portrait");
-  assert.ok(app.includes("battle-dialogue-group battle-dialogue-brother"), "the brother dialogue group must include its portrait");
-  assert.ok(app.includes("function BattleSpeechSlot("), "both dialogue groups should keep a persistent speech slot");
-  assert.ok(app.includes("speech-empty"), "empty dialogue should retain its speech frame");
-  assert.ok(styles.includes(".battle-portrait"), "portrait slots must have a dedicated layout style");
-  assert.ok(styles.includes(".battle-dialogue-opponent .battle-speech .speech::after"), "the opponent speech tail should point back toward the portrait");
+test("the portrait and the speech share one persistent message window per side", () => {
+  assert.ok(app.includes("function BattleMessageWindow("), "the window should be one replaceable component");
+  assert.ok(app.includes('<BattleMessageWindow side="opponent"'), "the opponent needs a message window");
+  assert.ok(app.includes('<BattleMessageWindow side="brother"'), "the brother needs a message window");
+  assert.ok(app.includes('className="battle-message-face"'), "the face sits inside the window, not in its own frame");
+  assert.ok(app.includes('className="battle-message-line"'), "the line sits inside the window, not in a bubble");
+  // 台詞が無い間も枠が残るよう、テキストは条件レンダリングにしない。
+  assert.ok(app.includes("{text ?? \"\"}"), "an absent line must leave the window standing with an empty line");
+  assert.ok(styles.includes(".battle-message-face"), "the window needs a dedicated face column");
+  assert.equal(app.includes("function BattlePortrait("), false, "the standalone portrait frame must be removed");
+  assert.equal(app.includes("function BattleSpeechSlot("), false, "the standalone speech bubble slot must be removed");
+  assert.equal(styles.includes(".battle-portrait"), false, "the standalone portrait styles must be removed");
+  assert.equal(styles.includes(".battle-dialogue-group"), false, "the split dialogue group must be removed");
   assert.equal(app.includes('className="avatar"'), false, "the old circular leader icons must be removed");
-  assert.equal(app.includes('className="avatar kid"'), false, "the old brother leader icon must be removed");
 });

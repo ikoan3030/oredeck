@@ -595,8 +595,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-header strong { font-size: 22px; }
 .brother-name { text-align: right; }
 .battle-turn { padding: 7px 16px; color: var(--ink); background: var(--yellow); border: 3px solid white; transform: skew(-8deg); }
-.arena { --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 300px; padding: 20px 100px 165px 260px; display: grid; grid-template-rows: auto minmax(120px, 1fr) 26px minmax(120px, 1fr) auto; gap: 8px; }
-.fighter { display: flex; align-items: center; gap: 12px; }
+.arena { --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 300px; padding: 6px 100px 172px; display: grid; grid-template-rows: auto minmax(120px, 1fr) 26px minmax(120px, 1fr) auto; gap: 8px; }
+.fighter { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 .opponent-fighter { justify-content: space-between; }
 .battle-leader-info { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
 .opponent-leader-info { justify-content: flex-end; }
@@ -605,7 +605,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .life span { font: 900 9px Arial, sans-serif; color: var(--yellow); }
 .life b { font-size: 30px; }
 .pp { padding: 6px 10px; color: var(--ink); background: var(--cyan); border: 3px solid var(--ink); font-size: 12px; }
-.opponent-hand-zone { min-width: 0; display: flex; align-items: center; gap: 8px; flex: 1 1 auto; padding: 4px 8px; }
+.opponent-hand-zone { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 0 1 auto; padding: 4px 8px; }
 .opponent-hand-label { display: grid; flex: 0 0 auto; justify-items: center; gap: 2px; color: #c9d9ff; font: 900 9px/1.1 "Yu Gothic", sans-serif; text-align: center; }
 .opponent-hand-label b { display: grid; place-items: center; width: 25px; height: 25px; color: var(--ink); background: var(--cyan); border: 3px solid var(--ink); border-radius: 50%; font: 1000 13px/1 Arial, sans-serif; }
 .opponent-hand-cards { min-width: 0; display: flex; align-items: center; gap: 4px; overflow: hidden; }
@@ -632,11 +632,11 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .board-card > div span:last-child { background: var(--green); }
 .board-card.intervened { box-shadow: 0 0 0 4px var(--yellow), 5px 7px 0 #0009; }
 .board-card .intervention-mark { width: 31px; height: 31px; border-width: 2px; font-size: 11px; }
-.hand-zone { position: absolute; left: 50%; bottom: 7px; transform: translateX(-50%); display: flex; align-items: end; gap: 2px; }
+.hand-zone { position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); display: flex; align-items: end; gap: 2px; }
 .hand-card { margin-left: -15px; transition: transform .15s; }
 .hand-card:hover { transform: translateY(-35px); z-index: 5; }
 .battle-log { position: absolute; z-index: 3; right: 0; top: 72px; bottom: 0; width: 300px; overflow: auto; color: var(--ink); background: #fffaf0eb; border-left: 5px solid var(--ink); }
-.battle-log.collapsed { top: auto; bottom: 88px; width: min(420px, calc(calc(100 * var(--stage-vw)) - 24px)); max-height: 64px; }
+.battle-log.collapsed { top: auto; bottom: 88px; width: min(320px, calc(calc(100 * var(--stage-vw)) - 24px)); max-height: 64px; }
 .battle-log.collapsed .panel-heading { padding: 5px 9px; }
 .battle-log.collapsed p { display: flex; gap: 7px; align-items: baseline; overflow: hidden; padding: 6px 9px; white-space: nowrap; text-overflow: ellipsis; }
 .battle-log.collapsed p span { display: inline; flex: 0 0 auto; }
@@ -645,22 +645,53 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-log p span { display: block; color: var(--blue); font-size: 9px; }
 .battle-log.collapsed p > span { display: inline; flex: 0 0 auto; }
 .battle-log p.highlight { background: var(--yellow); border: 3px solid var(--ink); font-weight: 1000; }
-.battle-dialogue-group { position: absolute; z-index: 8; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; pointer-events: none; }
-.battle-dialogue-opponent { top: 84px; right: 320px; width: 320px; justify-items: end; }
-.battle-dialogue-brother { bottom: 20px; left: 20px; width: 300px; justify-items: start; }
-.battle-portrait { width: 180px; height: 190px; padding: 7px; color: white; background: #626a78; border: 5px solid var(--ink); box-shadow: 7px 7px 0 #0009, inset 0 0 0 3px #ffffff55; }
-.battle-portrait-placeholder { width: 100%; height: 100%; display: grid; align-content: center; justify-items: center; gap: 6px; padding: 10px; text-align: center; background: repeating-linear-gradient(135deg, #7c8490 0 12px, #68717f 12px 24px); border: 3px dashed #d8dde4; }
-.battle-portrait-placeholder > span { display: grid; place-items: center; width: 76px; height: 76px; color: var(--ink); background: #d5d9df; border: 4px solid var(--ink); border-radius: 50%; font-size: 44px; line-height: 1; }
-.battle-portrait-placeholder strong { font-size: 17px; line-height: 1; text-shadow: 2px 2px 0 #0008; }
-.battle-portrait-placeholder small { color: #e9edf2; font: 900 8px/1 Arial, sans-serif; letter-spacing: .08em; }
-.battle-portrait-brother { border-color: var(--blue); box-shadow: 7px 7px 0 var(--ink), inset 0 0 0 3px #ffffff55; }
-.battle-portrait-opponent { border-color: var(--red); box-shadow: 7px 7px 0 var(--ink), inset 0 0 0 3px #ffffff55; }
-.battle-speech { position: relative; z-index: 1; left: auto; top: auto; bottom: auto; width: 100%; height: 62px; min-width: 0; }
-.battle-speech .speech { width: 100%; height: 100%; max-width: none; margin: 0; overflow: hidden; }
-.battle-speech .speech p { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.battle-dialogue-opponent .battle-speech .speech::after { left: auto; right: 35px; }
-.speech-empty { min-height: 62px; }
-.battle-controls { position: absolute; z-index: 9; right: 322px; bottom: 24px; display: flex; align-items: center; gap: 12px; }
+/* 顔グラ埋め込みの横長メッセージウィンドウ（スパロボ系の戦闘メッセージの形式を借りたもの）。
+   左端が正方形の顔グラでウィンドウの高さいっぱい、右が上段に話者名・下段に台詞、
+   右端にリーダーのLIFE/PP。台詞が無い間も枠は残り、台詞欄だけが空になる。
+   幅は BATTLE LOG（右300px）と操作ボタンを避ける形で決めている。 */
+.battle-message {
+  position: relative;
+  z-index: 8;
+  flex: 0 0 auto;
+  margin-left: 20px;
+  width: min(62%, calc(100 * var(--stage-vw) - 680px));
+  height: 72px;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow: hidden;
+  color: white;
+  background: #101725;
+  border: 5px solid var(--ink);
+  box-shadow: 6px 6px 0 #0009, inset 0 0 0 3px #ffffff2b;
+  pointer-events: none;
+}
+.battle-message-opponent { margin-top: 6px; border-color: var(--red); }
+.battle-message-brother { margin-bottom: 12px; border-color: var(--blue); }
+/* 顔グラは正方形。差し替えるときはこの枠の中身だけを入れ替える。 */
+.battle-message-face {
+  flex: 0 0 auto;
+  position: relative;
+  width: 62px;
+  align-self: stretch;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  background: repeating-linear-gradient(135deg, #7c8490 0 10px, #68717f 10px 20px);
+  border-right: 4px solid var(--ink);
+}
+.battle-message-face > span { display: grid; place-items: center; width: 38px; height: 38px; color: var(--ink); background: #d5d9df; border: 3px solid var(--ink); border-radius: 50%; font-size: 22px; line-height: 1; }
+.battle-message-face > small { color: #e9edf2; font: 900 6px/1 Arial, sans-serif; letter-spacing: .08em; }
+.battle-message-body { flex: 1 1 auto; min-width: 0; display: grid; align-content: center; gap: 3px; padding: 6px 16px 6px 14px; font-family: "Yu Gothic", sans-serif; }
+.battle-message-name { justify-self: start; padding: 2px 8px; color: var(--ink); background: var(--yellow); font: 900 10px/1 "Yu Gothic", sans-serif; letter-spacing: .04em; }
+.battle-message-opponent .battle-message-name { background: var(--red); color: white; }
+.battle-message-brother .battle-message-name { background: var(--cyan); }
+/* 台詞は1行に収めて枠の高さを固定する（空でも高さが変わらないよう min-height を持たせる）。 */
+.battle-message-line { margin: 0; min-height: 24px; line-height: 24px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 900; font-size: 16px; }
+.battle-message .battle-leader-info { flex: 0 0 auto; align-self: center; padding-right: 12px; }
+
+.battle-controls { position: absolute; z-index: 9; right: 322px; bottom: 14px; width: 320px; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .battle-controls .battle-speed-controls { position: static; top: auto; right: auto; flex: 0 0 auto; }
 .battle-controls > button:first-child { padding: 10px 14px; color: white; background: #303542; border: 4px solid white; cursor: pointer; }
 .battle-controls .primary-action { padding: 10px 17px; }
@@ -797,12 +828,14 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .species-cell.stage-1 { background: var(--yellow); }
 .species-cell.stage-2 { background: var(--orange); color: white; box-shadow: inset 0 0 0 2px #fff; }
 
+/* 発動中だけ出る帯。縦の並びに入れると盤面が上下にずれるので、盤面の右上へ重ねる。 */
 .synergy-declaration {
-  position: relative;
+  position: absolute;
   z-index: 9;
-  margin: 0 auto;
+  top: 82px;
+  right: 320px;
   width: max-content;
-  max-width: calc(calc(100 * var(--stage-vw)) - 24px);
+  max-width: calc(calc(100 * var(--stage-vw)) - 680px);
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
@@ -1433,6 +1466,22 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .result-burst p { margin-bottom: 18px; }
   .post-battle-commentary { margin: 10px auto 12px; }
   .result-burst > span { padding: 4px 10px; }
+  /* 背の低い横長では、上下のメッセージウィンドウと盤面・手札が同居できるよう、
+     ウィンドウと余白を一段詰める。盤面の枠はカードが収まる高さを優先する。 */
+  .battle-message { height: 62px; margin-left: 16px; }
+  .battle-message-opponent { margin-top: 4px; }
+  .battle-message-brother { margin-bottom: 8px; }
+  .battle-message-face { width: 54px; }
+  .battle-message-face > span { width: 32px; height: 32px; font-size: 18px; }
+  .battle-message-line { min-height: 20px; line-height: 20px; font-size: 15px; }
+  .arena { padding-top: 2px; padding-bottom: 118px; gap: 6px; }
+  .board-zone { padding: 8px; }
+  .opponent-hand-zone { padding: 0 8px; }
+  /* 背の低い横長では、上下のメッセージウィンドウと盤面・手札が同居できるよう手札を一段小さくする。 */
+  .card-face.compact { width: 92px; height: 118px; }
+  .card-face.compact .card-art { height: 54px; }
+  .card-face.compact .card-art span { width: 34px; height: 34px; font-size: 19px; }
+  .card-face.compact h3 { font-size: 9px; }
   .opponent-preview-screen { padding-top: 24px; padding-bottom: 24px; }
   .opponent-preview-panel { padding-top: 26px; padding-bottom: 26px; }
   .opponent-preview-panel h1 { margin: 12px 0 20px; font-size: clamp(44px, calc(6 * var(--stage-vw)), 62px); }
