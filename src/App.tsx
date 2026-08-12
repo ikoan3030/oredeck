@@ -441,10 +441,11 @@ function Speech({ speaker, text, tone = "kid" }: { speaker: string; text: string
 }
 
 /**
- * 顔グラと台詞を一体にした横長のメッセージウィンドウ。左端が顔グラ（正方形・枠の高さいっぱい、
- * 現状はプレースホルダ）、右が上段に話者名・下段に台詞。台詞が無い間も枠は残り、台詞欄だけが空になる。
+ * 立ち絵とその直下の台詞枠を縦に組んだ話者表示。自分側は画面左下、敵側は右上の鏡像配置で、
+ * LIFE/PP は台詞枠から切り離して立ち絵の外側に置く。台詞が無い間も枠は残り、台詞欄だけが空になる。
+ * 立ち絵は縦横比を保ったまま（トリミングせず）枠いっぱいに出す。
  */
-function BattleMessageWindow({ side, name, title, marker, text, leader, hit, portraitSrc }: {
+function BattleActor({ side, name, title, marker, text, leader, hit, portraitSrc }: {
   side: "brother" | "opponent";
   name: string;
   title?: string;
@@ -454,17 +455,17 @@ function BattleMessageWindow({ side, name, title, marker, text, leader, hit, por
   hit: boolean;
   portraitSrc?: string;
 }) {
-  return <div className={`battle-message battle-message-${side}`}>
-    <div className="battle-message-face" role="img" aria-label={`${name}の顔グラフィック${portraitSrc ? "" : "（プレースホルダ）"}`}>
-      {portraitSrc ? <img className="battle-message-portrait-image" src={portraitSrc} alt="" /> : <><span aria-hidden="true">{marker}</span><small>PORTRAIT</small></>}
-    </div>
-    <div className="battle-message-body">
-      <div className="battle-message-heading"><span className="battle-message-name">{name}</span>{title && <small className="battle-message-title">{title}</small>}</div>
-      <p className="battle-message-line" aria-live="polite">{text ?? ""}</p>
-    </div>
+  return <div className={`battle-actor battle-actor-${side}`}>
     <div className={`battle-leader-info ${side}-leader-info ` + (hit ? "life-target" : "")}>
       <div className="life"><span>LIFE</span><b>{leader.life}</b></div>
       <div className="pp">PP {leader.pp}/{leader.maxPp}</div>
+    </div>
+    <div className="battle-actor-portrait" role="img" aria-label={`${name}の立ち絵${portraitSrc ? "" : "（プレースホルダ）"}`}>
+      {portraitSrc ? <img className="battle-actor-portrait-image" src={portraitSrc} alt="" /> : <><span aria-hidden="true">{marker}</span><small>PORTRAIT</small></>}
+    </div>
+    <div className="battle-actor-caption">
+      <div className="battle-actor-heading"><span className="battle-actor-name">{name}</span>{title && <small className="battle-actor-title">{title}</small>}</div>
+      <p className="battle-actor-line" aria-live="polite">{text ?? ""}</p>
     </div>
   </div>;
 }
@@ -1140,7 +1141,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
     {/* 常時表示のシナジー帯はHUD整理のため一時停止。開戦時の宣言演出は別レイヤーで維持する。 */}
     <TurnTransitionBanner banner={turnBanner} />
     <div className="battle-turn-center" aria-label={`現在のターン ${battle.turn}`}>TURN <b>{battle.turn}</b></div>
-    <BattleMessageWindow side="opponent" name={opponent.name} title={opponent.title} marker={opponent.name.slice(0, 1)} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} leader={lifeOpponent} hit={leaderHitSide === "opponent"} />
+    <BattleActor side="opponent" name={opponent.name} title={opponent.title} marker={opponent.name.slice(0, 1)} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} leader={lifeOpponent} hit={leaderHitSide === "opponent"} />
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={arenaStyle}>
       <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" ? "battle-target" : "")}><div className="opponent-hand-zone" aria-label={`相手の手札 ${opponentHand.length}枚`}><div className="opponent-hand-label"><span>相手の手札</span><b>{opponentHand.length}</b></div><div className="opponent-hand-cards">{opponentHand.map((item) => <AnimatedOpponentHandCard key={item.instanceId} instance={item} activeEvent={activeEvent} />)}</div></div></div>
       <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{stableBoards.opponent.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!stableBoards.opponent.length && <span className="empty-board">相手の場は空</span>}</div>
@@ -1149,7 +1150,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
       <div className="hand-zone">{brotherHand.map((item) => <AnimatedBattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}</div>
       <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} />
     </section>
-    <BattleMessageWindow side="brother" name="ユウタ" marker="ユ" text={!battle.winner ? brotherDialogueEvent?.dialogue : undefined} leader={lifeBrother} hit={leaderHitSide === "brother"} portraitSrc={tanjunBustSmile} />
+    <BattleActor side="brother" name="ユウタ" marker="ユ" text={!battle.winner ? brotherDialogueEvent?.dialogue : undefined} leader={lifeBrother} hit={leaderHitSide === "brother"} portraitSrc={tanjunBustSmile} />
     <DeckCaseMeter stage={battle.syncRate === 0 ? 0 : syncStage(battle.syncRate, child)} deckCount={brotherDeckCount} />
     {/* The battle log is modal-only; the launcher and pause surface are rendered below. */}
     {!battle.winner && <div className="battle-controls"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /><button className="battle-pause-toggle" type="button" onClick={onAutoToggle} aria-pressed={!auto}>{auto ? "一時停止" : "再開"}</button></div>}
