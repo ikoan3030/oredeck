@@ -593,7 +593,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .battle-turn-center b { font-size: 1.2em; }
 /* デッキケース。大きさは --deck-case-size の1箇所で決め、窓の枠線と残数の文字は
    そこからの比率で出す（ケースを拡大しても窓に対する数字の比率が変わらない）。 */
-.deck-case-meter { --deck-case-size: 320; --deck-case-scale: calc(var(--deck-case-size) / 160); position: absolute; z-index: 8; right: 230px; bottom: 104px; width: calc(var(--deck-case-size) * 1px); aspect-ratio: 1; pointer-events: none; }
+.deck-case-meter { --deck-case-size: 148; --deck-case-scale: calc(var(--deck-case-size) / 160); position: absolute; z-index: 8; right: 24px; bottom: 14px; width: calc(var(--deck-case-size) * 1px); aspect-ratio: 1; pointer-events: none; }
 .deck-case-art { position: relative; width: 100%; height: 100%; filter: drop-shadow(calc(5px * var(--deck-case-scale)) calc(6px * var(--deck-case-scale)) 0 #0009); }
 .deck-case-art img { position: relative; z-index: 0; display: block; width: 100%; height: 100%; object-fit: contain; }
 .deck-case-window { position: absolute; z-index: 3; left: 38%; top: 39%; width: 24%; height: 22%; display: grid; place-items: center; color: white; background: #080c15dd; border: calc(3px * var(--deck-case-scale)) solid #ffd92899; border-radius: 12%; font: 1000 calc(25px * var(--deck-case-scale))/1 Arial, sans-serif; text-shadow: calc(2px * var(--deck-case-scale)) calc(2px * var(--deck-case-scale)) 0 var(--ink); }
