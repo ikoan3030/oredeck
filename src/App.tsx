@@ -879,21 +879,58 @@ function AnimatedBoardCard({ instance, cards, ace = false, activeEvent = null, g
   return <div className={className} title={card.name} data-instance-id={instance.instanceId} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}>{instance.intervention && <span className="intervention-mark">兄</span>}{card.species && <span className="species-tag">{card.species}</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}<KeywordBadges keywords={instanceVisibleKeywords(instance, cards)} compact /><b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
 }
 
-function AnimatedBattleHandCard({ instance, cards, ace, activeEvent = null, guardPreludeDone = true, attackPreludeDone = true, summonPreludeDone = true }: { instance: BattleState["brother"]["hand"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null; guardPreludeDone?: boolean; attackPreludeDone?: boolean; summonPreludeDone?: boolean }) {
-  const card = cards.find((item) => item.id === instance.cardId)!;
-  const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
-  const className = "hand-card " + (syncBonus && !ace ? "sync-granted " : "") + (ace ? "ace-granted " : "") + eventCardClass(instance, activeEvent, cards, guardPreludeDone, attackPreludeDone, summonPreludeDone);
-  return <div className={className} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}><CardFace compact card={card} intervention={instance.intervention} keywords={instanceVisibleKeywords(instance, cards)} />{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}</div>;
+
+/** 裏向きカード1枚。左右どちらの手札でも同じ見た目・同じ増減演出で使う。 */
+function AnimatedHandCountCard({ side, instance, activeEvent = null }: { side: "brother" | "opponent"; instance: { instanceId: string }; activeEvent?: BattleEvent | null }) {
+  const drawEvent = activeEvent?.side === side && (activeEvent.type === "draw" || (activeEvent.type === "effect" && activeEvent.keyword === "draw"));
+  const entered = drawEvent && (activeEvent.type === "draw"
+    ? activeEvent.snapshot?.[side].hand.at(-1)?.instanceId === instance.instanceId
+    : activeEvent.targetInstanceIds?.includes(instance.instanceId));
+  const left = activeEvent?.type === "play" && activeEvent.side === side && activeEvent.instanceId === instance.instanceId;
+  const className = `hand-count-card${entered ? " hand-count-draw" : ""}${left ? " hand-count-play" : ""}`;
+  return <div className={className} data-event-id={left ? activeEvent.id : undefined} aria-hidden="true"><span className="hand-card-back"><i /></span></div>;
 }
 
-function AnimatedOpponentHandCard({ instance, activeEvent = null }: { instance: BattleState["opponent"]["hand"][number]; activeEvent?: BattleEvent | null }) {
-  const drawEvent = activeEvent?.side === "opponent" && (activeEvent.type === "draw" || (activeEvent.type === "effect" && activeEvent.keyword === "draw"));
-  const entered = drawEvent && (activeEvent.type === "draw"
-    ? activeEvent.snapshot?.opponent.hand.at(-1)?.instanceId === instance.instanceId
-    : activeEvent.targetInstanceIds?.includes(instance.instanceId));
-  const left = activeEvent?.type === "play" && activeEvent.side === "opponent" && activeEvent.instanceId === instance.instanceId;
-  const className = `opponent-hand-card${entered ? " opponent-hand-draw" : ""}${left ? " opponent-hand-play" : ""}`;
-  return <div className={className} data-event-id={left ? activeEvent.id : undefined} aria-hidden="true"><span className="opponent-card-back"><i /></span></div>;
+/**
+ * 手札の省スペース表示。敵側は枚数だけ（中身は非公開情報）、弟側は押すと内訳をモーダルで開ける。
+ * どちらも裏向きカードと枚数という同じ形式にそろえてある。
+ */
+function HandCountZone({ side, label, hand, activeEvent, onOpen }: {
+  side: "brother" | "opponent";
+  label: string;
+  hand: { instanceId: string }[];
+  activeEvent: BattleEvent | null;
+  onOpen?: () => void;
+}) {
+  const inner = <>
+    <div className="hand-count-label"><span>{label}</span><b>{hand.length}</b></div>
+    <div className="hand-count-cards">{hand.map((item) => <AnimatedHandCountCard key={item.instanceId} side={side} instance={item} activeEvent={activeEvent} />)}</div>
+  </>;
+  if (!onOpen) return <div className={`hand-count-zone hand-count-${side}`} aria-label={`${label} ${hand.length}枚`}>{inner}</div>;
+  return <button type="button" className={`hand-count-zone hand-count-${side}`} onClick={onOpen} aria-haspopup="dialog" aria-label={`${label} ${hand.length}枚。押すと内訳を開く`}>{inner}</button>;
+}
+
+/** 弟の手札の内訳。ログモーダルと同じ形式で、開いている間は再生を止める。 */
+function BattleHandModal({ open, hand, cards, aceInstanceId, onClose }: { open: boolean; hand: BattleState["brother"]["hand"]; cards: Card[]; aceInstanceId: string | null; onClose: () => void }) {
+  if (!open) return null;
+  return <div className="battle-log-modal-backdrop" role="presentation" onClick={onClose}>
+    <section className="battle-log-modal battle-hand-modal" role="dialog" aria-modal="true" aria-label="ユウタの手札" onClick={(event) => event.stopPropagation()}>
+      <div className="panel-heading"><span>ユウタの手札</span><b>{hand.length}枚 / PAUSED</b><button type="button" onClick={onClose}>閉じる</button></div>
+      <div className="battle-hand-modal-cards">
+        {hand.map((item) => {
+          const card = cards.find((entry) => entry.id === item.cardId)!;
+          const syncBonus = item.grantedKeywords.length > 0 || item.grantedAtk > 0;
+          const ace = item.instanceId === aceInstanceId;
+          return <div key={item.instanceId} className={"hand-card " + (syncBonus && !ace ? "sync-granted " : "") + (ace ? "ace-granted" : "")}>
+            <CardFace compact card={card} intervention={item.intervention} keywords={instanceVisibleKeywords(item, cards)} />
+            {syncBonus && !ace && <span className="sync-mark">SYNC</span>}
+            {ace && <span className="ace-mark">ACE</span>}
+          </div>;
+        })}
+        {!hand.length && <p className="battle-hand-modal-empty">手札は空だ。</p>}
+      </div>
+    </section>
+  </div>;
 }
 
 function battleLogText(item: BattleEvent, cards: Card[]): string {
@@ -1001,6 +1038,9 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
   const [attackAfterglow, setAttackAfterglow] = useState(false);
   const [turnBanner, setTurnBanner] = useState<{ side: BattleEvent["side"]; text: string; duration: number } | null>(null);
   const [logOpen, setLogOpen] = useState(false);
+  const [handOpen, setHandOpen] = useState(false);
+  // どちらのモーダルも「開いている間は再生を止める」で同じ扱いにする。
+  const modalOpen = logOpen || handOpen;
   const turnBannerTimer = useRef<number | null>(null);
 
   useEffect(() => () => {
@@ -1008,7 +1048,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
   }, []);
 
   useEffect(() => {
-    if (logOpen || !auto) return;
+    if (modalOpen || !auto) return;
     if (visibleEventCount >= battle.events.length) {
       setPlaybackBusy(false);
       setActiveEvent(null);
@@ -1075,7 +1115,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
       timers.push(window.setTimeout(finishEvent, preludeDuration + timing[speed] + attackAfterglowDuration));
     }
     return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [auto, battle.events.length, cards, logOpen, opponent.name, speed, visibleEventCount]);
+  }, [auto, battle.events.length, cards, modalOpen, opponent.name, speed, visibleEventCount]);
 
   const playbackComplete = !playbackBusy && visibleEventCount >= battle.events.length;
   const visibleEvents = battle.events.slice(0, Math.min(battle.events.length, visibleEventCount + (activeEvent ? 1 : 0)));
@@ -1143,17 +1183,18 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
     <div className="battle-turn-center" aria-label={`現在のターン ${battle.turn}`}>TURN <b>{battle.turn}</b></div>
     <BattleActor side="opponent" name={opponent.name} title={opponent.title} marker={opponent.name.slice(0, 1)} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} leader={lifeOpponent} hit={leaderHitSide === "opponent"} />
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={arenaStyle}>
-      <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" ? "battle-target" : "")}><div className="opponent-hand-zone" aria-label={`相手の手札 ${opponentHand.length}枚`}><div className="opponent-hand-label"><span>相手の手札</span><b>{opponentHand.length}</b></div><div className="opponent-hand-cards">{opponentHand.map((item) => <AnimatedOpponentHandCard key={item.instanceId} instance={item} activeEvent={activeEvent} />)}</div></div></div>
+      <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" ? "battle-target" : "")}><HandCountZone side="opponent" label="相手の手札" hand={opponentHand} activeEvent={activeEvent} /></div>
       <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{stableBoards.opponent.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!stableBoards.opponent.length && <span className="empty-board">相手の場は空</span>}</div>
       <div className="board-line"><b>AUTO CARD BATTLE</b></div>
       <div className={"board-zone brother-board " + (damageTargetSide === "brother" ? "battle-target" : "")}>{stableBoards.brother.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!stableBoards.brother.length && <span className="empty-board">ユウタの場は空</span>}</div>
-      <div className="hand-zone">{brotherHand.map((item) => <AnimatedBattleHandCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}</div>
+      <div className="hand-zone"><HandCountZone side="brother" label="ユウタの手札" hand={brotherHand} activeEvent={activeEvent} onOpen={() => setHandOpen(true)} /></div>
       <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} />
     </section>
     <BattleActor side="brother" name="ユウタ" marker="ユ" text={!battle.winner ? brotherDialogueEvent?.dialogue : undefined} leader={lifeBrother} hit={leaderHitSide === "brother"} portraitSrc={tanjunBustSmile} />
     <DeckCaseMeter stage={battle.syncRate === 0 ? 0 : syncStage(battle.syncRate, child)} deckCount={brotherDeckCount} />
     {/* The battle log is modal-only; the launcher and pause surface are rendered below. */}
     {!battle.winner && <div className="battle-controls"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /><button className="battle-pause-toggle" type="button" onClick={onAutoToggle} aria-pressed={!auto}>{auto ? "一時停止" : "再開"}</button></div>}
+    <BattleHandModal open={handOpen} hand={brotherHand} cards={cards} aceInstanceId={aceInstanceId ?? null} onClose={() => setHandOpen(false)} />
     <BattleLogModal open={logOpen} recent={recent} cards={cards} opponentName={opponent.name} onOpen={() => setLogOpen(true)} onClose={() => setLogOpen(false)} />
     {cutIn?.visible && <BattleCutIn kind={cutIn.kind} />}
     {playbackComplete && battle.winner && <div className="result-overlay"><div className={"result-burst " + (battle.winner === "brother" ? "win" : "lose")}><span>{battle.winner === "brother" ? "VICTORY!" : battle.winner === "draw" ? "DRAW" : "DEFEAT"}</span><h1>{battle.winner === "brother" ? "ユウタの勝利！" : battle.winner === "draw" ? "引き分け！" : opponent.name + "の勝利！"}</h1><p>{battle.winner === "brother" ? "デッキは狙い通りに仕事をしただろうか？" : "次の相手とのバトルへ進もう。"}</p>{postBattleDialogue && <div className="post-battle-commentary"><Speech speaker={child.displayName} text={postBattleDialogue} /></div>}<button className="primary-action" onClick={onFinish}>{finalBattle ? "結果を見る" : "次の相手へ"}<span>▶</span></button></div></div>}

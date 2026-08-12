@@ -599,7 +599,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .deck-case-window { position: absolute; z-index: 3; left: 38%; top: 39%; width: 24%; height: 22%; display: grid; place-items: center; color: white; background: #080c15dd; border: calc(3px * var(--deck-case-scale)) solid #ffd92899; border-radius: 12%; font: 1000 calc(25px * var(--deck-case-scale))/1 Arial, sans-serif; text-shadow: calc(2px * var(--deck-case-scale)) calc(2px * var(--deck-case-scale)) 0 var(--ink); }
 .deck-case-meter.stage-5 .deck-case-window { box-shadow: 0 0 calc(12px * var(--deck-case-scale)) calc(3px * var(--deck-case-scale)) #ffd928aa; }
 .deck-case-meter.deck-out .deck-case-window { color: var(--red); border-color: var(--red); box-shadow: 0 0 calc(14px * var(--deck-case-scale)) calc(4px * var(--deck-case-scale)) #ee3342cc; }
-.arena { --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 0; padding: 8px 300px 254px; display: grid; grid-template-rows: auto minmax(120px, 1fr) 26px minmax(120px, 1fr) auto; gap: 8px; }
+.arena { --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 0; padding: 8px 300px 150px; display: grid; grid-template-rows: auto minmax(120px, 1fr) 26px minmax(120px, 1fr) auto; gap: 8px; }
 .fighter { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 .opponent-fighter { justify-content: space-between; }
 .battle-leader-info { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
@@ -609,18 +609,18 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .life span { font: 900 11px Arial, sans-serif; color: var(--yellow); }
 .life b { font-size: 38px; }
 .pp { padding: 10px 12px; color: var(--ink); background: var(--cyan); border: 3px solid var(--ink); font-size: 14px; }
-.opponent-hand-zone { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 0 1 auto; padding: 4px 8px; }
-.opponent-hand-label { display: grid; flex: 0 0 auto; justify-items: center; gap: 2px; color: #c9d9ff; font: 900 9px/1.1 "Yu Gothic", sans-serif; text-align: center; }
-.opponent-hand-label b { display: grid; place-items: center; width: 25px; height: 25px; color: var(--ink); background: var(--cyan); border: 3px solid var(--ink); border-radius: 50%; font: 1000 13px/1 Arial, sans-serif; }
-.opponent-hand-cards { min-width: 0; display: flex; align-items: center; gap: 4px; overflow: hidden; }
-.opponent-hand-card { position: relative; width: 39px; height: 56px; flex: 0 0 auto; }
-.opponent-hand-card + .opponent-hand-card { margin-left: -12px; }
-.opponent-card-back { position: relative; display: grid; place-items: center; width: 100%; height: 100%; overflow: hidden; background: linear-gradient(145deg, #314f8c, #111a3b); border: 3px solid var(--ink); border-radius: 6px; box-shadow: 3px 3px 0 #0008, inset 0 0 0 2px #84d9ff77; }
-.opponent-card-back::before { content: ""; position: absolute; width: 22px; height: 22px; border: 3px solid var(--yellow); transform: rotate(45deg); box-shadow: 0 0 0 2px var(--ink), 0 0 12px #ffd92899; }
-.opponent-card-back::after { content: ""; position: absolute; width: 9px; height: 9px; border: 2px solid var(--cyan); transform: rotate(45deg); background: #17254f; }
-.opponent-card-back i { position: relative; z-index: 1; width: 5px; height: 30px; background: var(--pink); box-shadow: 0 0 8px var(--pink); transform: rotate(45deg); }
-.opponent-hand-draw { animation: opponent-hand-draw var(--event-duration, .34s) cubic-bezier(.2,.8,.25,1) both; }
-.opponent-hand-play { animation: opponent-hand-play var(--event-duration, .48s) cubic-bezier(.2,.8,.25,1) both; }
+.hand-count-zone { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 0 1 auto; padding: 4px 8px; }
+.hand-count-label { display: grid; flex: 0 0 auto; justify-items: center; gap: 2px; color: #c9d9ff; font: 900 9px/1.1 "Yu Gothic", sans-serif; text-align: center; }
+.hand-count-label b { display: grid; place-items: center; width: 25px; height: 25px; color: var(--ink); background: var(--cyan); border: 3px solid var(--ink); border-radius: 50%; font: 1000 13px/1 Arial, sans-serif; }
+.hand-count-cards { min-width: 0; display: flex; align-items: center; gap: 4px; overflow: hidden; }
+.hand-count-card { position: relative; width: 39px; height: 56px; flex: 0 0 auto; }
+.hand-count-card + .hand-count-card { margin-left: -12px; }
+.hand-card-back { position: relative; display: grid; place-items: center; width: 100%; height: 100%; overflow: hidden; background: linear-gradient(145deg, #314f8c, #111a3b); border: 3px solid var(--ink); border-radius: 6px; box-shadow: 3px 3px 0 #0008, inset 0 0 0 2px #84d9ff77; }
+.hand-card-back::before { content: ""; position: absolute; width: 22px; height: 22px; border: 3px solid var(--yellow); transform: rotate(45deg); box-shadow: 0 0 0 2px var(--ink), 0 0 12px #ffd92899; }
+.hand-card-back::after { content: ""; position: absolute; width: 9px; height: 9px; border: 2px solid var(--cyan); transform: rotate(45deg); background: #17254f; }
+.hand-card-back i { position: relative; z-index: 1; width: 5px; height: 30px; background: var(--pink); box-shadow: 0 0 8px var(--pink); transform: rotate(45deg); }
+.hand-count-draw { animation: hand-count-draw var(--event-duration, .34s) cubic-bezier(.2,.8,.25,1) both; }
+.hand-count-play { animation: hand-count-play var(--event-duration, .48s) cubic-bezier(.2,.8,.25,1) both; }
 .board-zone { min-height: 128px; display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px; border: 3px dashed #ffffff44; border-radius: 20px; }
 .opponent-board { align-items: flex-start; }
 .brother-board { align-items: flex-end; }
@@ -637,7 +637,14 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .board-card > div span:last-child { background: var(--green); }
 .board-card.intervened { box-shadow: 0 0 0 4px var(--yellow), 5px 7px 0 #0009; }
 .board-card .intervention-mark { width: 31px; height: 31px; border-width: 2px; font-size: 11px; }
-.hand-zone { position: absolute; left: 50%; bottom: 98px; transform: translateX(-50%); display: flex; align-items: end; gap: 2px; }
+.hand-zone { position: absolute; left: 52%; bottom: 40px; transform: translateX(-50%); display: flex; align-items: end; gap: 2px; }
+button.hand-count-zone { margin: 0; color: inherit; background: #0e1625cc; border: 4px solid var(--ink); box-shadow: 4px 4px 0 #0009; cursor: pointer; pointer-events: auto; }
+button.hand-count-zone:hover, button.hand-count-zone:focus-visible { background: #1b2942e6; border-color: var(--cyan); }
+.hand-count-brother .hand-count-label span { color: var(--cyan); }
+.battle-hand-modal .battle-hand-modal-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; padding: 16px; }
+.battle-hand-modal .hand-card { position: relative; margin-left: 0; }
+.battle-hand-modal .hand-card:hover { transform: none; }
+.battle-hand-modal-empty { margin: 0; padding: 28px 16px; text-align: center; font: 900 14px/1 "Yu Gothic", sans-serif; }
 .hand-card { margin-left: -15px; transition: transform .15s; }
 .hand-card:hover { transform: translateY(-35px); z-index: 5; }
 .battle-log-launcher { position: absolute; z-index: 16; right: 358px; bottom: 14px; padding: 10px 14px; color: white; background: #303542; border: 4px solid white; box-shadow: 4px 4px 0 var(--ink); cursor: pointer; font: 900 13px/1 "Yu Gothic", sans-serif; }
@@ -1330,12 +1337,12 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   from { opacity: 0; transform: translateY(22px) scale(.6) rotate(-8deg); filter: brightness(2); }
   68% { transform: translateY(-5px) scale(1.08) rotate(2deg); }
 }
-@keyframes opponent-hand-draw {
+@keyframes hand-count-draw {
   from { opacity: 0; transform: translate(-24px, -14px) scale(.45) rotate(-8deg); }
   68% { opacity: 1; transform: translate(3px, 2px) scale(1.08) rotate(2deg); }
   to { opacity: 1; transform: translate(0) scale(1) rotate(0); }
 }
-@keyframes opponent-hand-play {
+@keyframes hand-count-play {
   from { opacity: 1; transform: translate(0) scale(1); }
   32% { transform: translateY(4px) scale(1.08) rotate(2deg); filter: brightness(1.5); }
   to { opacity: 0; transform: translateY(28px) scale(.45) rotate(8deg); }
@@ -1406,7 +1413,7 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .board-card.event-summon,
   .board-card.summon-prelude,
   .hand-card.summon-prelude,
-  .opponent-hand-card,
+  .hand-count-card,
   .board-card.event-sync-flash,
   .hand-card.event-sync-flash,
   .hand-card.event-ace-card,
@@ -1504,9 +1511,9 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   .life span { font-size: 9px; }
   .life b { font-size: 32px; }
   .pp { padding: 8px 9px; font-size: 12px; }
-  .arena { padding-top: 2px; padding-bottom: 214px; gap: 6px; }
+  .arena { padding-top: 2px; padding-bottom: 110px; gap: 6px; }
   .board-zone { padding: 8px; }
-  .opponent-hand-zone { padding: 0 8px; }
+  .hand-count-zone { padding: 0 8px; }
   /* 背の低い横長では、上下のメッセージウィンドウと盤面・手札が同居できるよう手札を一段小さくする。 */
   .card-face.compact { width: 92px; height: 118px; }
   .card-face.compact .card-art { height: 54px; }
