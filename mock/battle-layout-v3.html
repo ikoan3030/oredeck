@@ -70,18 +70,17 @@
 
     .opponent-hand,
     .brother-hand {
-      position: absolute;
-      z-index: 5;
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 4px;
       color: var(--cyan);
       font-size: 13px;
       font-weight: 900;
     }
 
-    .opponent-hand { top: 224px; right: 220px; flex-direction: row-reverse; }
-    .brother-hand { bottom: 198px; left: 212px; }
+    .opponent-hand { justify-content: flex-end; flex-direction: row-reverse; }
+    .brother-hand { justify-content: flex-start; }
 
     .hand-count {
       display: grid;
@@ -125,7 +124,7 @@
       position: absolute;
       z-index: 7;
       display: flex;
-      width: 330px;
+      width: 360px;
       flex-direction: column;
       gap: 8px;
     }
@@ -134,7 +133,8 @@
     .brother-group { bottom: 18px; left: 18px; align-items: stretch; }
 
     .speech {
-      min-height: 58px;
+      height: 96px;
+      overflow: hidden;
       padding: 12px 16px;
       border: 3px solid var(--ink);
       background: var(--panel);
@@ -156,6 +156,24 @@
 
     .enemy-speech .speaker-name { background: var(--red); color: white; }
     .speech-text { display: block; font-size: 22px; font-weight: 1000; line-height: 1.1; }
+
+    .portrait-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 170px;
+    }
+
+    .enemy-group .portrait-row { flex-direction: row-reverse; }
+
+    .side-stack {
+      display: flex;
+      min-width: 0;
+      flex: 1;
+      flex-direction: column;
+      justify-content: center;
+      gap: 10px;
+    }
 
     .portrait {
       position: relative;
@@ -186,13 +204,14 @@
     .status {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 8px;
     }
 
-    .enemy-group .status { flex-direction: row-reverse; }
+    .enemy-group .status { flex-direction: row-reverse; justify-content: flex-end; }
 
-    .life {
+    .life,
+    .pp {
       display: flex;
       align-items: baseline;
       gap: 8px;
@@ -206,29 +225,8 @@
 
     .life b { color: var(--yellow); font-size: 12px; }
     .life strong { font-size: 32px; line-height: .8; }
-    .pp { border: 0; background: var(--cyan); color: var(--ink); font-size: 17px; }
+    .pp { border: 3px solid var(--ink); background: var(--cyan); color: var(--ink); font-size: 17px; }
     .pp small { font-size: 11px; }
-
-    .pp-meter {
-      position: absolute;
-      z-index: 6;
-      display: flex;
-      width: 330px;
-      height: 28px;
-      align-items: center;
-      gap: 5px;
-      padding: 5px 9px;
-      border: 3px solid var(--ink);
-      background: #0b1220e8;
-    }
-
-    .pp-meter.enemy-pp { top: 8px; left: 18px; }
-    .pp-meter.brother-pp { right: 360px; bottom: 8px; }
-    .pp-meter .pp-label { width: 48px; color: var(--cyan); font-size: 11px; font-weight: 1000; }
-    .pp-meter .pp-value { width: 42px; color: var(--white); font-size: 11px; font-weight: 1000; text-align: right; }
-    .pp-pips { display: grid; flex: 1; grid-template-columns: repeat(10, 1fr); gap: 3px; }
-    .pp-pip { height: 12px; border: 2px solid #53647c; background: #1c2b3f; }
-    .pp-pip.is-on { border-color: #a7ffff; background: var(--cyan); box-shadow: 0 0 7px #2ee4edaa; }
 
     .arena {
       position: absolute;
@@ -371,19 +369,22 @@
 <body>
   <div class="stage-wrap">
     <main class="stage" aria-label="バトル画面レイアウト静止モック">
-      <section class="opponent-hand" aria-label="相手の手札">
-        <span>相手の手札</span><span class="hand-count">4</span>
-        <i class="back-card"></i><i class="back-card"></i><i class="back-card"></i><i class="back-card"></i>
-      </section>
-
       <section class="message-group enemy-group" aria-label="敵側メッセージ一式">
         <div class="speech enemy-speech">
           <span class="speaker-name">ゴウダ</span><span class="label">鉄壁番長</span>
-          <strong class="speech-text">ここからが本番だ！</strong>
+          <strong class="speech-text">ここからが本番だ！ この盤面を突破できるなら、かかってこい！</strong>
         </div>
-        <div class="portrait enemy-portrait"><img src="../src/assets/characters/tanjun-bust-smile.png" alt="敵側の仮顔グラ" /></div>
-        <div class="status" aria-label="敵のライフとPP">
-          <div class="life"><b>LIFE</b><strong>12</strong></div>
+        <div class="portrait-row">
+          <div class="portrait enemy-portrait"><img src="../src/assets/characters/tanjun-bust-smile.png" alt="敵側の仮顔グラ" /></div>
+          <div class="side-stack">
+            <div class="status" aria-label="敵のライフとPP">
+              <div class="life"><b>LIFE</b><strong>12</strong></div><div class="pp">PP <small>1/1</small></div>
+            </div>
+            <div class="opponent-hand" aria-label="相手の手札">
+              <span>相手の手札</span><span class="hand-count">4</span>
+              <i class="back-card"></i><i class="back-card"></i><i class="back-card"></i><i class="back-card"></i>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -401,30 +402,21 @@
       </section>
 
       <section class="message-group brother-group" aria-label="弟側メッセージ一式">
-        <div class="status" aria-label="弟のライフとPP">
-          <div class="life"><b>LIFE</b><strong>20</strong></div>
+        <div class="portrait-row">
+          <div class="portrait brother-portrait"><img src="../src/assets/characters/tanjun-bust-smile.png" alt="単純弟の笑顔" /></div>
+          <div class="side-stack">
+            <div class="status" aria-label="弟のライフとPP">
+              <div class="life"><b>LIFE</b><strong>20</strong></div><div class="pp">PP <small>0/2</small></div>
+            </div>
+            <div class="brother-hand" aria-label="ユウタの手札">
+              <span>ユウタの手札</span><span class="hand-count">3</span>
+              <i class="back-card"></i><i class="back-card"></i><i class="back-card"></i>
+            </div>
+          </div>
         </div>
-        <div class="portrait brother-portrait"><img src="../src/assets/characters/tanjun-bust-smile.png" alt="単純弟の笑顔" /></div>
         <div class="speech brother-speech">
           <span class="speaker-name">ユウタ</span><strong class="speech-text">いける、いける！</strong>
         </div>
-      </section>
-
-      <section class="brother-hand" aria-label="ユウタの手札">
-        <span>ユウタの手札</span><span class="hand-count">3</span>
-        <i class="back-card"></i><i class="back-card"></i><i class="back-card"></i>
-      </section>
-
-      <section class="pp-meter enemy-pp" aria-label="敵のPPメーター">
-        <span class="pp-label">敵 PP</span>
-        <span class="pp-pips"><i class="pp-pip is-on"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i></span>
-        <span class="pp-value">1 / 10</span>
-      </section>
-
-      <section class="pp-meter brother-pp" aria-label="弟のPPメーター">
-        <span class="pp-label">弟 PP</span>
-        <span class="pp-pips"><i class="pp-pip is-on"></i><i class="pp-pip is-on"></i><i class="pp-pip is-on"></i><i class="pp-pip is-on"></i><i class="pp-pip is-on"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i></span>
-        <span class="pp-value">5 / 10</span>
       </section>
 
       <img class="deck-case" src="../src/assets/deck-case-3.png" alt="シンクロ段階3のデッキケース" />
