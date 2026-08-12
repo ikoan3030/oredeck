@@ -81,7 +81,7 @@
     }
 
     .opponent-hand { top: 18px; right: 332px; }
-    .brother-hand { bottom: 18px; left: 390px; }
+    .brother-hand { right: 280px; bottom: 18px; }
 
     .hand-count {
       display: grid;
@@ -162,16 +162,15 @@
       width: 180px;
       height: 170px;
       overflow: hidden;
-      border: 6px solid var(--ink);
-      background: #707b8d;
+      border: 5px solid var(--ink);
+      background: #747d8c;
       box-shadow: 5px 5px 0 #000b;
     }
 
     .enemy-group .portrait { align-self: flex-end; }
     .brother-group .portrait { align-self: flex-start; }
 
-    .brother-portrait img,
-    .enemy-portrait img {
+    .brother-portrait img {
       display: block;
       width: 100%;
       height: 100%;
@@ -179,8 +178,26 @@
       object-position: 50% 13%;
     }
 
-    .enemy-portrait img {
-      transform: scaleX(-1);
+    .enemy-placeholder {
+      display: grid;
+      height: 100%;
+      place-items: center;
+      color: #dce2ec;
+      background: repeating-linear-gradient(135deg, #5d6675 0 12px, #737e8e 12px 24px);
+      font-weight: 1000;
+      letter-spacing: .12em;
+    }
+
+    .enemy-placeholder span {
+      display: grid;
+      width: 76px;
+      height: 76px;
+      place-items: center;
+      border: 4px solid var(--ink);
+      border-radius: 50%;
+      background: #e8e9ed;
+      color: var(--ink);
+      font-size: 34px;
     }
 
     .status {
@@ -214,16 +231,15 @@
       position: absolute;
       z-index: 2;
       top: 150px;
-      right: 18px;
+      right: 330px;
       bottom: 125px;
-      left: 18px;
+      left: 38px;
       display: grid;
       grid-template-rows: 1fr 28px 1fr;
       gap: 10px;
     }
 
     .board-row {
-      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -237,14 +253,10 @@
 
     .board-row.enemy-board { border-color: #ffd92899; }
     .board-row::after {
-      position: absolute;
-      top: 12px;
-      left: 50%;
       color: #dce2ec77;
       content: "相手の場";
       font-size: 14px;
       font-weight: 900;
-      transform: translateX(-50%);
     }
 
     .board-row.brother-board::after { content: "自分の場"; }
@@ -252,7 +264,7 @@
     .turn-band {
       align-self: center;
       width: 136px;
-      margin-left: 0;
+      margin-left: -16px;
       padding: 6px 14px;
       border: 4px solid var(--ink);
       background: var(--yellow);
@@ -361,7 +373,7 @@
           <span class="speaker-name">ゴウダ</span><span class="label">鉄壁番長</span>
           <strong class="speech-text">ここからが本番だ！</strong>
         </div>
-        <div class="portrait enemy-portrait"><img src="../src/assets/characters/tanjun-bust-smile.png" alt="敵側の仮顔グラ" /></div>
+        <div class="portrait enemy-portrait"><div class="enemy-placeholder"><span>ゴ</span></div></div>
         <div class="status" aria-label="敵のライフとPP">
           <div class="life"><b>LIFE</b><strong>12</strong></div><div class="pp">PP <small>1/1</small></div>
         </div>
