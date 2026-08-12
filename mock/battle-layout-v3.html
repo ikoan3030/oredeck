@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>バトル画面レイアウト検討モック</title>
+  <style>
+    :root {
+      --ink: #080c15;
+      --navy: #151d2b;
+      --panel: #0d1421e8;
+      --line: #687486;
+      --yellow: #ffd928;
+      --cyan: #2ee4ed;
+      --red: #ee3342;
+      --white: #f7f7f4;
+      --stage-w: 1280px;
+      --stage-h: 720px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #05070c; }
+    body {
+      display: grid;
+      min-width: 320px;
+      min-height: 100vh;
+      place-items: center;
+      overflow: auto;
+      color: var(--white);
+      font-family: Arial, "Noto Sans JP", sans-serif;
+    }
+
+    /* The mock keeps the game's 1280x720 design surface and scales it for review. */
+    .stage-wrap {
+      width: min(100vw, calc(100vh * 16 / 9));
+      aspect-ratio: 16 / 9;
+    }
+
+    .stage {
+      position: relative;
+      width: var(--stage-w);
+      height: var(--stage-h);
+      overflow: hidden;
+      transform-origin: top left;
+      transform: scale(min(calc(100vw / 1280), calc(100vh / 720)));
+      color: var(--white);
+      background:
+        radial-gradient(circle at 50% 45%, #34485f 0, #1d2939 45%, #111722 100%);
+      background-image:
+        radial-gradient(#ffffff16 1px, transparent 1px),
+        radial-gradient(circle at 50% 45%, #34485f 0, #1d2939 45%, #111722 100%);
+      background-size: 10px 10px, auto;
+    }
+
+    .stage::before {
+      position: absolute;
+      inset: 0;
+      content: "";
+      pointer-events: none;
+      background: linear-gradient(90deg, #050a12aa 0 4%, transparent 18% 82%, #050a12aa 96%);
+    }
+
+    .label {
+      color: var(--yellow);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .opponent-hand,
+    .brother-hand {
+      position: absolute;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--cyan);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .opponent-hand { top: 224px; right: 220px; flex-direction: row-reverse; }
+    .brother-hand { bottom: 198px; left: 212px; }
+
+    .hand-count {
+      display: grid;
+      width: 25px;
+      height: 25px;
+      place-items: center;
+      border: 2px solid var(--ink);
+      border-radius: 50%;
+      background: var(--cyan);
+      color: var(--ink);
+      font-size: 15px;
+    }
+
+    .back-card {
+      position: relative;
+      width: 30px;
+      height: 42px;
+      border: 2px solid #94a7c7;
+      border-radius: 3px;
+      background: #16243a;
+      box-shadow: inset 0 0 0 2px #122036, 2px 2px 0 #080c15;
+    }
+
+    .back-card::before,
+    .back-card::after {
+      position: absolute;
+      inset: 7px 4px;
+      content: "";
+      border: 3px solid var(--yellow);
+      transform: rotate(45deg);
+      background: linear-gradient(135deg, #f02d83 0 46%, transparent 47% 53%, #f02d83 54%);
+    }
+
+    .back-card::after {
+      inset: 11px 8px;
+      border-width: 2px;
+      background: transparent;
+    }
+
+    .message-group {
+      position: absolute;
+      z-index: 7;
+      display: flex;
+      width: 330px;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .enemy-group { top: 22px; right: 18px; align-items: stretch; }
+    .brother-group { bottom: 18px; left: 18px; align-items: stretch; }
+
+    .speech {
+      min-height: 58px;
+      padding: 12px 16px;
+      border: 3px solid var(--ink);
+      background: var(--panel);
+      box-shadow: 4px 4px 0 #000b;
+    }
+
+    .enemy-speech { border-color: var(--red); text-align: right; }
+    .brother-speech { border-color: #1974e8; text-align: left; }
+
+    .speaker-name {
+      display: inline-block;
+      margin-bottom: 5px;
+      padding: 3px 8px;
+      color: var(--ink);
+      background: var(--cyan);
+      font-size: 14px;
+      font-weight: 1000;
+    }
+
+    .enemy-speech .speaker-name { background: var(--red); color: white; }
+    .speech-text { display: block; font-size: 22px; font-weight: 1000; line-height: 1.1; }
+
+    .portrait {
+      position: relative;
+      width: 180px;
+      height: 170px;
+      overflow: hidden;
+      border: 6px solid var(--ink);
+      background: #707b8d;
+      box-shadow: 5px 5px 0 #000b;
+    }
+
+    .enemy-group .portrait { align-self: flex-end; }
+    .brother-group .portrait { align-self: flex-start; }
+
+    .brother-portrait img,
+    .enemy-portrait img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 50% 13%;
+    }
+
+    .enemy-portrait img {
+      transform: scaleX(-1);
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .enemy-group .status { flex-direction: row-reverse; }
+
+    .life {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      min-height: 48px;
+      padding: 8px 14px;
+      border: 3px solid var(--white);
+      background: var(--ink);
+      transform: skew(-7deg);
+      font-weight: 1000;
+    }
+
+    .life b { color: var(--yellow); font-size: 12px; }
+    .life strong { font-size: 32px; line-height: .8; }
+    .pp { border: 0; background: var(--cyan); color: var(--ink); font-size: 17px; }
+    .pp small { font-size: 11px; }
+
+    .pp-meter {
+      position: absolute;
+      z-index: 6;
+      display: flex;
+      width: 330px;
+      height: 28px;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 9px;
+      border: 3px solid var(--ink);
+      background: #0b1220e8;
+    }
+
+    .pp-meter.enemy-pp { top: 8px; left: 18px; }
+    .pp-meter.brother-pp { right: 360px; bottom: 8px; }
+    .pp-meter .pp-label { width: 48px; color: var(--cyan); font-size: 11px; font-weight: 1000; }
+    .pp-meter .pp-value { width: 42px; color: var(--white); font-size: 11px; font-weight: 1000; text-align: right; }
+    .pp-pips { display: grid; flex: 1; grid-template-columns: repeat(10, 1fr); gap: 3px; }
+    .pp-pip { height: 12px; border: 2px solid #53647c; background: #1c2b3f; }
+    .pp-pip.is-on { border-color: #a7ffff; background: var(--cyan); box-shadow: 0 0 7px #2ee4edaa; }
+
+    .arena {
+      position: absolute;
+      z-index: 2;
+      top: 150px;
+      right: 18px;
+      bottom: 125px;
+      left: 18px;
+      display: grid;
+      grid-template-rows: 1fr 28px 1fr;
+      gap: 10px;
+    }
+
+    .board-row {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      min-height: 0;
+      padding: 18px;
+      border: 3px dashed #8c98a866;
+      border-radius: 18px;
+      background: #1621333b;
+    }
+
+    .board-row.enemy-board { border-color: #ffd92899; }
+    .board-row::after {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      color: #dce2ec77;
+      content: "相手の場";
+      font-size: 14px;
+      font-weight: 900;
+      transform: translateX(-50%);
+    }
+
+    .board-row.brother-board::after { content: "自分の場"; }
+
+    .turn-band {
+      align-self: center;
+      width: 136px;
+      margin-left: 0;
+      padding: 6px 14px;
+      border: 4px solid var(--ink);
+      background: var(--yellow);
+      color: var(--ink);
+      box-shadow: 4px 4px 0 white;
+      font-size: 17px;
+      font-weight: 1000;
+      letter-spacing: .08em;
+      transform: skew(-8deg);
+    }
+
+    .dummy-card {
+      position: relative;
+      display: grid;
+      width: 108px;
+      height: 144px;
+      place-items: center;
+      border: 4px solid var(--ink);
+      border-radius: 5px;
+      background: linear-gradient(#d9efff, #f4b3d1);
+      box-shadow: 4px 5px 0 #000b;
+      color: var(--ink);
+      font-size: 36px;
+      font-weight: 1000;
+    }
+
+    .dummy-card small {
+      position: absolute;
+      top: 4px;
+      left: 5px;
+      padding: 3px 5px;
+      background: var(--yellow);
+      font-size: 11px;
+    }
+
+    .dummy-card .stats {
+      position: absolute;
+      right: 4px;
+      bottom: 4px;
+      left: 4px;
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 8px;
+      background: #1cae6a;
+      font-size: 14px;
+    }
+
+    .deck-case {
+      position: absolute;
+      z-index: 6;
+      right: 360px;
+      bottom: 76px;
+      width: 130px;
+      height: 130px;
+      object-fit: contain;
+      filter: drop-shadow(4px 5px 0 #000b);
+    }
+
+    .controls {
+      position: absolute;
+      z-index: 8;
+      right: 18px;
+      bottom: 78px;
+      display: grid;
+      grid-template-columns: repeat(2, auto);
+      gap: 8px;
+      padding: 8px;
+      border: 3px solid var(--ink);
+      background: #0b1220e8;
+    }
+
+    .controls button {
+      padding: 9px 12px;
+      border: 3px solid var(--white);
+      background: var(--yellow);
+      color: var(--ink);
+      font-weight: 1000;
+      cursor: default;
+    }
+
+    .controls button.secondary { background: #1c2d47; color: white; }
+    .controls .speed { grid-column: 1 / -1; padding: 5px; border: 0; color: var(--yellow); background: transparent; font-size: 12px; }
+
+    .mock-note {
+      position: fixed;
+      right: 12px;
+      bottom: 8px;
+      z-index: 20;
+      padding: 4px 8px;
+      color: #b4bdcc;
+      background: #05070ccc;
+      font: 11px/1.2 monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="stage-wrap">
+    <main class="stage" aria-label="バトル画面レイアウト静止モック">
+      <section class="opponent-hand" aria-label="相手の手札">
+        <span>相手の手札</span><span class="hand-count">4</span>
+        <i class="back-card"></i><i class="back-card"></i><i class="back-card"></i><i class="back-card"></i>
+      </section>
+
+      <section class="message-group enemy-group" aria-label="敵側メッセージ一式">
+        <div class="speech enemy-speech">
+          <span class="speaker-name">ゴウダ</span><span class="label">鉄壁番長</span>
+          <strong class="speech-text">ここからが本番だ！</strong>
+        </div>
+        <div class="portrait enemy-portrait"><img src="../src/assets/characters/tanjun-bust-smile.png" alt="敵側の仮顔グラ" /></div>
+        <div class="status" aria-label="敵のライフとPP">
+          <div class="life"><b>LIFE</b><strong>12</strong></div>
+        </div>
+      </section>
+
+      <section class="arena" aria-label="盤面">
+        <div class="board-row enemy-board">
+          <div class="dummy-card"><small>守護</small>盾<div class="stats"><span>2</span><span>4</span></div></div>
+          <div class="dummy-card"><small>速攻</small>風<div class="stats"><span>3</span><span>2</span></div></div>
+        </div>
+        <div class="turn-band">TURN 3</div>
+        <div class="board-row brother-board">
+          <div class="dummy-card"><small>SYNC</small>き<div class="stats"><span>2</span><span>1</span></div></div>
+          <div class="dummy-card"><small>SYNC</small>猛<div class="stats"><span>4</span><span>1</span></div></div>
+          <div class="dummy-card"><small>守護</small>岩<div class="stats"><span>1</span><span>4</span></div></div>
+        </div>
+      </section>
+
+      <section class="message-group brother-group" aria-label="弟側メッセージ一式">
+        <div class="status" aria-label="弟のライフとPP">
+          <div class="life"><b>LIFE</b><strong>20</strong></div>
+        </div>
+        <div class="portrait brother-portrait"><img src="../src/assets/characters/tanjun-bust-smile.png" alt="単純弟の笑顔" /></div>
+        <div class="speech brother-speech">
+          <span class="speaker-name">ユウタ</span><strong class="speech-text">いける、いける！</strong>
+        </div>
+      </section>
+
+      <section class="brother-hand" aria-label="ユウタの手札">
+        <span>ユウタの手札</span><span class="hand-count">3</span>
+        <i class="back-card"></i><i class="back-card"></i><i class="back-card"></i>
+      </section>
+
+      <section class="pp-meter enemy-pp" aria-label="敵のPPメーター">
+        <span class="pp-label">敵 PP</span>
+        <span class="pp-pips"><i class="pp-pip is-on"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i></span>
+        <span class="pp-value">1 / 10</span>
+      </section>
+
+      <section class="pp-meter brother-pp" aria-label="弟のPPメーター">
+        <span class="pp-label">弟 PP</span>
+        <span class="pp-pips"><i class="pp-pip is-on"></i><i class="pp-pip is-on"></i><i class="pp-pip is-on"></i><i class="pp-pip is-on"></i><i class="pp-pip is-on"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i><i class="pp-pip"></i></span>
+        <span class="pp-value">5 / 10</span>
+      </section>
+
+      <img class="deck-case" src="../src/assets/deck-case-3.png" alt="シンクロ段階3のデッキケース" />
+
+      <nav class="controls" aria-label="バトル操作モック">
+        <span class="speed">演出　じっくり　さくさく　スキップ</span>
+        <button class="secondary" type="button">ログ</button>
+        <button type="button">再開</button>
+      </nav>
+    </main>
+  </div>
+  <div class="mock-note">layout mock / 1280 × 720</div>
+</body>
+</html>
