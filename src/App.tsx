@@ -1,10 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import deckCase0 from "./assets/deck-case-0.png";
-import deckCase1 from "./assets/deck-case-1.png";
-import deckCase2 from "./assets/deck-case-2.png";
-import deckCase3 from "./assets/deck-case-3.png";
-import deckCase4 from "./assets/deck-case-4.png";
-import deckCase5 from "./assets/deck-case-5.png";
 import handImage from "./assets/characters/tanjun-hand-open.png";
 import tanjunBustSmile from "./assets/characters/tanjun-bust-smile.png";
 import {
@@ -43,8 +37,6 @@ import {
   type Species,
   type SpeciesSynergyConfig,
 } from "@/src/core";
-
-const DECK_CASE_IMAGES = [deckCase0, deckCase1, deckCase2, deckCase3, deckCase4, deckCase5];
 
 type Phase = "title" | "mode" | "character" | "opponent" | "draft" | "deck" | "ace" | "battle" | "clear";
 
@@ -445,27 +437,35 @@ function Speech({ speaker, text, tone = "kid" }: { speaker: string; text: string
  * LIFE/PP は台詞枠から切り離して立ち絵の外側に置く。台詞が無い間も枠は残り、台詞欄だけが空になる。
  * 立ち絵は縦横比を保ったまま（トリミングせず）枠いっぱいに出す。
  */
-function BattleActor({ side, name, title, marker, text, leader, hit, portraitSrc }: {
+function BattleActor({ side, name, title, marker, text, leader, hand, activeEvent, onHandOpen, hit, portraitSrc }: {
   side: "brother" | "opponent";
   name: string;
   title?: string;
   marker: string;
   text?: string;
   leader: { life: number; pp: number; maxPp: number };
+  hand?: { instanceId: string }[];
+  activeEvent?: BattleEvent | null;
+  onHandOpen?: () => void;
   hit: boolean;
   portraitSrc?: string;
 }) {
   return <div className={`battle-actor battle-actor-${side}`}>
-    <div className={`battle-leader-info ${side}-leader-info ` + (hit ? "life-target" : "")}>
-      <div className="life"><span>LIFE</span><b>{leader.life}</b></div>
-      <div className="pp">PP {leader.pp}/{leader.maxPp}</div>
-    </div>
-    <div className="battle-actor-portrait" role="img" aria-label={`${name}の立ち絵${portraitSrc ? "" : "（プレースホルダ）"}`}>
-      {portraitSrc ? <img className="battle-actor-portrait-image" src={portraitSrc} alt="" /> : <><span aria-hidden="true">{marker}</span><small>PORTRAIT</small></>}
-    </div>
     <div className="battle-actor-caption">
       <div className="battle-actor-heading"><span className="battle-actor-name">{name}</span>{title && <small className="battle-actor-title">{title}</small>}</div>
       <p className="battle-actor-line" aria-live="polite">{text ?? ""}</p>
+    </div>
+    <div className="battle-actor-row">
+      <div className="battle-actor-portrait" role="img" aria-label={`${name}の立ち絵${portraitSrc ? "" : "（プレースホルダ）"}`}>
+        {portraitSrc ? <img className="battle-actor-portrait-image" src={portraitSrc} alt="" /> : <><span aria-hidden="true">{marker}</span><small>PORTRAIT</small></>}
+      </div>
+      <div className="battle-actor-side-data">
+        <div className={`battle-leader-info ${side}-leader-info ` + (hit ? "life-target" : "")}>
+          <div className="life"><span>LIFE</span><b>{leader.life}</b></div>
+          <div className="pp">PP {leader.pp}/{leader.maxPp}</div>
+        </div>
+        {hand && <HandCountZone side={side} label={side === "brother" ? "ユウタの手札" : "相手の手札"} hand={hand} activeEvent={activeEvent ?? null} onOpen={onHandOpen} />}
+      </div>
     </div>
   </div>;
 }
@@ -913,8 +913,8 @@ function HandCountZone({ side, label, hand, activeEvent, onOpen }: {
 /** 弟の手札の内訳。ログモーダルと同じ形式で、開いている間は再生を止める。 */
 function BattleHandModal({ open, hand, cards, aceInstanceId, onClose }: { open: boolean; hand: BattleState["brother"]["hand"]; cards: Card[]; aceInstanceId: string | null; onClose: () => void }) {
   if (!open) return null;
-  return <div className="battle-log-modal-backdrop" role="presentation" onClick={onClose}>
-    <section className="battle-log-modal battle-hand-modal" role="dialog" aria-modal="true" aria-label="ユウタの手札" onClick={(event) => event.stopPropagation()}>
+  return <div className="battle-hand-modal-backdrop" role="presentation" onClick={onClose}>
+    <section className="battle-hand-modal" role="dialog" aria-modal="true" aria-label="ユウタの手札" onClick={(event) => event.stopPropagation()}>
       <div className="panel-heading"><span>ユウタの手札</span><b>{hand.length}枚 / PAUSED</b><button type="button" onClick={onClose}>閉じる</button></div>
       <div className="battle-hand-modal-cards">
         {hand.map((item) => {
@@ -953,32 +953,18 @@ function BattleSpeedControls({ speed, onChange }: { speed: PlaybackSpeed; onChan
   return <div className="battle-speed-controls" aria-label="バトル演出速度"><span>演出</span>{(["normal", "fast", "skip"] as PlaybackSpeed[]).map((item) => <button key={item} type="button" className={speed === item ? "active" : ""} aria-pressed={speed === item} onClick={() => onChange(item)}>{PLAYBACK_SPEED_LABELS[item]}</button>)}</div>;
 }
 
-function DeckCaseMeter({ stage, deckCount }: { stage: number; deckCount: number }) {
-  const visualStage = Math.min(5, Math.max(0, stage));
-  const deckCaseImage = DECK_CASE_IMAGES[visualStage];
-  return <div className={`deck-case-meter stage-${visualStage}${deckCount === 0 ? " deck-out" : ""}`} aria-label={`シンクロ段階${visualStage}、山札の残り${deckCount}枚`}>
-    <div className="deck-case-art">
-      <img src={deckCaseImage} alt="" />
-      <strong className="deck-case-window">{deckCount}</strong>
-    </div>
-  </div>;
-}
-
 function TurnTransitionBanner({ banner }: { banner: { side: BattleEvent["side"]; text: string; duration: number } | null }) {
   if (!banner) return null;
   const side = banner.side === "brother" ? "brother" : "opponent";
   return <div className={`turn-transition-banner ${side}`} style={{ "--turn-banner-duration": `${banner.duration}ms` } as CSSProperties} role="status" aria-live="polite"><span>{banner.text}</span></div>;
 }
 
-function BattleLogModal({ open, recent, cards, opponentName, onOpen, onClose }: { open: boolean; recent: BattleEvent[]; cards: Card[]; opponentName: string; onOpen: () => void; onClose: () => void }) {
+function BattleLogPanel({ open, recent, cards, opponentName, onToggle }: { open: boolean; recent: BattleEvent[]; cards: Card[]; opponentName: string; onToggle: () => void }) {
   return <>
-    <button className="battle-log-launcher" type="button" onClick={onOpen} aria-haspopup="dialog" aria-expanded={open}>ログ</button>
-    {open && <div className="battle-log-modal-backdrop" role="presentation" onClick={onClose}>
-      <section className="battle-log-modal" role="dialog" aria-modal="true" aria-label="バトルログ" onClick={(event) => event.stopPropagation()}>
-        <div className="panel-heading"><span>BATTLE LOG</span><b>PAUSED</b><button type="button" onClick={onClose}>閉じる</button></div>
-        <div className="battle-log-entries">{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponentName}</span>{battleLogText(item, cards)}</p>)}</div>
-      </section>
-    </div>}
+    <section className={`battle-log-panel ${open ? "is-open" : ""}`} aria-label="バトルログ">
+      <button className="battle-log-launcher" type="button" onClick={onToggle} aria-expanded={open}>ログ</button>
+      {open && <div className="battle-log-entries">{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponentName}</span>{battleLogText(item, cards)}</p>)}</div>}
+    </section>
   </>;
 }
 
@@ -1138,7 +1124,6 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
   const lifeSnapshot = playbackEvent?.snapshot;
   const lifeOpponent = lifeSnapshot?.opponent ?? battle.opponent;
   const lifeBrother = lifeSnapshot?.brother ?? battle.brother;
-  const brotherDeckCount = lifeSnapshot?.brother.deckCount ?? battle.brother.deck.length;
   const leaderHitSide = activeEvent && isDamageEvent(activeEvent) && activeEvent.targetLeader ? activeEvent.side === "brother" ? "opponent" : "brother" : null;
   const activeTiming = activeEvent ? EVENT_PLAYBACK_TIMING[activeEvent.type] : null;
   const visualDuration = activeEvent ? `${activeTiming!.visual?.[speed] ?? activeTiming![speed]}ms` : undefined;
@@ -1181,21 +1166,17 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
     {/* 常時表示のシナジー帯はHUD整理のため一時停止。開戦時の宣言演出は別レイヤーで維持する。 */}
     <TurnTransitionBanner banner={turnBanner} />
     <div className="battle-turn-center" aria-label={`現在のターン ${battle.turn}`}>TURN <b>{battle.turn}</b></div>
-    <BattleActor side="opponent" name={opponent.name} title={opponent.title} marker={opponent.name.slice(0, 1)} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} leader={lifeOpponent} hit={leaderHitSide === "opponent"} />
+    <BattleActor side="opponent" name={opponent.name} title={opponent.title} marker={opponent.name.slice(0, 1)} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} leader={lifeOpponent} hand={opponentHand} activeEvent={activeEvent} hit={leaderHitSide === "opponent"} />
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={arenaStyle}>
-      <div className={"fighter opponent-fighter " + (damageTargetSide === "opponent" ? "battle-target" : "")}><HandCountZone side="opponent" label="相手の手札" hand={opponentHand} activeEvent={activeEvent} /></div>
       <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{stableBoards.opponent.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!stableBoards.opponent.length && <span className="empty-board">相手の場は空</span>}</div>
       <div className="board-line"><b>AUTO CARD BATTLE</b></div>
       <div className={"board-zone brother-board " + (damageTargetSide === "brother" ? "battle-target" : "")}>{stableBoards.brother.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!stableBoards.brother.length && <span className="empty-board">ユウタの場は空</span>}</div>
-      <div className="hand-zone"><HandCountZone side="brother" label="ユウタの手札" hand={brotherHand} activeEvent={activeEvent} onOpen={() => setHandOpen(true)} /></div>
       <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} />
     </section>
-    <BattleActor side="brother" name="ユウタ" marker="ユ" text={!battle.winner ? brotherDialogueEvent?.dialogue : undefined} leader={lifeBrother} hit={leaderHitSide === "brother"} portraitSrc={tanjunBustSmile} />
-    <DeckCaseMeter stage={battle.syncRate === 0 ? 0 : syncStage(battle.syncRate, child)} deckCount={brotherDeckCount} />
-    {/* The battle log is modal-only; the launcher and pause surface are rendered below. */}
+    <BattleActor side="brother" name="ユウタ" marker="ユ" text={!battle.winner ? brotherDialogueEvent?.dialogue : undefined} leader={lifeBrother} hand={brotherHand} activeEvent={activeEvent} onHandOpen={() => setHandOpen(true)} hit={leaderHitSide === "brother"} portraitSrc={tanjunBustSmile} />
     {!battle.winner && <div className="battle-controls"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /><button className="battle-pause-toggle" type="button" onClick={onAutoToggle} aria-pressed={!auto}>{auto ? "一時停止" : "再開"}</button></div>}
     <BattleHandModal open={handOpen} hand={brotherHand} cards={cards} aceInstanceId={aceInstanceId ?? null} onClose={() => setHandOpen(false)} />
-    <BattleLogModal open={logOpen} recent={recent} cards={cards} opponentName={opponent.name} onOpen={() => setLogOpen(true)} onClose={() => setLogOpen(false)} />
+    <BattleLogPanel open={logOpen} recent={recent} cards={cards} opponentName={opponent.name} onToggle={() => setLogOpen((value) => !value)} />
     {cutIn?.visible && <BattleCutIn kind={cutIn.kind} />}
     {playbackComplete && battle.winner && <div className="result-overlay"><div className={"result-burst " + (battle.winner === "brother" ? "win" : "lose")}><span>{battle.winner === "brother" ? "VICTORY!" : battle.winner === "draw" ? "DRAW" : "DEFEAT"}</span><h1>{battle.winner === "brother" ? "ユウタの勝利！" : battle.winner === "draw" ? "引き分け！" : opponent.name + "の勝利！"}</h1><p>{battle.winner === "brother" ? "デッキは狙い通りに仕事をしただろうか？" : "次の相手とのバトルへ進もう。"}</p>{postBattleDialogue && <div className="post-battle-commentary"><Speech speaker={child.displayName} text={postBattleDialogue} /></div>}<button className="primary-action" onClick={onFinish}>{finalBattle ? "結果を見る" : "次の相手へ"}<span>▶</span></button></div></div>}
   </main>;
