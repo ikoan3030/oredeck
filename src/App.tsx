@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import boardImage from "./assets/board.png";
 import handImage from "./assets/characters/tanjun-hand-open.png";
 import tanjunBustSmile from "./assets/characters/tanjun-bust-smile.png";
 import {
@@ -1205,6 +1206,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
     <DeckOutBanner banner={deckOutBanner} />
     <BattleActor side="opponent" name={opponent.name} title={opponent.title} marker={opponent.name.slice(0, 1)} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} leader={lifeOpponent} hand={opponentHand} activeEvent={activeEvent} hit={leaderHitSide === "opponent"} />
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={arenaStyle}>
+      <img className="battle-board-art" src={boardImage} alt="" aria-hidden="true" />
       <div className="board-turn" aria-label={`現在のターン ${battle.turn}`}>TURN {battle.turn}</div>
       <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{stableBoards.opponent.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!stableBoards.opponent.length && <span className="empty-board">相手の場は空</span>}</div>
       <div className="board-line"><b>AUTO CARD BATTLE</b></div>

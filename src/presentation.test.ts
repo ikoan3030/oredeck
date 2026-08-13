@@ -85,10 +85,12 @@ test("the turn number is a field watermark that never covers a card", () => {
   assert.equal(styles.includes(".battle-turn-center"), false, "the old fixed turn badge styles must be gone");
   assert.ok(app.includes('className="board-turn"'), "the turn number lives inside the field");
   const block = rulesFor("board-turn")[0] ?? "";
-  assert.ok(/z-index:\s*-1/.test(block), "the watermark must sit behind the cards");
+  assert.ok(/z-index:\s*1/.test(block), "the watermark must sit above the board art and behind the cards");
   assert.ok(!/background(-color)?:/.test(block), "the watermark must not paint a band");
   assert.ok(!/(^|[;\s])border\s*:/.test(block), "the watermark must not draw a border");
   // 盤面の点線枠と同じ淡さ。
-  assert.ok(block.includes("#ffffff44"), "the watermark must match the dashed board outline");
-  assert.ok(styles.includes("border: 3px dashed #ffffff44"), "the dashed board outline is the reference tone");
+  assert.ok(block.includes("#ffffff44"), "the watermark must remain a subdued field label");
+  assert.ok(app.includes('className="battle-board-art"'), "the field uses the imported board artwork");
+  assert.ok(styles.includes(".battle-board-art"), "the board artwork needs a dedicated background layer");
+  assert.equal(styles.includes("border: 3px dashed #ffffff44"), false, "the old dashed board outline must be removed");
 });
