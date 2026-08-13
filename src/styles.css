@@ -589,8 +589,21 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 
 .battle-screen { height: calc(100 * var(--stage-vh)); display: flex; flex-direction: column; position: relative; overflow: hidden; color: white; background: radial-gradient(circle at 50% 46%, #34485f, #151922 65%); }
 .battle-screen::before { content: ""; position: absolute; inset: 0; opacity: .15; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 10px 10px; }
-.battle-turn-center { position: absolute; z-index: 3; top: calc(44.444 * var(--stage-vh) + 27px); left: calc(16 * var(--stage-vw)); padding: 5px 18px; color: var(--ink); background: var(--yellow); border: 3px solid var(--ink); box-shadow: 4px 4px 0 white; font: 1000 15px/1 Arial, sans-serif; letter-spacing: .12em; pointer-events: none; transform: translate(-50%, -50%) skew(-8deg); }
-.battle-turn-center b { font-size: 1.2em; }
+/* ターン数は盤面の中心に置く透かし。盤面の点線枠と同じ淡さで、帯も背景も持たない。
+   z-index を負にしてあるので、カードや演出は常にこの文字の上に描かれる。 */
+.board-turn {
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 50%;
+  color: #ffffff44;
+  font: 800 clamp(22px, calc(2.6 * var(--stage-vw)), 34px)/1 "Yu Gothic", sans-serif;
+  letter-spacing: .22em;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  transform: translate(-50%, -50%);
+}
 .arena { --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 0; padding: 8px 300px 150px; display: grid; grid-template-rows: minmax(120px, 1fr) 26px minmax(120px, 1fr); gap: 8px; }
 .battle-leader-info { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
 .opponent-leader-info { justify-content: flex-end; }

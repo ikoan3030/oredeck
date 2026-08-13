@@ -79,3 +79,16 @@ test("deck depletion is announced once per player, and never during skip", () =>
   assert.ok(styles.includes(".deck-out-banner"), "the banner needs its own thin-band style");
   assert.equal(app.includes("deck-case-meter"), false, "the always-on deck count must stay retired");
 });
+
+test("the turn number is a field watermark that never covers a card", () => {
+  assert.equal(app.includes("battle-turn-center"), false, "the old fixed turn badge must be gone");
+  assert.equal(styles.includes(".battle-turn-center"), false, "the old fixed turn badge styles must be gone");
+  assert.ok(app.includes('className="board-turn"'), "the turn number lives inside the field");
+  const block = rulesFor("board-turn")[0] ?? "";
+  assert.ok(/z-index:\s*-1/.test(block), "the watermark must sit behind the cards");
+  assert.ok(!/background(-color)?:/.test(block), "the watermark must not paint a band");
+  assert.ok(!/(^|[;\s])border\s*:/.test(block), "the watermark must not draw a border");
+  // 盤面の点線枠と同じ淡さ。
+  assert.ok(block.includes("#ffffff44"), "the watermark must match the dashed board outline");
+  assert.ok(styles.includes("border: 3px dashed #ffffff44"), "the dashed board outline is the reference tone");
+});

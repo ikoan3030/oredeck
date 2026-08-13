@@ -1203,9 +1203,9 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
     {/* 常時表示のシナジー帯はHUD整理のため一時停止。開戦時の宣言演出は別レイヤーで維持する。 */}
     <TurnTransitionBanner banner={turnBanner} />
     <DeckOutBanner banner={deckOutBanner} />
-    <div className="battle-turn-center" aria-label={`現在のターン ${battle.turn}`}>TURN <b>{battle.turn}</b></div>
     <BattleActor side="opponent" name={opponent.name} title={opponent.title} marker={opponent.name.slice(0, 1)} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} leader={lifeOpponent} hand={opponentHand} activeEvent={activeEvent} hit={leaderHitSide === "opponent"} />
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={arenaStyle}>
+      <div className="board-turn" aria-label={`現在のターン ${battle.turn}`}>TURN {battle.turn}</div>
       <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{stableBoards.opponent.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!stableBoards.opponent.length && <span className="empty-board">相手の場は空</span>}</div>
       <div className="board-line"><b>AUTO CARD BATTLE</b></div>
       <div className={"board-zone brother-board " + (damageTargetSide === "brother" ? "battle-target" : "")}>{stableBoards.brother.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!stableBoards.brother.length && <span className="empty-board">ユウタの場は空</span>}</div>
