@@ -626,8 +626,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .hand-count-draw { animation: hand-count-draw var(--event-duration, .34s) cubic-bezier(.2,.8,.25,1) both; }
 .hand-count-play { animation: hand-count-play var(--event-duration, .48s) cubic-bezier(.2,.8,.25,1) both; }
 .board-zone { position: relative; z-index: 2; min-height: 128px; display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px; border: 0; border-radius: 0; }
-.opponent-board { align-items: flex-start; }
-.brother-board { align-items: flex-end; }
+.opponent-board,
+.brother-board { align-items: center; }
 .empty-board { color: #ffffff55; font: 800 12px "Yu Gothic", sans-serif; }
 .board-line { position: relative; z-index: 1; display: grid; place-items: center; }
 .board-line::before { display: none; }
