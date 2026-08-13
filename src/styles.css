@@ -604,8 +604,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   user-select: none;
   transform: translate(-50%, -50%);
 }
-.arena { --board-shift: 60px; --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 0; padding: calc(8px + var(--board-shift)) 300px 150px; display: grid; grid-template-rows: minmax(120px, 1fr) 26px minmax(120px, 1fr); gap: 8px; }
-.battle-board-art { position: absolute; z-index: 0; top: calc(8px + var(--board-shift)); right: 300px; bottom: 150px; left: 300px; display: block; width: calc(100% - 600px); height: calc(100% - 158px - var(--board-shift)); object-fit: fill; pointer-events: none; user-select: none; }
+.arena { --board-shift: 60px; --board-top: calc(8px + var(--board-shift)); --board-height: calc(var(--stage-h) - 158px - var(--board-shift)); --board-left: 300px; --board-width: calc(100% - 600px); --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 0; padding: 0; display: block; }
+.battle-board-art { position: absolute; z-index: 0; top: var(--board-top); right: 300px; bottom: auto; left: 300px; display: block; width: var(--board-width); height: var(--board-height); object-fit: fill; pointer-events: none; user-select: none; }
 .battle-leader-info { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
 .opponent-leader-info { justify-content: flex-end; }
 .brother-leader-info { justify-content: flex-start; }
@@ -625,11 +625,13 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .hand-card-back i { position: relative; z-index: 1; width: 5px; height: 30px; background: var(--pink); box-shadow: 0 0 8px var(--pink); transform: rotate(45deg); }
 .hand-count-draw { animation: hand-count-draw var(--event-duration, .34s) cubic-bezier(.2,.8,.25,1) both; }
 .hand-count-play { animation: hand-count-play var(--event-duration, .48s) cubic-bezier(.2,.8,.25,1) both; }
-.board-zone { position: relative; z-index: 2; min-height: 128px; display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px; border: 0; border-radius: 0; }
+.board-zone { position: absolute; z-index: 2; left: var(--board-left); width: var(--board-width); min-height: 128px; display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px; border: 0; border-radius: 0; box-sizing: border-box; }
 .opponent-board,
 .brother-board { align-items: center; }
+.opponent-board { top: calc(var(--board-top) + var(--board-height) * .135); height: max(128px, calc(var(--board-height) * .17)); }
+.brother-board { top: calc(var(--board-top) + var(--board-height) * .44); height: max(128px, calc(var(--board-height) * .18)); }
 .empty-board { color: #ffffff55; font: 800 12px "Yu Gothic", sans-serif; }
-.board-line { position: relative; z-index: 1; display: grid; place-items: center; }
+.board-line { position: absolute; z-index: 1; top: calc(var(--board-top) + var(--board-height) * .416 - 13px); left: var(--board-left); width: var(--board-width); height: 26px; display: grid; place-items: center; }
 .board-line::before { display: none; }
 .board-line b { visibility: hidden; }
 .board-line b { z-index: 1; padding: 4px 12px; color: var(--ink); background: var(--yellow); border: 2px solid var(--ink); font: 900 9px Arial, sans-serif; letter-spacing: .12em; }
@@ -1553,7 +1555,7 @@ button.hand-count-zone:hover, button.hand-count-zone:focus-visible { background:
   .life span { font-size: 9px; }
   .life b { font-size: 32px; }
   .pp { padding: 8px 9px; font-size: 12px; }
-  .arena { padding-top: calc(2px + var(--board-shift)); padding-bottom: 110px; gap: 6px; }
+  .arena { padding: 0; }
   .board-zone { padding: 8px; }
   .hand-count-zone { padding: 0 8px; }
   /* 背の低い横長では、上下のメッセージウィンドウと盤面・手札が同居できるよう手札を一段小さくする。 */
