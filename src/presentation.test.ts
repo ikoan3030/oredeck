@@ -67,3 +67,15 @@ test("each side stacks a portrait over its own caption, with life split out", ()
   assert.equal(styles.includes(".battle-dialogue-group"), false, "the split dialogue group must be removed");
   assert.equal(app.includes('className="avatar"'), false, "the old circular leader icons must be removed");
 });
+
+test("deck depletion is announced once per player, and never during skip", () => {
+  assert.ok(app.includes("function DeckOutBanner("), "the announcement needs its own small banner");
+  assert.ok(app.includes("announcedDeckOut"), "the announcement must remember who was already announced");
+  assert.ok(app.includes("announcedDeckOut.current.add(deckOutSide)"), "a side must be recorded the first time it runs out");
+  assert.ok(app.includes("!announcedDeckOut.current.has(target)"), "an already-announced side must not fire again");
+  // スキップは0msなので帯を出さない。
+  assert.ok(/DECK_OUT_BANNER_MS[^;]*skip: 0/.test(app), "skip playback must omit the announcement");
+  // 切り札カットインより明確に小さい細帯であること。
+  assert.ok(styles.includes(".deck-out-banner"), "the banner needs its own thin-band style");
+  assert.equal(app.includes("deck-case-meter"), false, "the always-on deck count must stay retired");
+});

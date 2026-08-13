@@ -184,6 +184,9 @@ interface EventPlaybackTiming {
   cutIn?: Record<PlaybackSpeed, { before: number; hold: number; after: number }>;
 }
 
+// 山札切れの告知。ターン転換の帯と同じ小型カットインで、スキップ時は省略する。
+const DECK_OUT_BANNER_MS: Record<PlaybackSpeed, number> = { normal: 900, fast: 700, skip: 0 };
+
 const PLAYBACK_SPEED_KEY = "oredeck-battle-playback-speed";
 const PLAYBACK_SPEED_LABELS: Record<PlaybackSpeed, string> = { normal: "じっくり", fast: "さくさく", skip: "スキップ" };
 // Keep the internal keys stable for localStorage compatibility: normal is rich pacing, fast is quick pacing.
@@ -953,6 +956,13 @@ function BattleSpeedControls({ speed, onChange }: { speed: PlaybackSpeed; onChan
   return <div className="battle-speed-controls" aria-label="バトル演出速度"><span>演出</span>{(["normal", "fast", "skip"] as PlaybackSpeed[]).map((item) => <button key={item} type="button" className={speed === item ? "active" : ""} aria-pressed={speed === item} onClick={() => onChange(item)}>{PLAYBACK_SPEED_LABELS[item]}</button>)}</div>;
 }
 
+/** 山札が尽きたことの告知。ターン転換の帯と同じ細さで、切り札カットインより明確に小さい。 */
+function DeckOutBanner({ banner }: { banner: { side: BattleEvent["side"]; text: string; duration: number } | null }) {
+  if (!banner) return null;
+  const side = banner.side === "brother" ? "brother" : "opponent";
+  return <div className={`deck-out-banner ${side}`} style={{ "--deck-out-duration": `${banner.duration}ms` } as CSSProperties} role="status" aria-live="polite"><span>{banner.text}</span></div>;
+}
+
 function TurnTransitionBanner({ banner }: { banner: { side: BattleEvent["side"]; text: string; duration: number } | null }) {
   if (!banner) return null;
   const side = banner.side === "brother" ? "brother" : "opponent";
@@ -1028,9 +1038,14 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
   // どちらのモーダルも「開いている間は再生を止める」で同じ扱いにする。
   const modalOpen = logOpen || handOpen;
   const turnBannerTimer = useRef<number | null>(null);
+  const [deckOutBanner, setDeckOutBanner] = useState<{ side: BattleEvent["side"]; text: string; duration: number } | null>(null);
+  const deckOutBannerTimer = useRef<number | null>(null);
+  // 1試合につき各プレイヤー1回だけ。0枚が続く間、毎ターン出さないための記録。
+  const announcedDeckOut = useRef<Set<"brother" | "opponent">>(new Set());
 
   useEffect(() => () => {
     if (turnBannerTimer.current !== null) window.clearTimeout(turnBannerTimer.current);
+    if (deckOutBannerTimer.current !== null) window.clearTimeout(deckOutBannerTimer.current);
   }, []);
 
   useEffect(() => {
@@ -1068,6 +1083,28 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
         }, turnBannerDuration);
       }
     }
+    // 山札が0になった瞬間を、そのイベントのスナップショットから拾って一度だけ告知する。
+    const deckSnapshot = item.snapshot ?? item.beforeSnapshot;
+    const deckOutSide = (["brother", "opponent"] as const).find(
+      (target) => deckSnapshot?.[target].deckCount === 0 && !announcedDeckOut.current.has(target),
+    );
+    if (deckOutSide) {
+      announcedDeckOut.current.add(deckOutSide);
+      const deckOutDuration = DECK_OUT_BANNER_MS[speed];
+      if (deckOutDuration > 0) {
+        if (deckOutBannerTimer.current !== null) window.clearTimeout(deckOutBannerTimer.current);
+        setDeckOutBanner({
+          side: deckOutSide,
+          text: `${deckOutSide === "brother" ? "ユウタ" : opponent.name}のデッキがなくなった！`,
+          duration: deckOutDuration,
+        });
+        deckOutBannerTimer.current = window.setTimeout(() => {
+          setDeckOutBanner(null);
+          deckOutBannerTimer.current = null;
+        }, deckOutDuration);
+      }
+    }
+
     const cutInKind: CutInKind | null = item.type === "ace" ? "ace" : item.type === "result" ? "finisher" : null;
     const timers: number[] = [];
     const finishEvent = () => {
@@ -1165,6 +1202,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
   return <main className={`battle-screen ${auto ? "" : "playback-paused"}`}>
     {/* 常時表示のシナジー帯はHUD整理のため一時停止。開戦時の宣言演出は別レイヤーで維持する。 */}
     <TurnTransitionBanner banner={turnBanner} />
+    <DeckOutBanner banner={deckOutBanner} />
     <div className="battle-turn-center" aria-label={`現在のターン ${battle.turn}`}>TURN <b>{battle.turn}</b></div>
     <BattleActor side="opponent" name={opponent.name} title={opponent.title} marker={opponent.name.slice(0, 1)} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} leader={lifeOpponent} hand={opponentHand} activeEvent={activeEvent} hit={leaderHitSide === "opponent"} />
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={arenaStyle}>

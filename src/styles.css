@@ -649,7 +649,8 @@ button.hand-count-zone:hover, button.hand-count-zone:focus-visible { background:
 .battle-screen:has(.battle-log-panel.is-open) .arena *,
 .battle-screen:has(.battle-log-panel.is-open) .turn-transition-banner { animation-play-state: paused; }
 .battle-screen.playback-paused .arena *,
-.battle-screen.playback-paused .turn-transition-banner { animation-play-state: paused; }
+.battle-screen.playback-paused .turn-transition-banner,
+.battle-screen.playback-paused .deck-out-banner { animation-play-state: paused; }
 .battle-log-entries p { margin: 0; padding: 7px 8px; border-bottom: 1px solid #b9ad9d; font: 700 10px/1.35 "Yu Gothic", sans-serif; }
 .battle-log-entries p span { display: block; color: var(--blue); font-size: 8px; }
 .battle-log-entries p.highlight { background: var(--yellow); border: 3px solid var(--ink); font-weight: 1000; }
@@ -1036,6 +1037,28 @@ button.hand-count-zone:hover, button.hand-count-zone:focus-visible { background:
 .turn-transition-banner.opponent { background: linear-gradient(100deg, transparent, var(--blue) 16%, #2368ba 50%, var(--blue) 84%, transparent); }
 .turn-transition-banner span { display: block; font: 1000 clamp(17px, calc(3 * var(--stage-vw)), 25px)/1 "Yu Gothic", sans-serif; letter-spacing: .04em; text-shadow: 3px 3px 0 var(--ink); transform: skew(8deg); }
 
+/* 山札切れの告知。ターン転換帯と同じ細さ・同じ動きで、切り札カットインより明確に小さい。
+   ターン転換帯と同時に出ても読めるよう、少し下に置く。 */
+.deck-out-banner {
+  position: fixed;
+  z-index: 24;
+  top: 148px;
+  left: 50%;
+  width: min(400px, calc(100% - 32px));
+  padding: 8px 22px;
+  color: white;
+  background: linear-gradient(100deg, transparent, #4a4551 16%, var(--ink) 50%, #4a4551 84%, transparent);
+  border: 3px solid var(--yellow);
+  box-shadow: 5px 5px 0 var(--ink);
+  text-align: center;
+  pointer-events: none;
+  transform: translateX(-50%) skew(-8deg);
+  animation: turn-transition-sweep var(--deck-out-duration, .9s) ease-out both;
+}
+.deck-out-banner.brother { border-color: var(--cyan); }
+.deck-out-banner.opponent { border-color: var(--red); }
+.deck-out-banner span { display: block; font: 1000 clamp(15px, calc(2.4 * var(--stage-vw)), 21px)/1 "Yu Gothic", sans-serif; letter-spacing: .04em; text-shadow: 3px 3px 0 var(--ink); transform: skew(8deg); }
+
 .battle-target {
   border-color: var(--yellow);
   box-shadow: inset 0 0 0 3px #ffd92855, 0 0 15px #ffd92899;
@@ -1402,6 +1425,7 @@ button.hand-count-zone:hover, button.hand-count-zone:focus-visible { background:
 @media (prefers-reduced-motion: reduce) {
   .battle-speed-controls,
   .turn-transition-banner,
+  .deck-out-banner,
   .board-card.event-attack,
   .board-card.attack-windup,
   .hand-card.attack-windup,
