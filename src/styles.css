@@ -654,8 +654,8 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
 /* 盤面はボードの絵とぴったり同じ矩形に重ねる。カードは枠の中心比（--slot-x / --slot-y）で絶対配置。 */
 .board-zone { position: absolute; z-index: 2; left: var(--board-left); top: var(--board-top); width: var(--board-width); height: var(--board-height); padding: 0; border: 0; border-radius: 0; box-sizing: border-box; pointer-events: none; }
 .empty-board { position: absolute; left: 50%; transform: translate(-50%, -50%); color: #ffffff55; font: 800 12px "Yu Gothic", sans-serif; white-space: nowrap; }
-.opponent-board .empty-board { top: 19.06%; }
-.brother-board .empty-board { top: 47.88%; }
+.opponent-board .empty-board { top: 21.32%; }
+.brother-board .empty-board { top: 48.07%; }
 .board-line { position: absolute; z-index: 1; top: calc(var(--board-top) + var(--board-height) * .331 - 13px); left: calc(var(--board-left) + var(--board-width) * .129); width: calc(var(--board-width) * .737); height: 26px; display: grid; place-items: center; }
 .board-line::before { display: none; }
 .board-line b { visibility: hidden; }

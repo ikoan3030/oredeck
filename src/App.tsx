@@ -892,9 +892,12 @@ function opponentHandForPlayback(event: BattleEvent | undefined, fallback: Battl
  * 画像に対する比率（0〜1）。絵を差し替えたら測り直してここだけ更新する。
  * 手前が広い台形なので、上段（相手）と下段（弟）で幅と中心が違う。
  */
+/* board.png v2 measurement: source 1448x1086. Slot centers are measured from the
+   ten white crosshair marks. Card widths intentionally stay at the existing
+   readable values instead of being derived from the smaller marks. */
 const BOARD_SLOTS = {
-  opponent: { centerY: 0.1906, width: 0.0988, centerX: [0.2293, 0.3633, 0.4965, 0.6305, 0.7645] },
-  brother: { centerY: 0.4788, width: 0.1069, centerX: [0.2044, 0.3502, 0.4955, 0.6409, 0.7873] },
+  opponent: { centerY: 0.2132, width: 0.0988, centerX: [0.2379, 0.3677, 0.4979, 0.6281, 0.7573] },
+  brother: { centerY: 0.4807, width: 0.1069, centerX: [0.2155, 0.3564, 0.4976, 0.6392, 0.7794] },
 } as const;
 
 /** 中央寄りの枠から埋める順。1枚目が中央、以降は内側から外側へ交互に広がる。 */
