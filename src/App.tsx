@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import boardImage from "./assets/board.png";
 import bgClassroom from "./assets/backgrounds/classroom.png";
 import bgPark from "./assets/backgrounds/park.png";
@@ -887,11 +887,30 @@ function opponentHandForPlayback(event: BattleEvent | undefined, fallback: Battl
 
 
 
-function AnimatedBoardCard({ instance, cards, ace = false, activeEvent = null, guardPreludeDone = true, attackPreludeDone = true, summonPreludeDone = true }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; ace?: boolean; activeEvent?: BattleEvent | null; guardPreludeDone?: boolean; attackPreludeDone?: boolean; summonPreludeDone?: boolean }) {
+/**
+ * ボード画像に描かれたカード枠の位置。src/assets/board.png を画素走査して測った、
+ * 画像に対する比率（0〜1）。絵を差し替えたら測り直してここだけ更新する。
+ * 手前が広い台形なので、上段（相手）と下段（弟）で幅と中心が違う。
+ */
+const BOARD_SLOTS = {
+  opponent: { centerY: 0.1906, width: 0.0988, centerX: [0.2293, 0.3633, 0.4965, 0.6305, 0.7645] },
+  brother: { centerY: 0.4788, width: 0.1069, centerX: [0.2044, 0.3502, 0.4955, 0.6409, 0.7873] },
+} as const;
+
+/** 中央寄りの枠から埋める順。1枚目が中央、以降は内側から外側へ交互に広がる。 */
+const SLOT_FILL_ORDER = [2, 1, 3, 0, 4] as const;
+
+function slotStyle(side: "brother" | "opponent", index: number): CSSProperties {
+  const slots = BOARD_SLOTS[side];
+  const slot = SLOT_FILL_ORDER[index] ?? SLOT_FILL_ORDER[SLOT_FILL_ORDER.length - 1];
+  return { "--slot-x": `${slots.centerX[slot]}`, "--slot-y": `${slots.centerY}` } as CSSProperties;
+}
+
+function AnimatedBoardCard({ instance, cards, side, slotIndex, ace = false, activeEvent = null, guardPreludeDone = true, attackPreludeDone = true, summonPreludeDone = true }: { instance: BattleState["brother"]["board"][number]; cards: Card[]; side: "brother" | "opponent"; slotIndex: number; ace?: boolean; activeEvent?: BattleEvent | null; guardPreludeDone?: boolean; attackPreludeDone?: boolean; summonPreludeDone?: boolean }) {
   const card = cards.find((item) => item.id === instance.cardId)!;
   const syncBonus = instance.grantedKeywords.length > 0 || instance.grantedAtk > 0;
   const className = "board-card " + (instance.intervention ? "intervened " : "") + (syncBonus && !ace ? "sync-granted " : "") + (ace ? "ace-granted " : "") + eventCardClass(instance, activeEvent, cards, guardPreludeDone, attackPreludeDone, summonPreludeDone);
-  return <div className={className} title={card.name} data-instance-id={instance.instanceId} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}>{instance.intervention && <span className="intervention-mark">兄</span>}{card.species && <span className="species-tag">{card.species}</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}<KeywordBadges keywords={instanceVisibleKeywords(instance, cards)} compact /><b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
+  return <div className={className} style={slotStyle(side, slotIndex)} title={card.name} data-instance-id={instance.instanceId} data-event-id={activeEvent?.instanceId === instance.instanceId ? activeEvent.id : undefined}>{instance.intervention && <span className="intervention-mark">兄</span>}{card.species && <span className="species-tag">{card.species}</span>}{syncBonus && !ace && <span className="sync-mark">SYNC</span>}{ace && <span className="ace-mark">ACE</span>}<KeywordBadges keywords={instanceVisibleKeywords(instance, cards)} compact /><b>{card.name.slice(0, 1)}</b><small>{card.name}</small><div><span>{instance.atk}</span><span>{instance.hp}</span></div></div>;
 }
 
 
@@ -997,7 +1016,7 @@ function BattleLogPanel({ open, recent, cards, opponentName, onToggle }: { open:
   </>;
 }
 
-function BattleEffectLayer({ activeEvent, cards, guardPreludeDone, attackAfterglow }: { activeEvent: BattleEvent | null; cards: Card[]; guardPreludeDone: boolean; attackAfterglow: boolean }) {
+function BattleEffectLayer({ activeEvent, cards, guardPreludeDone, attackAfterglow, slotOf }: { activeEvent: BattleEvent | null; cards: Card[]; guardPreludeDone: boolean; attackAfterglow: boolean; slotOf: (instanceId: string | undefined) => CSSProperties | undefined }) {
   if (!activeEvent) return null;
   const amount = eventDamageAmount(activeEvent);
   const targetSide = activeEvent.side === "brother" ? "opponent" : "brother";
@@ -1010,14 +1029,21 @@ function BattleEffectLayer({ activeEvent, cards, guardPreludeDone, attackAftergl
   const isGuardPrelude = activeEvent.type === "attack" && isGuardInterceptAttack(activeEvent, cards) && !guardPreludeDone;
   const isAttackOnCard = activeEvent.type === "attack" && Boolean(activeEvent.targetInstanceId) && !isGuardPrelude;
   const attackerSide = activeEvent.side;
+  // 演出は対象カードの載っている枠へ寄せる。枠が特定できないもの（リーダーへの攻撃など）は
+  // 従来どおり盤面の割合位置に置く。
+  const targetSlot = slotOf(activeEvent.targetInstanceId ?? activeEvent.targetInstanceIds?.[0] ?? destroyedInstance?.instanceId);
+  const sourceSlot = slotOf(activeEvent.sourceInstanceId ?? activeEvent.instanceId);
+  const at = (slot: CSSProperties | undefined) => (slot ? { className: " at-slot", style: slot } : { className: "", style: undefined });
+  const target = at(targetSlot);
+  const source = at(sourceSlot);
   return <div className="battle-effect-layer" aria-live="polite">
-    {isAttackOnCard && <span className={`attack-impact ${attackerSide === "brother" ? "opponent" : "brother"} ${attackAfterglow ? "afterglow" : ""}`} aria-hidden="true" />}
-    {isAttackOnCard && activeEvent.retaliationDamage !== undefined && <span className={`damage-pop attack-retaliation ${attackerSide}`}>-{activeEvent.retaliationDamage}</span>}
-    {amount !== null && !isGuardPrelude && <span className={`damage-pop ${targetSide} ${isAttackOnCard ? "attack-contact" : "effect-hit"}`}>-{amount}</span>}
-    {activeEvent.type === "play" && <span className={"summon-pop " + activeEvent.side}>登場！</span>}
+    {isAttackOnCard && <span className={`attack-impact ${attackerSide === "brother" ? "opponent" : "brother"} ${attackAfterglow ? "afterglow" : ""}${target.className}`} style={target.style} aria-hidden="true" />}
+    {isAttackOnCard && activeEvent.retaliationDamage !== undefined && <span className={`damage-pop attack-retaliation ${attackerSide}${source.className}`} style={source.style}>-{activeEvent.retaliationDamage}</span>}
+    {amount !== null && !isGuardPrelude && <span className={`damage-pop ${targetSide} ${isAttackOnCard ? "attack-contact" : "effect-hit"}${target.className}`} style={target.style}>-{amount}</span>}
+    {activeEvent.type === "play" && <span className={`summon-pop ${activeEvent.side}${source.className}`} style={source.style}>登場！</span>}
     {activeEvent.type === "effect" && sourceCard && !sourceVisible && <div className={`effect-source-label ${activeEvent.side}`}><span>EFFECT</span><b>{sourceCard.name}</b></div>}
-    {activeEvent.type === "effect" && <span className={`effect-hit-label ${targetSide}`}>{activeEvent.keyword === "destroy" ? "BREAK!" : activeEvent.keyword === "damage" ? "HIT!" : "EFFECT!"}</span>}
-    {destroyedCard && <div className="destruction-pop"><b>BREAK!</b><small>{destroyedCard.name}</small></div>}
+    {activeEvent.type === "effect" && <span className={`effect-hit-label ${targetSide}${target.className}`} style={target.style}>{activeEvent.keyword === "destroy" ? "BREAK!" : activeEvent.keyword === "damage" ? "HIT!" : "EFFECT!"}</span>}
+    {destroyedCard && <div className={`destruction-pop${target.className}`} style={target.style}><b>BREAK!</b><small>{destroyedCard.name}</small></div>}
   </div>;
 }
 
@@ -1166,6 +1192,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
   const recent = compactAttributionEvents(visibleEvents).slice(-9).reverse();
   const aceEvent = [...battle.events].reverse().find((item) => item.type === "ace");
   const aceInstanceId = aceEvent?.instanceId;
+
   const playbackEvent = activeEvent ?? battle.events[visibleEventCount];
   const postBattleDialogue = playbackComplete && battle.winner ? postBattleLine(battle, cards, child) : null;
   const damageTargetSide = isDamageEvent(activeEvent) && activeEvent?.targetLeader ? activeEvent.side === "brother" ? "opponent" : "brother" : null;
@@ -1175,6 +1202,16 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
   // Lifetime comes from the played events; the snapshot only supplies stats and ordering.
   const removedIds = useMemo(() => removedInstanceIds(visibleEvents), [visibleEvents]);
   const stableBoards = useStableBoards(boardBrother.board, boardOpponent.board, removedIds, battleIdentity);
+  // 盤面に出ているカードの instanceId から、そのカードが載っている枠の座標を引く。
+  // 演出はこれを使って枠に追随する（見つからない場合は従来の割合位置のまま）。
+  const slotOf = useCallback((instanceId: string | undefined): CSSProperties | undefined => {
+    if (!instanceId) return undefined;
+    for (const side of ["brother", "opponent"] as const) {
+      const index = stableBoards[side].findIndex((item) => item.instanceId === instanceId);
+      if (index >= 0) return slotStyle(side, index);
+    }
+    return undefined;
+  }, [stableBoards]);
   const opponentHand = speed === "skip" ? battle.opponent.hand : opponentHandForPlayback(playbackEvent, boardOpponent.hand);
   const brotherHand = speed === "skip" ? battle.brother.hand : boardBrother.hand;
   const lifeSnapshot = playbackEvent?.snapshot;
@@ -1229,12 +1266,12 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={arenaStyle}>
       <img className="battle-board-art" src={boardImage} alt="" aria-hidden="true" />
       <div className="board-turn" aria-label={`現在のターン ${battle.turn}`}>TURN {battle.turn}</div>
-      <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{stableBoards.opponent.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!stableBoards.opponent.length && <span className="empty-board">相手の場は空</span>}</div>
+      <div className={"board-zone opponent-board " + (damageTargetSide === "opponent" ? "battle-target" : "")}>{stableBoards.opponent.map((item, index) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} side="opponent" slotIndex={index} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!stableBoards.opponent.length && <span className="empty-board">相手の場は空</span>}</div>
       <div className="board-line"><b>AUTO CARD BATTLE</b></div>
-      <div className={"board-zone brother-board " + (damageTargetSide === "brother" ? "battle-target" : "")}>{stableBoards.brother.map((item) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!stableBoards.brother.length && <span className="empty-board">ユウタの場は空</span>}</div>
+      <div className={"board-zone brother-board " + (damageTargetSide === "brother" ? "battle-target" : "")}>{stableBoards.brother.map((item, index) => <AnimatedBoardCard key={item.instanceId} instance={item} cards={cards} side="brother" slotIndex={index} ace={item.instanceId === aceInstanceId} activeEvent={activeEvent} guardPreludeDone={guardPreludeDone} attackPreludeDone={attackPreludeDone} summonPreludeDone={summonPreludeDone} />)}{!stableBoards.brother.length && <span className="empty-board">ユウタの場は空</span>}</div>
       <BattleHandRail side="opponent" hand={opponentHand} cards={cards} activeEvent={activeEvent} />
       <BattleHandRail side="brother" hand={brotherHand} cards={cards} activeEvent={activeEvent} onOpen={() => setHandOpen(true)} />
-      <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} />
+      <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} slotOf={slotOf} />
     </section>
     <BattleActor side="brother" name="ユウタ" marker="ユ" text={!battle.winner ? brotherDialogueEvent?.dialogue : undefined} leader={lifeBrother} hit={leaderHitSide === "brother"} portraitSrc={tanjunBustSmile} />
     {!battle.winner && <div className="battle-controls"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /><button className="battle-pause-toggle" type="button" onClick={onAutoToggle} aria-pressed={!auto}>{auto ? "一時停止" : "再開"}</button></div>}
