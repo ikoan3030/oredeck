@@ -451,9 +451,20 @@ function Speech({ speaker, text, tone = "kid" }: { speaker: string; text: string
   return <div className={`speech ${tone}`}><span>{speaker}</span><p>{text}</p></div>;
 }
 
+function PpMeter({ current, maximum }: { current: number; maximum: number }) {
+  const safeCurrent = Math.max(0, Math.min(10, current));
+  const safeMaximum = Math.max(0, Math.min(10, maximum));
+  return <div className="pp-meter" aria-label={`PP ${current}/${maximum}`}>
+    <div className="pp-meter-track" aria-hidden="true">
+      {Array.from({ length: 10 }, (_, index) => <i key={index} className={`pp-pip ${index < safeCurrent ? "available" : index < safeMaximum ? "spent" : "locked"}`} />)}
+    </div>
+    <small>PP {current}/{maximum}</small>
+  </div>;
+}
+
 /**
  * 立ち絵とその直下の台詞枠を縦に組んだ話者表示。自分側は画面左下、敵側は右上の鏡像配置で、
- * LIFE/PP は台詞枠から切り離して立ち絵の外側に置く。台詞が無い間も枠は残り、台詞欄だけが空になる。
+ * LIFE/PP は立ち絵の横に一体型ステータスパネルとして置く。台詞が無い間も枠は残り、台詞欄だけが空になる。
  * 立ち絵は縦横比を保ったまま（トリミングせず）枠いっぱいに出す。
  */
 function BattleActor({ side, name, title, marker, text, leader, hit, portraitSrc }: {
@@ -476,9 +487,9 @@ function BattleActor({ side, name, title, marker, text, leader, hit, portraitSrc
         {portraitSrc ? <img className="battle-actor-portrait-image" src={portraitSrc} alt="" /> : <><span aria-hidden="true">{marker}</span><small>PORTRAIT</small></>}
       </div>
       <div className="battle-actor-side-data">
-        <div className={`battle-leader-info ${side}-leader-info ` + (hit ? "life-target" : "")}>
+        <div className={`battle-status-panel ${side}-status-panel ` + (hit ? "life-target" : "")}>
           <div className="life"><span>LIFE</span><b>{leader.life}</b></div>
-          <div className="pp">PP {leader.pp}/{leader.maxPp}</div>
+          <PpMeter current={leader.pp} maximum={leader.maxPp} />
         </div>
       </div>
     </div>
