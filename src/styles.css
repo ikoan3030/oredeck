@@ -604,8 +604,11 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   user-select: none;
   transform: translate(-50%, -50%);
 }
-.arena { --board-shift: 60px; --board-top: calc(8px + var(--board-shift)); --board-height: calc(var(--stage-h) - 158px - var(--board-shift)); --board-left: 300px; --board-width: calc(100% - 600px); --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 0; padding: 0; display: block; }
-.battle-board-art { position: absolute; z-index: 0; top: var(--board-top); right: 300px; bottom: auto; left: 300px; display: block; width: var(--board-width); height: var(--board-height); object-fit: fill; pointer-events: none; user-select: none; }
+.arena { --board-top: 20px; --board-height: calc(var(--stage-h) * 1.31); --board-width: max(840px, calc(100% - 500px)); --board-left: calc((100% - var(--board-width)) / 2); --attack-reach: clamp(180px, calc(26 * var(--stage-vh)), 260px); --attack-leader-reach: clamp(220px, calc(32 * var(--stage-vh)), 320px); --attack-overlap: 0px; --attack-knockback: 20px; --attack-shake: 5px; --guard-intercept-distance: 15px; --leader-shake: 5px; --attack-impact-size: clamp(115px, calc(16 * var(--stage-vw)), 190px); position: relative; z-index: 2; flex: 1; min-height: 0; margin-right: 0; padding: 0; display: block; }
+/* 角柱型のボード。緑面（天板）は画像高の 8.29%〜60.96%、中央の仕切りは 33.1% に写っている。
+   カード列・仕切り・手札レールはこの実測比から置いているので、絵を差し替えるときは
+   同じ3つの比率を測り直せば全部が追従する。柱の下部は画面下端で切れてよい。 */
+.battle-board-art { position: absolute; z-index: 0; top: var(--board-top); left: var(--board-left); display: block; width: var(--board-width); height: var(--board-height); object-fit: fill; pointer-events: none; user-select: none; }
 .battle-leader-info { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
 .opponent-leader-info { justify-content: flex-end; }
 .brother-leader-info { justify-content: flex-start; }
@@ -614,8 +617,8 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
 .life b { font-size: 38px; }
 .pp { padding: 10px 12px; color: var(--ink); background: var(--cyan); border: 3px solid var(--ink); font-size: 14px; }
 .battle-hand-rail { position: absolute; z-index: 7; left: var(--board-left); width: var(--board-width); display: flex; align-items: center; pointer-events: auto; box-sizing: border-box; }
-.battle-hand-rail-opponent { top: calc(var(--board-top) - 56px); height: 150px; align-items: center; }
-.battle-hand-rail-brother { top: calc(var(--board-top) + var(--board-height) - 8px); left: calc(var(--board-left) + 180px); width: calc(var(--board-width) - 180px); height: 158px; align-items: flex-start; }
+.battle-hand-rail-opponent { top: calc(var(--board-top) + var(--board-height) * .0829 - 128px); left: calc(var(--board-left) + 60px); width: calc(var(--board-width) - 60px); height: 150px; align-items: center; }
+.battle-hand-rail-brother { top: calc(var(--board-top) + var(--board-height) * .6096 - 34px); left: calc(var(--board-left) + 240px); width: calc(var(--board-width) - 240px); height: 158px; align-items: flex-start; }
 .battle-hand-rail-opponent { justify-content: flex-start; padding-left: 10px; }
 .battle-hand-rail-brother { justify-content: center; }
 .battle-hand-rail-label { position: absolute; z-index: 2; padding: 3px 8px; color: #dcecff; background: #0b1224d9; border: 2px solid var(--ink); font: 900 9px/1 Arial, sans-serif; letter-spacing: .12em; pointer-events: none; }
@@ -638,10 +641,10 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
 .board-zone { position: absolute; z-index: 2; left: var(--board-left); width: var(--board-width); min-height: 128px; display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px; border: 0; border-radius: 0; box-sizing: border-box; }
 .opponent-board,
 .brother-board { align-items: center; }
-.opponent-board { top: calc(var(--board-top) + var(--board-height) * .135); height: max(128px, calc(var(--board-height) * .17)); }
-.brother-board { top: calc(var(--board-top) + var(--board-height) * .44); height: max(128px, calc(var(--board-height) * .18)); }
+.opponent-board { top: calc(var(--board-top) + var(--board-height) * .109); height: calc(var(--board-height) * .163); left: calc(var(--board-left) + var(--board-width) * .152); width: calc(var(--board-width) * .690); }
+.brother-board { top: calc(var(--board-top) + var(--board-height) * .391); height: calc(var(--board-height) * .178); left: calc(var(--board-left) + var(--board-width) * .127); width: calc(var(--board-width) * .746); }
 .empty-board { color: #ffffff55; font: 800 12px "Yu Gothic", sans-serif; }
-.board-line { position: absolute; z-index: 1; top: calc(var(--board-top) + var(--board-height) * .416 - 13px); left: var(--board-left); width: var(--board-width); height: 26px; display: grid; place-items: center; }
+.board-line { position: absolute; z-index: 1; top: calc(var(--board-top) + var(--board-height) * .331 - 13px); left: calc(var(--board-left) + var(--board-width) * .129); width: calc(var(--board-width) * .737); height: 26px; display: grid; place-items: center; }
 .board-line::before { display: none; }
 .board-line b { visibility: hidden; }
 .board-line b { z-index: 1; padding: 4px 12px; color: var(--ink); background: var(--yellow); border: 2px solid var(--ink); font: 900 9px Arial, sans-serif; letter-spacing: .12em; }
@@ -690,7 +693,8 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
   gap: 0;
   pointer-events: none;
 }
-.battle-actor-brother { left: 8px; bottom: 12px; align-items: flex-start; flex-direction: column-reverse; --actor-portrait-size: 260px; --actor-caption-width: 500px; --actor-caption-height: 78px; }
+.battle-actor-brother { left: 8px; bottom: 26px; align-items: flex-start; flex-direction: column-reverse; --actor-portrait-size: 260px; --actor-caption-width: 236px; --actor-caption-height: 84px; }
+.battle-actor-brother .battle-actor-line { min-height: 46px; line-height: 23px; font-size: 17px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 /* 敵側は立ち絵を一回り小さくし、台詞枠が盤面の札ではなく中央の仕切り帯へ掛かる高さに収める。 */
 .battle-actor-opponent { right: 8px; top: 10px; align-items: flex-end; --actor-portrait-size: 210px; --actor-caption-width: 440px; --actor-caption-height: 72px; }
 
@@ -745,7 +749,7 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
 .battle-actor-line { display: -webkit-box; margin: 0; min-height: 0; overflow: hidden; font-weight: 900; font-size: 21px; line-height: 26px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 
 /* LIFE/PP は台詞枠から独立させ、立ち絵の外側（自分側は上、敵側も上）に置く。 */
-.battle-actor .battle-leader-info { flex: 0 0 auto; gap: 10px; margin: 0; }
+.battle-actor .battle-leader-info { flex: 0 0 auto; gap: 10px; margin: 0;  min-width: max-content; white-space: nowrap; }
 .battle-actor-opponent .battle-leader-info { justify-content: flex-end; }
 
 .battle-controls { position: absolute; z-index: 9; right: 18px; bottom: 14px; width: 320px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; align-items: center; justify-items: end; gap: 8px; }
@@ -1549,7 +1553,9 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
   .result-burst > span { padding: 4px 10px; }
   /* 背の低い横長では、立ち絵と台詞枠・盤面・手札が同居できるよう一段詰める。
      盤面の枠はカードが収まる高さを優先する。 */
-  .battle-actor-brother { --actor-portrait-size: 230px; --actor-caption-width: 460px; --actor-caption-height: 70px; }
+  .battle-actor-brother { --actor-portrait-size: 230px; --actor-caption-width: 236px; --actor-caption-height: 78px; }
+  /* 柱を避けて幅が狭いので、弟側だけ2行まで折り返す（枠の高さは固定のまま）。 */
+  .battle-actor-brother .battle-actor-line { min-height: 42px; line-height: 21px; font-size: 15px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .battle-actor-opponent { --actor-portrait-size: 186px; --actor-caption-width: 400px; --actor-caption-height: 64px; }
   .battle-actor-caption { padding: 6px 13px; }
   .battle-actor-name { padding: 2px 8px; font-size: 12px; }
