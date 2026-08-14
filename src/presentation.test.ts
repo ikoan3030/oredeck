@@ -94,3 +94,32 @@ test("the turn number is a field watermark that never covers a card", () => {
   assert.ok(styles.includes(".battle-board-art"), "the board artwork needs a dedicated background layer");
   assert.equal(styles.includes("border: 3px dashed #ffffff44"), false, "the old dashed board outline must be removed");
 });
+
+test("the board art is the back layer and every UI layer sits in front of it", () => {
+  // 同じクラスに複数の宣言ブロックがあるので、z-index を宣言している方を拾う。
+  const zOf = (className: string) => {
+    for (const block of rulesFor(className)) {
+      const found = /z-index:\s*(-?\d+)/.exec(block);
+      if (found) return Number(found[1]);
+    }
+    return NaN;
+  };
+  const arena = zOf("arena");
+  assert.equal(zOf("battle-board-art"), 0, "the board art stays at the back of the arena");
+  // .arena が重ね合わせ文脈を作るので、arena より大きい z-index の要素は必ずボードより手前になる。
+  for (const layer of ["battle-actor", "battle-controls", "battle-log-panel", "deck-out-banner", "turn-transition-banner"]) {
+    const z = zOf(layer);
+    assert.ok(Number.isFinite(z), `${layer} must declare a z-index`);
+    assert.ok(z > arena, `${layer} (z-index ${z}) must sit in front of the board layer (arena z-index ${arena})`);
+  }
+});
+
+test("a speaker caption reserves two lines so a long line is never cut", () => {
+  const line = rulesFor("battle-actor-line")[0] ?? "";
+  const clamp = /-webkit-line-clamp:\s*(\d+)/.exec(line);
+  const minHeight = /min-height:\s*(\d+)px/.exec(line);
+  const lineHeight = /line-height:\s*(\d+)px/.exec(line);
+  assert.ok(clamp && Number(clamp[1]) === 2, "the caption shows up to two lines");
+  assert.ok(minHeight && lineHeight, "the caption reserves its height explicitly");
+  assert.ok(Number(minHeight[1]) >= Number(lineHeight[1]) * 2, "the reserved height must hold both lines");
+});
