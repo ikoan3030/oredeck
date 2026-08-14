@@ -454,11 +454,10 @@ function Speech({ speaker, text, tone = "kid" }: { speaker: string; text: string
 function PpMeter({ current, maximum }: { current: number; maximum: number }) {
   const safeCurrent = Math.max(0, Math.min(10, current));
   const safeMaximum = Math.max(0, Math.min(10, maximum));
-  return <div className="pp-meter" aria-label={`PP ${current}/${maximum}`}>
+  return <div className="pp-meter" role="meter" aria-label="PPメーター" aria-valuenow={current} aria-valuemin={0} aria-valuemax={maximum}>
     <div className="pp-meter-track" aria-hidden="true">
       {Array.from({ length: 10 }, (_, index) => <i key={index} className={`pp-pip ${index < safeCurrent ? "available" : index < safeMaximum ? "spent" : "locked"}`} />)}
     </div>
-    <small>PP {current}/{maximum}</small>
   </div>;
 }
 
