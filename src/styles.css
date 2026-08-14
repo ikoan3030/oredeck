@@ -743,10 +743,11 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
   align-content: center;
   gap: 4px;
   padding: 8px 16px;
-  color: white;
-  background: #0a0d14c4;
+  /* 白地に太い黒枠＋黒文字。漫画のフキダシに寄せた見え方にする。 */
+  color: var(--ink);
+  background: white;
   border: 5px solid var(--ink);
-  box-shadow: 5px 5px 0 #0009, inset 0 0 0 2px #ffffff33;
+  box-shadow: 5px 5px 0 #0009;
   font-family: "Yu Gothic", sans-serif;
 }
 .battle-actor-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -754,7 +755,7 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
 .battle-actor-opponent .battle-actor-heading { justify-content: flex-end; }
 .battle-actor-name { padding: 3px 10px; color: var(--ink); background: var(--cyan); font: 900 14px/1 "Yu Gothic", sans-serif; letter-spacing: .04em; }
 .battle-actor-opponent .battle-actor-name { color: white; background: var(--red); }
-.battle-actor-title { color: #ffe77d; font: 900 11px/1.2 "Yu Gothic", sans-serif; white-space: nowrap; }
+.battle-actor-title { color: #665f6d; font: 900 11px/1.2 "Yu Gothic", sans-serif; white-space: nowrap; }
 /* 台詞は1行に収めて枠の高さを固定する（空でも高さが変わらない）。 */
 .battle-actor-line { display: -webkit-box; margin: 0; min-height: 52px; overflow: hidden; font-weight: 900; font-size: 21px; line-height: 26px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 
