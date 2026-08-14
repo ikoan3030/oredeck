@@ -604,8 +604,13 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
   user-select: none;
   transform: translate(-50%, -50%);
 }
+/* 対戦相手ごとの背景。ボードより奥の最背面で、画面全体を覆う（はみ出しはトリミング）。
+   読み込み前・未指定の相手では .battle-screen の濃紺がそのまま見える。 */
+.battle-background { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; pointer-events: none; user-select: none; }
+
 /* バトル画面の重ね順。
    ボードは奥の背景、UIは手前の前面レイヤーとする。UIはボードを避けず、重なってよい。
+     .battle-background（z-index 0）… 対戦相手ごとの背景。最背面
      .arena（z-index 2）……… ボードの絵（内側で z-index 0）と盤面の札・演出をまとめた奥の層
      UI（z-index 8以上）…… 話者表示・操作ボタン・ログ・カットインなど。arena より必ず前に出る
    .arena が重ね合わせ文脈を作るので、arena より大きい z-index を持つ要素は

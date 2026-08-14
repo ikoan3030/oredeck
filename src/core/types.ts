@@ -317,6 +317,8 @@ export interface OpponentDefinition {
   /** Attack target preference. Missing data falls back to balanced in core. */
   attackStyle?: AttackStyle;
   color: string;
+  /** Battle backdrop key. Resolves to an image in src/assets/backgrounds/ on the UI side. */
+  background?: string;
   leaderLife?: number;
   /** Organization opponents may resolve their deck's species grants at battle start. */
   speciesSynergy?: boolean;

@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import boardImage from "./assets/board.png";
+import bgClassroom from "./assets/backgrounds/classroom.png";
+import bgPark from "./assets/backgrounds/park.png";
+import bgCardshop from "./assets/backgrounds/cardshop.png";
+import bgStreet from "./assets/backgrounds/street.png";
+import bgHideout from "./assets/backgrounds/hideout.png";
 import handImage from "./assets/characters/tanjun-hand-open.png";
 import tanjunBustSmile from "./assets/characters/tanjun-bust-smile.png";
 import {
@@ -187,6 +192,16 @@ interface EventPlaybackTiming {
 
 // 山札切れの告知。ターン転換の帯と同じ小型カットインで、スキップ時は省略する。
 const DECK_OUT_BANNER_MS: Record<PlaybackSpeed, number> = { normal: 900, fast: 700, skip: 0 };
+
+// バトルの背景。data/opponents.json の background キーと対応させる。
+// 未知のキーや未指定の相手は画像なしになり、.battle-screen の濃紺がそのまま出る。
+const BATTLE_BACKGROUNDS: Record<string, string> = {
+  classroom: bgClassroom,
+  park: bgPark,
+  cardshop: bgCardshop,
+  street: bgStreet,
+  hideout: bgHideout,
+};
 
 const PLAYBACK_SPEED_KEY = "oredeck-battle-playback-speed";
 const PLAYBACK_SPEED_LABELS: Record<PlaybackSpeed, string> = { normal: "じっくり", fast: "さくさく", skip: "スキップ" };
@@ -1203,7 +1218,10 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
     return () => window.clearTimeout(timer);
   }, [auto, battle.winner, onNext, playbackComplete]);
 
+  const backgroundImage = opponent.background ? BATTLE_BACKGROUNDS[opponent.background] : undefined;
+
   return <main className={`battle-screen ${auto ? "" : "playback-paused"}`}>
+    {backgroundImage && <img className="battle-background" src={backgroundImage} alt="" aria-hidden="true" />}
     {/* 常時表示のシナジー帯はHUD整理のため一時停止。開戦時の宣言演出は別レイヤーで維持する。 */}
     <TurnTransitionBanner banner={turnBanner} />
     <DeckOutBanner banner={deckOutBanner} />
