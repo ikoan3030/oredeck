@@ -622,11 +622,11 @@ button.character-slot.active:focus-visible { z-index: 2; transform: translateY(-
    カード列・仕切り・手札レールはこの実測比から置いているので、絵を差し替えるときは
    同じ3つの比率を測り直せば全部が追従する。柱の下部は画面下端で切れてよい。 */
 .battle-board-art { position: absolute; z-index: 0; top: var(--board-top); left: var(--board-left); display: block; width: var(--board-width); height: var(--board-height); object-fit: fill; pointer-events: none; user-select: none; }
-.life { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 0 0 6px; color: white; border: 0; border-bottom: 3px solid var(--yellow); }
+.life { display: flex; align-items: baseline; justify-content: flex-start; gap: 6px; padding: 0 0 6px; color: white; border: 0; border-bottom: 3px solid var(--yellow); white-space: nowrap; }
 .life span { font: 900 11px Arial, sans-serif; color: var(--yellow); }
 .life b { font: 1000 40px/0.9 Arial, sans-serif; letter-spacing: -.06em; }
 .pp-meter { display: grid; margin-top: 8px; }
-.pp-meter-track { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; width: 100%; height: 15px; }
+.pp-meter-track { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(2, 15px); gap: 3px; width: 100%; }
 .pp-pip { min-width: 0; border: 2px solid #090e18; background: #16243a; box-shadow: inset 0 0 0 1px #4d6688; }
 .pp-pip.available { background: var(--cyan); box-shadow: 0 0 8px #2bd9dc, inset 0 0 0 1px white; }
 .pp-pip.spent { background: #33435a; border-color: var(--yellow); box-shadow: inset 0 0 0 1px #77631d; }
@@ -718,7 +718,7 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
 .battle-actor-side-data { display: flex; min-width: 0; flex: 0 0 178px; flex-direction: column; gap: 8px; }
 .battle-actor-brother .battle-actor-side-data { align-self: flex-end; margin-bottom: 4px; }
 .battle-actor-opponent .battle-actor-side-data { align-self: flex-start; margin-top: 4px; }
-.battle-status-panel { width: 100%; box-sizing: border-box; padding: 10px 10px 9px; color: white; background: linear-gradient(155deg, #263955, #0b1322 72%); border: 4px solid var(--ink); box-shadow: 5px 5px 0 #0009, inset 0 0 0 2px var(--yellow); }
+.battle-status-panel { width: 116px; box-sizing: border-box; padding: 10px 10px 9px; color: white; background: linear-gradient(155deg, #263955, #0b1322 72%); border: 4px solid var(--ink); box-shadow: 5px 5px 0 #0009, inset 0 0 0 2px var(--yellow); }
 .battle-status-panel .life { width: 100%; }
 
 /* 立ち絵はトリミングせず、縦横比を保ったまま枠いっぱいに出す。 */
@@ -770,7 +770,8 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
 
 /* LIFE/PP は顔グラ横の一体型パネルにまとめる。敵側は行方向だけ鏡像にする。 */
 .battle-status-panel.brother-status-panel { text-align: left; }
-.battle-status-panel.opponent-status-panel { text-align: right; }
+.battle-status-panel.opponent-status-panel { align-self: flex-end; text-align: right; }
+.battle-status-panel.opponent-status-panel .life { justify-content: flex-end; }
 
 .battle-controls { position: absolute; z-index: 9; right: 18px; bottom: 14px; width: 320px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; align-items: center; justify-items: end; gap: 8px; }
 .battle-controls .battle-speed-controls { position: static; top: auto; right: auto; grid-column: 1 / -1; grid-row: 1; flex: 0 0 auto; }
@@ -1598,7 +1599,7 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
   .life b { font-size: 32px; }
   .battle-status-panel { padding: 8px 8px 7px; }
   .pp-meter { margin-top: 6px; }
-  .pp-meter-track { gap: 2px; height: 13px; }
+  .pp-meter-track { grid-template-rows: repeat(2, 13px); gap: 2px; }
   .arena { padding: 0; }
   .board-zone { padding: 8px; }
   /* 背の低い横長では、上下のメッセージウィンドウと盤面・手札が同居できるよう手札を一段小さくする。 */
