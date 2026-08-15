@@ -78,7 +78,7 @@ test("deck depletion is announced once per player, and never during skip", () =>
   // 切り札カットインより明確に小さい細帯であること。
   assert.ok(styles.includes(".deck-out-banner"), "the banner needs its own thin-band style");
   assert.ok(app.includes("function DeckCaseMeter("), "the deck case meter must expose the current deck count");
-  assert.ok(app.includes("deckCountOpponent") && app.includes("deckCountBrother"), "both sides must receive playback-synchronized deck counts");
+  assert.ok(app.includes("deckCountBrother") && app.includes('side === "brother" && <DeckCaseMeter'), "only the brother side displays the playback-synchronized deck count");
 });
 
 test("the turn number is a field watermark that never covers a card", () => {

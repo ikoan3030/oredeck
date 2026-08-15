@@ -469,9 +469,9 @@ function PpMeter({ current, maximum }: { current: number; maximum: number }) {
 
 const DECK_CASE_IMAGES = [deckCase0, deckCase1, deckCase2, deckCase3, deckCase4, deckCase5];
 
-function DeckCaseMeter({ side, stage, deckCount }: { side: "brother" | "opponent"; stage: number; deckCount: number }) {
+function DeckCaseMeter({ stage, deckCount }: { stage: number; deckCount: number }) {
   const safeStage = Math.max(0, Math.min(5, Math.round(stage)));
-  return <div className={`deck-case-meter deck-case-meter-${side}`} aria-label={`シンクロ段階${safeStage}、山札残り${deckCount}枚`}>
+  return <div className="deck-case-meter" aria-label={`シンクロ段階${safeStage}、山札残り${deckCount}枚`}>
     <img src={DECK_CASE_IMAGES[safeStage]} alt={`シンクロ段階${safeStage}のデッキケース`} />
     <strong>{deckCount}</strong>
   </div>;
@@ -489,7 +489,7 @@ function BattleActor({ side, name, title, marker, text, leader, deckCount, syncS
   marker: string;
   text?: string;
   leader: { life: number; pp: number; maxPp: number };
-  deckCount: number;
+  deckCount?: number;
   syncStageValue: number;
   hit: boolean;
   portraitSrc?: string;
@@ -508,7 +508,7 @@ function BattleActor({ side, name, title, marker, text, leader, deckCount, syncS
           <div className="life"><span>LIFE</span><b>{leader.life}</b></div>
           <PpMeter current={leader.pp} maximum={leader.maxPp} />
         </div>
-        <DeckCaseMeter side={side} stage={syncStageValue} deckCount={deckCount} />
+        {side === "brother" && <DeckCaseMeter stage={syncStageValue} deckCount={deckCount ?? 0} />}
       </div>
     </div>
   </div>;
@@ -1249,7 +1249,6 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
   const lifeSnapshot = playbackEvent?.snapshot;
   const lifeOpponent = lifeSnapshot?.opponent ?? battle.opponent;
   const lifeBrother = lifeSnapshot?.brother ?? battle.brother;
-  const deckCountOpponent = lifeSnapshot?.opponent.deckCount ?? battle.opponent.deck.length;
   const deckCountBrother = lifeSnapshot?.brother.deckCount ?? battle.brother.deck.length;
   const battleSyncStage = syncStage(battle.syncRate, child);
   const leaderHitSide = activeEvent && isDamageEvent(activeEvent) && activeEvent.targetLeader ? activeEvent.side === "brother" ? "opponent" : "brother" : null;
@@ -1297,7 +1296,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
     {/* 常時表示のシナジー帯はHUD整理のため一時停止。開戦時の宣言演出は別レイヤーで維持する。 */}
     <TurnTransitionBanner banner={turnBanner} />
     <DeckOutBanner banner={deckOutBanner} />
-    <BattleActor side="opponent" name={opponent.name} title={opponent.title} marker={opponent.name.slice(0, 1)} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} leader={lifeOpponent} deckCount={deckCountOpponent} syncStageValue={battleSyncStage} hit={leaderHitSide === "opponent"} />
+    <BattleActor side="opponent" name={opponent.name} title={opponent.title} marker={opponent.name.slice(0, 1)} text={!battle.winner ? opponentDialogueEvent?.dialogue : undefined} leader={lifeOpponent} syncStageValue={battleSyncStage} hit={leaderHitSide === "opponent"} />
     <section className={`arena ${leaderHitSide ? `leader-hit-${leaderHitSide}` : ""} ${cardAttackHit ? "attack-hit-card" : ""} ${attackAfterglow ? "attack-afterglow" : ""}`} style={arenaStyle}>
       <img className="battle-board-art" src={boardImage} alt="" aria-hidden="true" />
       <div className="board-turn" aria-label={`現在のターン ${battle.turn}`}>TURN {battle.turn}</div>
