@@ -1,4 +1,5 @@
 import { nextRandom, randomIndex, shuffle } from "./random";
+import { learnedRecipes, recipeHandIndexes } from "./recipes";
 import { activeSpeciesSynergies, speciesGrant } from "./species";
 import { syncStage } from "./sync";
 import type {
@@ -19,6 +20,7 @@ import type {
   BattleCommentaryKind,
   Keyword,
   OpponentDefinition,
+  RecipeContext,
 } from "./types";
 
 const MAX_BOARD = 5;
@@ -464,6 +466,8 @@ function resolvePlay(
   handIndex: number,
   cards: readonly Card[],
   child: ChildProfile,
+  /** レシピ層の targetOverride 専用。未指定なら従来どおり自動ターゲットに任せる。 */
+  buffTargetInstanceId?: string,
 ): BattleState {
   let active = state[side];
   let enemy = state[other(side)];
@@ -587,7 +591,11 @@ function resolvePlay(
       });
     }
     if (effect.keyword === "buff" && active.board.length) {
-      const targetIndex = active.board.reduce((best, item, index, all) => item.atk > all[best].atk ? index : best, 0);
+      // 既定は最高攻撃力。レシピの targetOverride がある時だけ、その相方に差し替える。
+      const overrideIndex = buffTargetInstanceId ? active.board.findIndex((item) => item.instanceId === buffTargetInstanceId) : -1;
+      const targetIndex = overrideIndex >= 0
+        ? overrideIndex
+        : active.board.reduce((best, item, index, all) => item.atk > all[best].atk ? index : best, 0);
       const target = active.board[targetIndex];
       const buffed = { ...target, atk: target.atk + effect.value, buffSources: [...target.buffSources, { instanceId: instance.instanceId, amount: effect.value, intervention: instance.intervention }] };
       active = { ...active, board: active.board.map((item, index) => index === targetIndex ? buffed : item) };
@@ -673,6 +681,72 @@ function resolvePlay(
         });
       }
     }
+  }
+  return next;
+}
+
+/**
+ * レシピの2枚が「いま続けて出せるか」を見る。
+ * 2枚目は、1枚目を出した後のPPと盤面に対して既存の `canPlay` で判定する
+ * （強化スペルは味方がいないと出せないため、1枚目の着地を織り込む必要がある）。
+ */
+function recipeIsPlayable(
+  player: BattlePlayer,
+  enemy: BattlePlayer,
+  cards: readonly Card[],
+  indexes: { first: number; second: number },
+): boolean {
+  const firstInstance = player.hand[indexes.first];
+  const secondInstance = player.hand[indexes.second];
+  const firstCard = cardById(cards, firstInstance.cardId);
+  const secondCard = cardById(cards, secondInstance.cardId);
+  if (firstCard.cost + secondCard.cost > player.pp) return false;
+  if (!canPlay(firstInstance, player, enemy, cards)) return false;
+  const afterFirst: BattlePlayer = {
+    ...player,
+    pp: player.pp - firstCard.cost,
+    board: firstCard.type === "monster" ? [...player.board, firstInstance] : player.board,
+  };
+  return canPlay(secondInstance, afterFirst, enemy, cards);
+}
+
+/**
+ * レシピ層。プレイフェイズの前段で1回だけ走る。
+ *
+ * - 習得済みレシピのうち最初に成立した1本だけを、レシピの順序どおりに出す（1ターン1レシピ）
+ * - その2枚はコスト降順の並べ替えを通さない。残りPPと残り手札は従来ロジックに戻して続行する
+ * - 未習得レシピには手を出さない。ペアが手札に揃っていた事実だけをログに残す（検証用）
+ */
+function applyRecipePhase(
+  state: BattleState,
+  side: BattleSide,
+  cards: readonly Card[],
+  child: ChildProfile,
+  context: RecipeContext,
+): BattleState {
+  let next = state;
+  const handAtPhaseStart = state[side].hand;
+  for (const recipe of context.recipes) {
+    if (context.memory.learnedRecipeIds.includes(recipe.id)) continue;
+    if (!recipeHandIndexes(recipe, handAtPhaseStart)) continue;
+    next = event(next, { type: "recipe", side, text: `[RECIPE-MISS] ${recipe.name} のペアが手札に揃っていたが未習得` });
+  }
+
+  for (const recipe of learnedRecipes(context.recipes, context.memory)) {
+    const active = next[side];
+    const enemy = next[other(side)];
+    const indexes = recipeHandIndexes(recipe, active.hand);
+    if (!indexes || !recipeIsPlayable(active, enemy, cards, indexes)) continue;
+    const partnerInstanceId = active.hand[indexes.first].instanceId;
+    const secondInstanceId = active.hand[indexes.second].instanceId;
+    next = event(next, { type: "recipe", side, text: `[RECIPE] ${recipe.name} 発動`, effective: true });
+    next = resolvePlay(next, side, indexes.first, cards, child);
+    const secondIndex = next[side].hand.findIndex((item) => item.instanceId === secondInstanceId);
+    if (secondIndex >= 0) {
+      const override = recipe.targetOverride?.mode === "recipePartner" ? partnerInstanceId : undefined;
+      next = resolvePlay(next, side, secondIndex, cards, child, override);
+    }
+    break;
   }
   return next;
 }
@@ -807,6 +881,8 @@ export function advanceBattle(
   cards: readonly Card[],
   child: ChildProfile,
   opponent: OpponentDefinition,
+  /** レシピ層。渡さなければ挙動・イベント列とも従来のまま。 */
+  recipeContext?: RecipeContext,
 ): BattleState {
   if (state.winner) return state;
   const side = state.activeSide;
@@ -822,6 +898,7 @@ export function advanceBattle(
   if (draw.drawn) next = event(next, { type: "draw", side, text: `${active.name}が1枚ドロー`, cardId: draw.drawn.cardId });
 
   if (draw.aceCard) next = addBattleCommentary(next, child, "ace");
+  if (recipeContext && side === "brother") next = applyRecipePhase(next, side, cards, child, recipeContext);
   while (true) {
     active = next[side]; enemy = next[other(side)];
     const playable = active.hand
@@ -862,8 +939,9 @@ export function runBattle(
   cards: readonly Card[],
   child: ChildProfile,
   opponent: OpponentDefinition,
+  recipeContext?: RecipeContext,
 ): BattleState {
   let next = state;
-  while (!next.winner) next = advanceBattle(next, cards, child, opponent);
+  while (!next.winner) next = advanceBattle(next, cards, child, opponent, recipeContext);
   return next;
 }

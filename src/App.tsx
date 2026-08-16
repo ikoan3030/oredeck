@@ -44,7 +44,10 @@ import {
   type ChildProfile,
   type DraftOffer,
   type DraftState,
+  type DraftCard,
   type OpponentDefinition,
+  type Recipe,
+  type RecipeContext,
   type RunState,
   type Species,
   type SpeciesSynergyConfig,
@@ -236,6 +239,8 @@ const EVENT_PLAYBACK_TIMING: Record<BattleEventType, EventPlaybackTiming> = {
   },
   destroyed: { normal: 450, fast: 260, skip: 80, visual: { normal: 450, fast: 260, skip: 100 } },
   attribution: { normal: 1400, fast: 550, skip: 100 },
+  // レシピ層は検証用のログ行なので、間だけ取って演出は持たせない。
+  recipe: { normal: 300, fast: 180, skip: 60 },
   taunt: { normal: 1100, fast: 450, skip: 100 },
   result: {
     normal: 900,
@@ -1039,11 +1044,51 @@ function TurnTransitionBanner({ banner }: { banner: { side: BattleEvent["side"];
   return <div className={`turn-transition-banner ${side}`} style={{ "--turn-banner-duration": `${banner.duration}ms` } as CSSProperties} role="status" aria-live="polite"><span>{banner.text}</span></div>;
 }
 
+/**
+ * 検証用: 組み上がったデッキの後半を、全レシピのペア（各2枚）に差し替える。
+ * ドラフトには一切触れず、戦闘開始時の手札の中身だけを検証しやすくするための細工。
+ */
+function stackRecipePairs(deck: DraftCard[], recipes: Recipe[]): DraftCard[] {
+  const pairs = recipes.flatMap((recipe) => [recipe.cards[0], recipe.cards[0], recipe.cards[1], recipe.cards[1]]);
+  const kept = deck.slice(0, Math.max(0, deck.length - pairs.length));
+  return [...kept, ...pairs.map((cardId, index) => ({ instanceId: `recipe-test-${index}`, cardId, intervention: false, source: "auto" as const }))];
+}
+
+/**
+ * レシピ層の検証パネル。開発ビルドでのみ描画する。
+ * 「レシピ層を有効にする」がOFFの間はコアへ何も渡さないので、イベント列は従来と一致する。
+ */
+function RecipeDebugPanel({ recipes, enabled, learnedIds, stackDeck, cards, onToggleEnabled, onToggleLearned, onToggleStackDeck }: {
+  recipes: Recipe[];
+  enabled: boolean;
+  learnedIds: string[];
+  stackDeck: boolean;
+  cards: Card[];
+  onToggleEnabled: () => void;
+  onToggleLearned: (recipeId: string) => void;
+  onToggleStackDeck: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const cardName = (cardId: string) => cards.find((card) => card.id === cardId)?.name ?? cardId;
+  return <section className={`recipe-debug ${open ? "is-open" : ""}`} aria-label="レシピ層デバッグ">
+    <button className="recipe-debug-launcher" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}>RECIPE</button>
+    {open && <div className="recipe-debug-body">
+      <label className="recipe-debug-master"><input type="checkbox" checked={enabled} onChange={onToggleEnabled} />レシピ層を有効にする</label>
+      <ul>{recipes.map((recipe) => <li key={recipe.id}>
+        <label><input type="checkbox" checked={learnedIds.includes(recipe.id)} onChange={() => onToggleLearned(recipe.id)} disabled={!enabled} />{recipe.name}</label>
+        <small>{recipe.cards.map(cardName).join(" → ")}</small>
+      </li>)}</ul>
+      <label className="recipe-debug-master"><input type="checkbox" checked={stackDeck} onChange={onToggleStackDeck} disabled={!enabled} />デッキ後半を全レシピのペアに差し替える</label>
+      <p className="recipe-debug-note">習得OFFのままペアが手札に揃うと、バトルログに [RECIPE-MISS] が出ます。差し替えONの戦闘では切り札は無効になります。</p>
+    </div>}
+  </section>;
+}
+
 function BattleLogPanel({ open, recent, cards, opponentName, onToggle }: { open: boolean; recent: BattleEvent[]; cards: Card[]; opponentName: string; onToggle: () => void }) {
   return <>
     <section className={`battle-log-panel ${open ? "is-open" : ""}`} aria-label="バトルログ">
       <button className="battle-log-launcher" type="button" onClick={onToggle} aria-expanded={open}>ログ</button>
-      {open && <div className="battle-log-entries">{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponentName}</span>{battleLogText(item, cards)}</p>)}</div>}
+      {open && <div className="battle-log-entries">{recent.map((item) => <p key={item.id} className={item.type === "attribution" ? "highlight" : item.type === "sync_bonus" ? "sync-event" : item.type === "ace" ? "ace-event" : item.type === "recipe" ? "recipe-event" : ""}><span>{item.side === "brother" ? "ユウタ" : opponentName}</span>{battleLogText(item, cards)}</p>)}</div>}
     </section>
   </>;
 }
@@ -1335,7 +1380,15 @@ export default function Home() {
   const [pickFlash, setPickFlash] = useState<PickFlash | null>(null);
   const [pendingGame, setPendingGame] = useState<SavedGame | null>(null);
   const [autoPick, setAutoPick] = useState<{ key: string; phase: AutoPickPhase } | null>(null);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  // レシピ層はプロトタイプの検証機能。既定はOFFで、開発ビルドのデバッグパネルからだけ入り切りする。
+  const [recipeEnabled, setRecipeEnabled] = useState(false);
+  const [learnedRecipeIds, setLearnedRecipeIds] = useState<string[]>([]);
+  const [recipeStackDeck, setRecipeStackDeck] = useState(false);
   useLandscapeStage();
+  const recipeContext: RecipeContext | undefined = import.meta.env.DEV && recipeEnabled
+    ? { recipes, memory: { learnedRecipeIds } }
+    : undefined;
 
   useEffect(() => {
     Promise.all([
@@ -1343,8 +1396,9 @@ export default function Home() {
       fetch("./data/children/tanjun.json").then((response) => response.json()),
       fetch("./data/opponents.json").then((response) => response.json()),
       fetch("./data/species.json").then((response) => response.json()),
+      fetch("./data/recipes.json").then((response) => response.json()).catch(() => []),
     ])
-      .then(([cardData, childData, opponentData, speciesData]) => { setCards(cardData); setChild(childData); setOpponents(opponentData); setSynergyConfig(speciesData); setGame(loadSavedGame(localStorage.getItem(SAVE_KEY)) ?? createDefaultSave(childData.sync.initial)); setHydrated(true); });
+      .then(([cardData, childData, opponentData, speciesData, recipeData]) => { setCards(cardData); setChild(childData); setOpponents(opponentData); setSynergyConfig(speciesData); setRecipes(recipeData); setGame(loadSavedGame(localStorage.getItem(SAVE_KEY)) ?? createDefaultSave(childData.sync.initial)); setHydrated(true); });
   }, []);
 
   useEffect(() => {
@@ -1501,7 +1555,11 @@ export default function Home() {
     const opponentId = getCurrentOpponentId(game.run);
     const opponent = opponentId ? getOpponentById(opponents, opponentId) : undefined;
     if (!opponent) return;
-    const battle = createBattle(game.draft.deck, opponent, cards, game.draft.seed ^ 0xa5a5a5a5, game.draft.syncRate, aceCardId, synergyConfig);
+    // 検証用の差し替え。デバッグパネルからONにした時だけ通る道で、製品ビルドには存在しない。
+    const stacked = recipeContext && recipeStackDeck;
+    const deck = stacked ? stackRecipePairs(game.draft.deck, recipes) : game.draft.deck;
+    const ace = stacked ? null : aceCardId;
+    const battle = createBattle(deck, opponent, cards, game.draft.seed ^ 0xa5a5a5a5, game.draft.syncRate, ace, synergyConfig);
     setAutoBattle(true);
     setGame({ ...game, phase: "battle", battle, aceCardId });
   }
@@ -1518,7 +1576,7 @@ export default function Home() {
       if (!current.battle || !child) return current;
       const opponentId = getCurrentOpponentId(current.run);
       const opponent = opponentId ? getOpponentById(opponents, opponentId) : undefined;
-      return opponent ? { ...current, battle: advanceBattle(current.battle, cards, child, opponent) } : current;
+      return opponent ? { ...current, battle: advanceBattle(current.battle, cards, child, opponent, recipeContext) } : current;
     });
   }
 
@@ -1556,6 +1614,16 @@ export default function Home() {
   return (
     <>
       <div className="landscape-stage">{renderScreen()}</div>
+      {import.meta.env.DEV && recipes.length > 0 && <RecipeDebugPanel
+        recipes={recipes}
+        enabled={recipeEnabled}
+        learnedIds={learnedRecipeIds}
+        stackDeck={recipeStackDeck}
+        cards={cards}
+        onToggleEnabled={() => setRecipeEnabled((value) => !value)}
+        onToggleStackDeck={() => setRecipeStackDeck((value) => !value)}
+        onToggleLearned={(recipeId) => setLearnedRecipeIds((current) => current.includes(recipeId) ? current.filter((item) => item !== recipeId) : [...current, recipeId])}
+      />}
       <RotateNotice />
     </>
   );

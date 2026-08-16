@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
-import { activeAdviceFocus, applyAdvice, matchesAdviceCategory, activeSpeciesSynergies, advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createLadderRun, createRun, decaySync, decideOffer, deferPassiveIntervention, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, countSpeciesTypes, instanceHasKeyword, speciesGrant, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type AttackStyle, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition, type SpeciesSynergyConfig } from "./index";
+import { activeAdviceFocus, applyAdvice, matchesAdviceCategory, activeSpeciesSynergies, advanceRun, aestheticScore, advanceBattle, createBattle, createDraft, createLadderRun, createRun, decaySync, decideOffer, deferPassiveIntervention, evaluateDeck, gainSync, generateOffer, getCurrentOpponentId, getOpponentById, countSpeciesTypes, instanceHasKeyword, speciesGrant, isAceUnlocked, isAdviceDue, isRunComplete, recordBattleResult, resetRun, resolveOffer, runBattle, syncStage, type AttackStyle, type Card, type ChildProfile, type DraftCard, type DraftOffer, type OpponentDefinition, type Recipe, type SpeciesSynergyConfig } from "./index";
 
 const cards = JSON.parse(readFileSync(resolve("data/cards.json"), "utf8")) as Card[];
 const child = JSON.parse(readFileSync(resolve("data/children/tanjun.json"), "utf8")) as ChildProfile;
@@ -827,4 +827,60 @@ test("run summary aggregates passive support, rejection, love cards, outcomes, a
   assert.equal(run.summary.passiveRejects, 1);
   assert.deepEqual(run.summary.loveCardIds, ["zexvain"]);
   assert.equal(run.summary.finalSync, decaySync(draft.syncRate, child));
+});
+
+const testRecipe: Recipe = {
+  id: "test-recipe",
+  name: "テストレシピ",
+  cards: ["geminai", "fangblessing"],
+  targetOverride: { mode: "recipePartner" },
+  priority: 1,
+};
+
+/**
+ * 正順がコスト昇順のレシピ。従来のコスト降順プレイだと祝福が先に出て、
+ * 盤面で一番攻撃力が高い別のユニットへ飛ぶ。
+ */
+function recipeTurn(learnedRecipeIds: string[]) {
+  const opponent = getOpponent("wall");
+  const base = createBattle(battleDeck("grim"), opponent, cards, 1);
+  const make = (cardId: string, instanceId: string) => ({
+    ...base.brother.hand[0],
+    instanceId,
+    cardId,
+    atk: get(cardId).atk,
+    hp: get(cardId).hp,
+    maxHp: get(cardId).hp,
+  });
+  const bystander = { ...make("grim", "bystander"), summonedTurn: 0, attacked: false };
+  const staged = {
+    ...base,
+    turn: 3,
+    brother: { ...base.brother, deck: [], hand: [make("geminai", "h-geminai"), make("fangblessing", "h-fang")], board: [bystander], maxPp: 3, pp: 3 },
+    opponent: { ...base.opponent, deck: [], hand: [], board: [] },
+  };
+  const result = advanceBattle(staged, cards, child, opponent, { recipes: [testRecipe], memory: { learnedRecipeIds } });
+  const buff = result.events.find((item) => item.type === "effect" && item.keyword === "buff" && item.cardId === "fangblessing");
+  return { result, buffTarget: buff?.targetInstances?.[0]?.instanceId };
+}
+
+test("a learned recipe plays its pair in order and buffs the partner", () => {
+  const learned = recipeTurn([testRecipe.id]);
+  assert.equal(learned.buffTarget, "h-geminai");
+  assert.ok(learned.result.events.some((item) => item.type === "recipe" && item.text.startsWith("[RECIPE] テストレシピ")));
+  assert.ok(!learned.result.events.some((item) => item.text.startsWith("[RECIPE-MISS]")));
+
+  const unlearned = recipeTurn([]);
+  assert.equal(unlearned.buffTarget, "bystander");
+  assert.ok(unlearned.result.events.some((item) => item.type === "recipe" && item.text.startsWith("[RECIPE-MISS] テストレシピ")));
+  assert.ok(!unlearned.result.events.some((item) => item.text.startsWith("[RECIPE] ")));
+});
+
+test("the recipe layer is inert when no recipe context is passed", () => {
+  const opponent = getOpponent("wall");
+  const base = createBattle(battleDeck("grim"), opponent, cards, 4321);
+  const plain = runBattle(base, cards, child, opponent);
+  const empty = runBattle(base, cards, child, opponent, { recipes: [testRecipe], memory: { learnedRecipeIds: [] } });
+  assert.equal(plain.events.some((item) => item.type === "recipe"), false);
+  assert.deepEqual(empty.events.filter((item) => item.type !== "recipe").map((item) => item.text), plain.events.map((item) => item.text));
 });

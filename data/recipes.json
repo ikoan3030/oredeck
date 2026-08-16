@@ -1,0 +1,23 @@
+[
+  {
+    "id": "flash-charge",
+    "name": "閃光突撃",
+    "cards": ["alvine", "fighting-spirit"],
+    "targetOverride": { "mode": "recipePartner" },
+    "priority": 1
+  },
+  {
+    "id": "fang-scout",
+    "name": "竜牙の斥候",
+    "cards": ["geminai", "fangblessing"],
+    "targetOverride": { "mode": "recipePartner" },
+    "priority": 2
+  },
+  {
+    "id": "mist-steel",
+    "name": "霧衣の鋼",
+    "cards": ["mistluna", "steel-blessing"],
+    "targetOverride": { "mode": "recipePartner" },
+    "priority": 3
+  }
+]

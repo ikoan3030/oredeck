@@ -1533,6 +1533,17 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
   .sync-box.sync-flash-burst strong { animation: none; }
 }
 
+/* レシピ層の検証パネル。開発ビルドでしか描画されないので、見た目は最小限に留める。 */
+.recipe-debug { position: fixed; left: 8px; bottom: 8px; z-index: 60; font-size: 12px; }
+.recipe-debug-launcher { padding: 4px 10px; border: 2px solid var(--ink); border-radius: 4px; background: var(--yellow); color: var(--ink); font-weight: 900; cursor: pointer; }
+.recipe-debug-body { margin-top: 6px; padding: 8px 10px; width: 260px; border: 2px solid var(--ink); border-radius: 6px; background: white; color: var(--ink); box-shadow: 4px 4px 0 #0006; }
+.recipe-debug-master { display: block; margin-bottom: 6px; font-weight: 900; }
+.recipe-debug-body ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.recipe-debug-body li label { display: flex; align-items: center; gap: 4px; font-weight: 700; }
+.recipe-debug-body li small { display: block; padding-left: 18px; color: #665f6d; }
+.recipe-debug-note { margin: 8px 0 0; color: #665f6d; line-height: 1.4; }
+.battle-log-entries p.recipe-event { color: var(--ink); background: #fff0b8; border-left: 6px solid var(--yellow); font-weight: 1000; }
+
 /* 背の低い横長（設計原寸の 1280x720 を含む）。パネル系の画面は縦に余裕がある
    前提で組んであるので、ここで一段詰めて1画面に収める。組み替えはしない。 */
 @media (max-height: 820px) {

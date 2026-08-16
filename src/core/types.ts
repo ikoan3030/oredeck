@@ -326,6 +326,33 @@ export interface OpponentDefinition {
   taunts: string[];
 }
 
+/**
+ * レシピ = 「このカードを、この順で、同じターンに出すと強い」という手作りのデータ。
+ * 弟が習得していれば通常のコスト降順プレイより先に、この順序どおりに出す。
+ * 未習得のレシピには一切介入しない（従来ロジックが崩すのが仕様）。
+ */
+export interface Recipe {
+  id: string;
+  name: string;
+  /** [先に出すcardId, 後に出すcardId]。順序に意味がある。 */
+  cards: [string, string];
+  /** 後手カードの効果ターゲットの上書き。recipePartner は cards[0] で出したユニット。 */
+  targetOverride?: { mode: "recipePartner" };
+  /** 複数レシピが同時に成立したとき、小さい方を先に解決する。 */
+  priority: number;
+}
+
+/** 習得済みレシピの保持。プロトタイプではデバッグUIから直接編集する。 */
+export interface RecipeMemory {
+  learnedRecipeIds: string[];
+}
+
+/** バトルにレシピ層を差し込むための入れ物。渡さなければレシピ層は完全に無効。 */
+export interface RecipeContext {
+  recipes: readonly Recipe[];
+  memory: RecipeMemory;
+}
+
 export type BattleSide = "brother" | "opponent";
 
 export interface BattleCardInstance {
@@ -362,7 +389,7 @@ export interface BattlePlayer {
   aceUsed: boolean;
 }
 
-export type BattleEventType = "turn" | "draw" | "play" | "effect" | "attack" | "destroyed" | "attribution" | "taunt" | "result" | "sync_bonus" | "ace" | "heal";
+export type BattleEventType = "turn" | "draw" | "play" | "effect" | "attack" | "destroyed" | "attribution" | "taunt" | "result" | "sync_bonus" | "ace" | "heal" | "recipe";
 
 export interface BattleEventSnapshotPlayer {
   side: BattleSide;
