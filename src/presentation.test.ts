@@ -124,3 +124,25 @@ test("a speaker caption reserves two lines so a long line is never cut", () => {
   assert.ok(minHeight && lineHeight, "the caption reserves its height explicitly");
   assert.ok(Number(minHeight[1]) >= Number(lineHeight[1]) * 2, "the reserved height must hold both lines");
 });
+
+test("only destruction and fusion take a card off the board", () => {
+  const body = app.slice(app.indexOf("function removedInstanceIds("), app.indexOf("function useStableBoards("));
+  assert.ok(body.includes('event.type !== "destroyed"'), "destruction must still be the ordinary removal path");
+  assert.ok(
+    /event\.type === "recipe" && event\.destroyed/.test(body),
+    "fusion takes its materials off the board without a destruction event, so recipe events marked destroyed must count too",
+  );
+  assert.equal(
+    /if \(!?event\.destroyed\) (continue|removed)/.test(body.replace(/event\.type === "recipe" && event\.destroyed/g, "")),
+    false,
+    "a bare destroyed flag must not remove cards: attack and effect events set it one event early",
+  );
+});
+
+test("the recipe debug panel is a development-only overlay", () => {
+  assert.ok(app.includes("import.meta.env.DEV && recipes.length > 0 && <RecipeDebugPanel"), "the panel must be gated on the dev build");
+  assert.ok(app.includes("import.meta.env.DEV && recipeEnabled"), "the recipe layer must stay off unless the dev panel turns it on");
+  for (const label of ["レシピ層を有効にする", "デッキ後半をレシピのペアに差し替える", "敵レシピデッキで戦う"]) {
+    assert.ok(app.includes(label), `the panel must offer the "${label}" toggle`);
+  }
+});

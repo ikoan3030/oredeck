@@ -2,6 +2,7 @@
   {
     "id": "flash-charge",
     "name": "閃光突撃",
+    "kind": "play",
     "cards": ["alvine", "fighting-spirit"],
     "targetOverride": { "mode": "recipePartner" },
     "priority": 1
@@ -9,6 +10,7 @@
   {
     "id": "fang-scout",
     "name": "竜牙の斥候",
+    "kind": "play",
     "cards": ["geminai", "fangblessing"],
     "targetOverride": { "mode": "recipePartner" },
     "priority": 2
@@ -16,8 +18,34 @@
   {
     "id": "mist-steel",
     "name": "霧衣の鋼",
+    "kind": "play",
     "cards": ["mistluna", "steel-blessing"],
     "targetOverride": { "mode": "recipePartner" },
     "priority": 3
+  },
+  {
+    "id": "twin-fang-king",
+    "name": "双牙合体",
+    "kind": "fusion",
+    "cards": ["grim", "zahhak"],
+    "resultCardId": "grimzahhak",
+    "priority": 4
+  },
+  {
+    "id": "moss-wind",
+    "name": "苔玉の風変わり",
+    "kind": "transform",
+    "cards": ["mosslin", "sylphy"],
+    "resultCardId": "sylphina",
+    "priority": 5
+  },
+  {
+    "id": "star-scale-seal",
+    "name": "星鱗の封じ手",
+    "kind": "counter",
+    "cards": ["noelka", "dragonix"],
+    "counterCondition": { "minAtk": 5 },
+    "counterEffect": { "mode": "neutralize" },
+    "priority": 6
   }
 ]

@@ -876,11 +876,15 @@ function reconcileBoard(
   return { board, carriedOver };
 }
 
-/** Ids the played events have taken off the board. Nothing else may remove a card. */
+/**
+ * Ids the played events have taken off the board. Nothing else may remove a card.
+ * 合体レシピだけは破壊イベントを伴わずに素材が場を離れるので、`destroyed` 印の付いた
+ * recipe イベントも退場として数える。他の種別は従来どおり destroyed イベントだけを見る。
+ */
 function removedInstanceIds(playedEvents: readonly BattleEvent[]): Set<string> {
   const removed = new Set<string>();
   for (const event of playedEvents) {
-    if (event.type !== "destroyed") continue;
+    if (event.type !== "destroyed" && !(event.type === "recipe" && event.destroyed)) continue;
     if (event.targetInstanceId) removed.add(event.targetInstanceId);
     event.targetInstanceIds?.forEach((id) => removed.add(id));
     event.targetInstances?.forEach((item) => removed.add(item.instanceId));
@@ -1048,25 +1052,42 @@ function TurnTransitionBanner({ banner }: { banner: { side: BattleEvent["side"];
  * 検証用: 組み上がったデッキの後半を、全レシピのペア（各2枚）に差し替える。
  * ドラフトには一切触れず、戦闘開始時の手札の中身だけを検証しやすくするための細工。
  */
-function stackRecipePairs(deck: DraftCard[], recipes: Recipe[]): DraftCard[] {
-  const pairs = recipes.flatMap((recipe) => [recipe.cards[0], recipe.cards[0], recipe.cards[1], recipe.cards[1]]);
+function stackRecipePairs(deck: DraftCard[], recipes: Recipe[], learnedIds: string[]): DraftCard[] {
+  // 習得中のレシピがあればそれだけを厚く積む。1本ずつ検証するときに引けないと話にならないため。
+  const focus = recipes.filter((recipe) => learnedIds.includes(recipe.id));
+  const chosen = focus.length ? focus : recipes;
+  const copies = chosen.length <= 3 ? 2 : 1;
+  const pairs = chosen.flatMap((recipe) => Array.from({ length: copies }, () => [recipe.cards[0], recipe.cards[1]]).flat());
   const kept = deck.slice(0, Math.max(0, deck.length - pairs.length));
   return [...kept, ...pairs.map((cardId, index) => ({ instanceId: `recipe-test-${index}`, cardId, intervention: false, source: "auto" as const }))];
+}
+
+/** 検証用: 敵にも合体を持たせたバリアント。opponents.json は書き換えず、この場で差し替える。 */
+const ENEMY_RECIPE_OPPONENT = "wall";
+function enemyRecipeOpponent(opponent: OpponentDefinition, recipes: Recipe[]): OpponentDefinition {
+  const fusion = recipes.find((recipe) => recipe.kind === "fusion");
+  if (!fusion) return opponent;
+  const pair = [fusion.cards[0], fusion.cards[0], fusion.cards[1], fusion.cards[1]];
+  return { ...opponent, deck: [...opponent.deck.slice(0, Math.max(0, opponent.deck.length - pair.length)), ...pair] };
 }
 
 /**
  * レシピ層の検証パネル。開発ビルドでのみ描画する。
  * 「レシピ層を有効にする」がOFFの間はコアへ何も渡さないので、イベント列は従来と一致する。
  */
-function RecipeDebugPanel({ recipes, enabled, learnedIds, stackDeck, cards, onToggleEnabled, onToggleLearned, onToggleStackDeck }: {
+const RECIPE_KIND_LABELS: Record<Recipe["kind"], string> = { play: "実行", fusion: "合体", transform: "変化", counter: "妨害" };
+
+function RecipeDebugPanel({ recipes, enabled, learnedIds, stackDeck, enemyDeck, cards, onToggleEnabled, onToggleLearned, onToggleStackDeck, onToggleEnemyDeck }: {
   recipes: Recipe[];
   enabled: boolean;
   learnedIds: string[];
   stackDeck: boolean;
+  enemyDeck: boolean;
   cards: Card[];
   onToggleEnabled: () => void;
   onToggleLearned: (recipeId: string) => void;
   onToggleStackDeck: () => void;
+  onToggleEnemyDeck: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const cardName = (cardId: string) => cards.find((card) => card.id === cardId)?.name ?? cardId;
@@ -1075,11 +1096,12 @@ function RecipeDebugPanel({ recipes, enabled, learnedIds, stackDeck, cards, onTo
     {open && <div className="recipe-debug-body">
       <label className="recipe-debug-master"><input type="checkbox" checked={enabled} onChange={onToggleEnabled} />レシピ層を有効にする</label>
       <ul>{recipes.map((recipe) => <li key={recipe.id}>
-        <label><input type="checkbox" checked={learnedIds.includes(recipe.id)} onChange={() => onToggleLearned(recipe.id)} disabled={!enabled} />{recipe.name}</label>
-        <small>{recipe.cards.map(cardName).join(" → ")}</small>
+        <label><input type="checkbox" checked={learnedIds.includes(recipe.id)} onChange={() => onToggleLearned(recipe.id)} disabled={!enabled} /><b className="recipe-debug-kind">{RECIPE_KIND_LABELS[recipe.kind]}</b>{recipe.name}</label>
+        <small>{recipe.cards.map(cardName).join(recipe.kind === "play" ? " → " : " ＋ ")}{recipe.resultCardId ? ` ⇒ ${cardName(recipe.resultCardId)}` : ""}</small>
       </li>)}</ul>
-      <label className="recipe-debug-master"><input type="checkbox" checked={stackDeck} onChange={onToggleStackDeck} disabled={!enabled} />デッキ後半を全レシピのペアに差し替える</label>
-      <p className="recipe-debug-note">習得OFFのままペアが手札に揃うと、バトルログに [RECIPE-MISS] が出ます。差し替えONの戦闘では切り札は無効になります。</p>
+      <label className="recipe-debug-master"><input type="checkbox" checked={stackDeck} onChange={onToggleStackDeck} disabled={!enabled} />デッキ後半をレシピのペアに差し替える（習得中があればそれを厚く）</label>
+      <label className="recipe-debug-master"><input type="checkbox" checked={enemyDeck} onChange={onToggleEnemyDeck} disabled={!enabled} />敵レシピデッキで戦う（{ENEMY_RECIPE_OPPONENT} に合体ペアを積む）</label>
+      <p className="recipe-debug-note">習得OFFのままペアが揃うと、バトルログに実行型は [RECIPE-MISS]、状態型は [RECIPE-STANDBY] が出ます。差し替えONの戦闘では切り札は無効になります。</p>
     </div>}
   </section>;
 }
@@ -1385,10 +1407,14 @@ export default function Home() {
   const [recipeEnabled, setRecipeEnabled] = useState(false);
   const [learnedRecipeIds, setLearnedRecipeIds] = useState<string[]>([]);
   const [recipeStackDeck, setRecipeStackDeck] = useState(false);
+  const [recipeEnemyDeck, setRecipeEnemyDeck] = useState(false);
+  const [recipeCards, setRecipeCards] = useState<Card[]>([]);
   useLandscapeStage();
   const recipeContext: RecipeContext | undefined = import.meta.env.DEV && recipeEnabled
     ? { recipes, memory: { learnedRecipeIds } }
     : undefined;
+  // 合体・変化の結果カードはドラフトのプールに混ぜない。バトルの解決と表示にだけ渡す。
+  const battleCards = useMemo(() => [...cards, ...recipeCards], [cards, recipeCards]);
 
   useEffect(() => {
     Promise.all([
@@ -1397,8 +1423,9 @@ export default function Home() {
       fetch("./data/opponents.json").then((response) => response.json()),
       fetch("./data/species.json").then((response) => response.json()),
       fetch("./data/recipes.json").then((response) => response.json()).catch(() => []),
+      fetch("./data/recipe_cards.json").then((response) => response.json()).catch(() => []),
     ])
-      .then(([cardData, childData, opponentData, speciesData, recipeData]) => { setCards(cardData); setChild(childData); setOpponents(opponentData); setSynergyConfig(speciesData); setRecipes(recipeData); setGame(loadSavedGame(localStorage.getItem(SAVE_KEY)) ?? createDefaultSave(childData.sync.initial)); setHydrated(true); });
+      .then(([cardData, childData, opponentData, speciesData, recipeData, recipeCardData]) => { setCards(cardData); setChild(childData); setOpponents(opponentData); setSynergyConfig(speciesData); setRecipes(recipeData); setRecipeCards(recipeCardData); setGame(loadSavedGame(localStorage.getItem(SAVE_KEY)) ?? createDefaultSave(childData.sync.initial)); setHydrated(true); });
   }, []);
 
   useEffect(() => {
@@ -1553,13 +1580,14 @@ export default function Home() {
     setSyncNotice(null);
     clearPickFlash();
     const opponentId = getCurrentOpponentId(game.run);
-    const opponent = opponentId ? getOpponentById(opponents, opponentId) : undefined;
-    if (!opponent) return;
+    const found = opponentId ? getOpponentById(opponents, opponentId) : undefined;
+    if (!found) return;
     // 検証用の差し替え。デバッグパネルからONにした時だけ通る道で、製品ビルドには存在しない。
     const stacked = recipeContext && recipeStackDeck;
-    const deck = stacked ? stackRecipePairs(game.draft.deck, recipes) : game.draft.deck;
+    const opponent = recipeContext && recipeEnemyDeck && found.id === ENEMY_RECIPE_OPPONENT ? enemyRecipeOpponent(found, recipes) : found;
+    const deck = stacked ? stackRecipePairs(game.draft.deck, recipes, learnedRecipeIds) : game.draft.deck;
     const ace = stacked ? null : aceCardId;
-    const battle = createBattle(deck, opponent, cards, game.draft.seed ^ 0xa5a5a5a5, game.draft.syncRate, ace, synergyConfig);
+    const battle = createBattle(deck, opponent, battleCards, game.draft.seed ^ 0xa5a5a5a5, game.draft.syncRate, ace, synergyConfig);
     setAutoBattle(true);
     setGame({ ...game, phase: "battle", battle, aceCardId });
   }
@@ -1576,7 +1604,7 @@ export default function Home() {
       if (!current.battle || !child) return current;
       const opponentId = getCurrentOpponentId(current.run);
       const opponent = opponentId ? getOpponentById(opponents, opponentId) : undefined;
-      return opponent ? { ...current, battle: advanceBattle(current.battle, cards, child, opponent, recipeContext) } : current;
+      return opponent ? { ...current, battle: advanceBattle(current.battle, battleCards, child, opponent, recipeContext) } : current;
     });
   }
 
@@ -1606,7 +1634,7 @@ export default function Home() {
   if (game.phase === "draft" && game.draft) return <DraftScreen draft={game.draft} offer={game.offer} cards={cards} child={child} adviceOpen={game.adviceOpen} reaction={reaction} syncNotice={syncNotice} pickFlash={pickFlash} autoPickPhase={autoPick?.phase ?? null} synergyConfig={synergyConfig} speed={playbackSpeed} onSpeedChange={(speed) => changePlaybackSpeed(speed)} onPick={takePick} onAdvice={chooseAdvice} />;
   if (game.phase === "deck" && game.draft) return <DeckScreen draft={game.draft} cards={cards} child={child} reaction={reaction} synergyConfig={synergyConfig} onBattle={prepareBattle} />;
   if (game.phase === "ace" && game.draft) return <AceSelectionScreen draft={game.draft} cards={cards} selectedCardId={game.aceCardId ?? null} onSelect={selectAceCard} onConfirm={() => startBattle()} onSkip={() => startBattle(null)} />;
-  if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={cards} child={child} opponent={currentOpponent} onNext={advanceCurrentBattle} onAutoToggle={() => setAutoBattle((value) => !value)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={(speed) => changePlaybackSpeed(speed)} />;
+  if (game.phase === "battle" && game.battle && currentOpponent) return <BattleScreen battle={game.battle} cards={battleCards} child={child} opponent={currentOpponent} onNext={advanceCurrentBattle} onAutoToggle={() => setAutoBattle((value) => !value)} auto={autoBattle} onFinish={finishBattle} finalBattle={game.run.currentBattle === game.run.opponentIds.length - 1} speed={playbackSpeed} onSpeedChange={(speed) => changePlaybackSpeed(speed)} />;
   if (game.phase === "clear") return <ClearScreen run={game.run} cards={cards} child={child} opponents={opponents} onTitle={returnToTitle} />;
   return <main className="boot-screen"><button className="primary-action" onClick={returnToTitle}>タイトルへ</button></main>;
   }
@@ -1619,9 +1647,11 @@ export default function Home() {
         enabled={recipeEnabled}
         learnedIds={learnedRecipeIds}
         stackDeck={recipeStackDeck}
-        cards={cards}
+        enemyDeck={recipeEnemyDeck}
+        cards={battleCards}
         onToggleEnabled={() => setRecipeEnabled((value) => !value)}
         onToggleStackDeck={() => setRecipeStackDeck((value) => !value)}
+        onToggleEnemyDeck={() => setRecipeEnemyDeck((value) => !value)}
         onToggleLearned={(recipeId) => setLearnedRecipeIds((current) => current.includes(recipeId) ? current.filter((item) => item !== recipeId) : [...current, recipeId])}
       />}
       <RotateNotice />

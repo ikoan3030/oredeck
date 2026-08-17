@@ -1541,6 +1541,7 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
 .recipe-debug-body ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
 .recipe-debug-body li label { display: flex; align-items: center; gap: 4px; font-weight: 700; }
 .recipe-debug-body li small { display: block; padding-left: 18px; color: #665f6d; }
+.recipe-debug-kind { flex: none; padding: 1px 5px; border-radius: 3px; background: var(--ink); color: white; font-size: 10px; }
 .recipe-debug-note { margin: 8px 0 0; color: #665f6d; line-height: 1.4; }
 .battle-log-entries p.recipe-event { color: var(--ink); background: #fff0b8; border-left: 6px solid var(--yellow); font-weight: 1000; }
 

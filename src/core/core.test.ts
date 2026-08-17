@@ -832,6 +832,7 @@ test("run summary aggregates passive support, rejection, love cards, outcomes, a
 const testRecipe: Recipe = {
   id: "test-recipe",
   name: "テストレシピ",
+  kind: "play",
   cards: ["geminai", "fangblessing"],
   targetOverride: { mode: "recipePartner" },
   priority: 1,
@@ -883,4 +884,120 @@ test("the recipe layer is inert when no recipe context is passed", () => {
   const empty = runBattle(base, cards, child, opponent, { recipes: [testRecipe], memory: { learnedRecipeIds: [] } });
   assert.equal(plain.events.some((item) => item.type === "recipe"), false);
   assert.deepEqual(empty.events.filter((item) => item.type !== "recipe").map((item) => item.text), plain.events.map((item) => item.text));
+});
+
+const recipeCards = JSON.parse(readFileSync(resolve("data/recipe_cards.json"), "utf8")) as Card[];
+const battleCards = [...cards, ...recipeCards];
+const stateRecipeList = JSON.parse(readFileSync(resolve("data/recipes.json"), "utf8")) as Recipe[];
+const stateRecipeOf = (id: string) => stateRecipeList.find((recipe) => recipe.id === id)!;
+
+/** 場に好きな2体を並べた状態で1ターン進める。状態型レシピの判定はこの盤面に対して走る。 */
+function stateRecipeTurn(boardCardIds: string[], learnedRecipeIds: string[], enemyBoardCardIds: string[] = []) {
+  const opponent = getOpponent("wall");
+  const base = createBattle(battleDeck("grim"), opponent, battleCards, 1);
+  const make = (cardId: string, instanceId: string, summonedTurn: number) => ({
+    ...base.brother.hand[0],
+    instanceId,
+    cardId,
+    atk: battleCards.find((card) => card.id === cardId)!.atk,
+    hp: battleCards.find((card) => card.id === cardId)!.hp,
+    maxHp: battleCards.find((card) => card.id === cardId)!.hp,
+    summonedTurn,
+    attacked: false,
+  });
+  const staged = {
+    ...base,
+    turn: 3,
+    brother: { ...base.brother, deck: [], hand: [], board: boardCardIds.map((id, index) => make(id, `b-${index}-${id}`, 0)), maxPp: 0, pp: 0 },
+    opponent: { ...base.opponent, deck: [], hand: [], board: enemyBoardCardIds.map((id, index) => make(id, `o-${index}-${id}`, 0)), maxPp: 0, pp: 0, life: 30 },
+  };
+  const result = advanceBattle(staged, battleCards, child, opponent, { recipes: stateRecipeList, memory: { learnedRecipeIds } });
+  return { result, fire: result.events.find((item) => item.type === "recipe" && item.text.startsWith("[RECIPE]")) };
+}
+
+test("a learned fusion recipe swaps both materials for the result unit", () => {
+  const recipe = stateRecipeOf("twin-fang-king");
+  const { result, fire } = stateRecipeTurn(["noelka", recipe.cards[0], "lumina", recipe.cards[1]], [recipe.id]);
+  const board = result.brother.board;
+
+  assert.ok(fire, "合体は発動しなければならない");
+  assert.equal(board.length, 3, "2体が1体に置き換わる");
+  assert.equal(board[1].cardId, recipe.resultCardId, "空いた枠のうち若い方に結果ユニットが入る");
+  assert.deepEqual(board.map((item) => item.cardId), ["noelka", recipe.resultCardId, "lumina"]);
+  assert.equal(result.brother.graveyard.filter((item) => recipe.cards.includes(item.cardId)).length, 2, "素材は墓地へ送られる");
+  assert.deepEqual(fire!.targetInstanceIds?.length, 2, "退場する2体を表示側へ伝える");
+  assert.equal(fire!.destroyed, true, "表示側はこの印で素材の退場を知る");
+  assert.ok(
+    result.events.some((item) => item.type === "attack" && item.instanceId === fire!.instanceId),
+    "結果ユニットはそのターンのうちに攻撃する",
+  );
+});
+
+test("a learned transform recipe replaces only the second card and leaves the catalyst", () => {
+  const recipe = stateRecipeOf("moss-wind");
+  const { result, fire } = stateRecipeTurn([recipe.cards[1], recipe.cards[0]], [recipe.id]);
+
+  assert.ok(fire, "変化は発動しなければならない");
+  assert.deepEqual(result.brother.board.map((item) => item.cardId), [recipe.resultCardId, recipe.cards[0]], "変化元だけが置き換わり、触媒は場に残る");
+  assert.equal(result.brother.board[0].instanceId, "b-0-sylphy", "盤面の枠は同じ札のまま引き継ぐ");
+});
+
+test("a learned counter recipe neutralizes the strongest qualifying enemy and waits otherwise", () => {
+  const recipe = stateRecipeOf("star-scale-seal");
+  const minAtk = recipe.counterCondition!.minAtk;
+
+  const waiting = stateRecipeTurn([recipe.cards[0], recipe.cards[1]], [recipe.id], ["grim"]);
+  assert.equal(waiting.fire, undefined, "条件を満たす敵がいなければ発動しない");
+  assert.ok(waiting.result.events.some((item) => item.type === "recipe" && item.text.startsWith("[RECIPE-WAIT]")), "待機はログに残る");
+
+  const firing = stateRecipeTurn([recipe.cards[0], recipe.cards[1]], [recipe.id], ["grim", "baldrogia", "zexvain"]);
+  const sealed = firing.result.opponent.board.find((item) => item.cannotAttack);
+  assert.ok(firing.fire, "条件を満たす敵がいれば発動する");
+  assert.equal(sealed?.cardId, "baldrogia", "条件を満たすうち攻撃力が最大の1体を止める");
+  assert.equal(sealed?.atk, 1, "攻撃力は1になる");
+  assert.ok(battleCards.find((card) => card.id === "baldrogia")!.atk >= minAtk, "対象は minAtk 以上でなければならない");
+
+  const nextTurn = advanceBattle(firing.result, battleCards, child, getOpponent("wall"), { recipes: stateRecipeList, memory: { learnedRecipeIds: [recipe.id] } });
+  assert.equal(
+    nextTurn.events.some((item) => item.type === "attack" && item.instanceId === sealed!.instanceId),
+    false,
+    "無力化した相手は攻撃してこない",
+  );
+});
+
+test("an unlearned state recipe does nothing but leaves a standby line", () => {
+  const recipe = stateRecipeOf("twin-fang-king");
+  const { result, fire } = stateRecipeTurn([recipe.cards[0], recipe.cards[1]], []);
+
+  assert.equal(fire, undefined, "未習得の状態型は発動しない");
+  assert.deepEqual(result.brother.board.map((item) => item.cardId), recipe.cards, "盤面はそのまま");
+  assert.ok(result.events.some((item) => item.type === "recipe" && item.text.startsWith("[RECIPE-STANDBY]")), "並んだ事実だけがログに残る");
+});
+
+test("the opponent fires a state recipe without learning it", () => {
+  const recipe = stateRecipeOf("twin-fang-king");
+  const opponent = getOpponent("wall");
+  const base = createBattle(battleDeck("grim"), opponent, battleCards, 1);
+  const make = (cardId: string, instanceId: string) => ({
+    ...base.opponent.hand[0],
+    instanceId,
+    cardId,
+    atk: battleCards.find((card) => card.id === cardId)!.atk,
+    hp: battleCards.find((card) => card.id === cardId)!.hp,
+    maxHp: battleCards.find((card) => card.id === cardId)!.hp,
+    summonedTurn: 0,
+    attacked: false,
+  });
+  const staged = {
+    ...base,
+    turn: 3,
+    activeSide: "opponent" as const,
+    brother: { ...base.brother, deck: [], hand: [], board: [], maxPp: 0, pp: 0, life: 30 },
+    opponent: { ...base.opponent, deck: [], hand: [], board: recipe.cards.map((id, index) => make(id, `o-${index}-${id}`)), maxPp: 0, pp: 0 },
+  };
+  const result = advanceBattle(staged, battleCards, child, opponent, { recipes: stateRecipeList, memory: { learnedRecipeIds: [] } });
+
+  assert.ok(result.events.some((item) => item.type === "recipe" && item.text.startsWith("[RECIPE-ENEMY]")), "敵は習得なしで発動する");
+  assert.deepEqual(result.opponent.board.map((item) => item.cardId), [recipe.resultCardId]);
+  assert.equal(result.events.some((item) => item.text.startsWith("[RECIPE-STANDBY]")), false, "敵側に不発の概念はない");
 });

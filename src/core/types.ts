@@ -327,17 +327,33 @@ export interface OpponentDefinition {
 }
 
 /**
- * レシピ = 「このカードを、この順で、同じターンに出すと強い」という手作りのデータ。
- * 弟が習得していれば通常のコスト降順プレイより先に、この順序どおりに出す。
- * 未習得のレシピには一切介入しない（従来ロジックが崩すのが仕様）。
+ * レシピの系統。
+ * - play: 手札の2枚を、この順で同一ターンに出す（実行型）
+ * - fusion/transform/counter: 場に2枚が並ぶことが条件（状態型）。カードの順不同で判定する
+ */
+export type RecipeKind = "play" | "fusion" | "transform" | "counter";
+
+/**
+ * レシピ = 「このカードとこのカードを、こう組み合わせると強い」という手作りのデータ。
+ * 実行型は「プレイ順序とターゲットの上書き」、状態型は「場に並んだら発動」。
+ * 未習得のレシピには一切介入しない（実行型は従来ロジックが崩し、状態型は何も起きない）。
  */
 export interface Recipe {
   id: string;
   name: string;
-  /** [先に出すcardId, 後に出すcardId]。順序に意味がある。 */
+  kind: RecipeKind;
+  /** play型は [先に出すcardId, 後に出すcardId]。状態型は順不同（transformのみ cards[1] が変化元）。 */
   cards: [string, string];
-  /** 後手カードの効果ターゲットの上書き。recipePartner は cards[0] で出したユニット。 */
+  /** play型のみ。後手カードの効果ターゲットの上書き。recipePartner は cards[0] で出したユニット。 */
   targetOverride?: { mode: "recipePartner" };
+  /** fusion: 2体と入れ替わって出るカード。transform: cards[1] が置き換わるカード。 */
+  resultCardId?: string;
+  /** counter型のみ。相手の場にこの条件を満たすユニットがいるときだけ発動する。 */
+  counterCondition?: { minAtk: number };
+  /** counter型のみ。neutralize は攻撃力を1にし、攻撃宣言を封じる（永続）。 */
+  counterEffect?: { mode: "neutralize" };
+  /** 本プロトタイプでは未使用。ノート/図鑑を作るときのための予約。 */
+  discovery?: "undiscovered" | "witnessed" | "discovered";
   /** 複数レシピが同時に成立したとき、小さい方を先に解決する。 */
   priority: number;
 }
@@ -371,6 +387,8 @@ export interface BattleCardInstance {
   grantedHp: number;
   summonedTurn: number;
   attacked: boolean;
+  /** 妨害レシピ（counter/neutralize）で攻撃宣言を封じられた状態。永続。攻撃対象にはなる。 */
+  cannotAttack?: boolean;
   revived: boolean;
   buffSources: Array<{ instanceId: string; amount: number; intervention: boolean }>;
 }

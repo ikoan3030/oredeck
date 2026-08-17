@@ -1,5 +1,5 @@
 import { nextRandom, randomIndex, shuffle } from "./random";
-import { learnedRecipes, recipeHandIndexes } from "./recipes";
+import { isRecipeLearned, learnedRecipes, playRecipes, recipeBoardIndexes, recipeHandIndexes, stateRecipes } from "./recipes";
 import { activeSpeciesSynergies, speciesGrant } from "./species";
 import { syncStage } from "./sync";
 import type {
@@ -20,6 +20,7 @@ import type {
   BattleCommentaryKind,
   Keyword,
   OpponentDefinition,
+  Recipe,
   RecipeContext,
 } from "./types";
 
@@ -726,13 +727,13 @@ function applyRecipePhase(
 ): BattleState {
   let next = state;
   const handAtPhaseStart = state[side].hand;
-  for (const recipe of context.recipes) {
+  for (const recipe of playRecipes(context.recipes)) {
     if (context.memory.learnedRecipeIds.includes(recipe.id)) continue;
     if (!recipeHandIndexes(recipe, handAtPhaseStart)) continue;
     next = event(next, { type: "recipe", side, text: `[RECIPE-MISS] ${recipe.name} のペアが手札に揃っていたが未習得` });
   }
 
-  for (const recipe of learnedRecipes(context.recipes, context.memory)) {
+  for (const recipe of playRecipes(learnedRecipes(context.recipes, context.memory))) {
     const active = next[side];
     const enemy = next[other(side)];
     const indexes = recipeHandIndexes(recipe, active.hand);
@@ -747,6 +748,132 @@ function applyRecipePhase(
       next = resolvePlay(next, side, secondIndex, cards, child, override);
     }
     break;
+  }
+  return next;
+}
+
+/**
+ * 状態型レシピの結果ユニット。イベント番号から作るので、同じ試合の中で重複しない。
+ * 「結果ユニットはそのターン攻撃できる」は、rush を偽装せず召喚ターンを1つ前にして表す。
+ */
+function makeResultInstance(state: BattleState, side: BattleSide, card: Card): BattleCardInstance {
+  return { ...makeInstance(card, `${side}-recipe-${state.nextEventId}`), summonedTurn: state.turn - 1, attacked: false };
+}
+
+function recipeFireText(side: BattleSide, recipe: Recipe): string {
+  return side === "opponent" ? `[RECIPE-ENEMY] 敵が ${recipe.name} を発動` : `[RECIPE] ${recipe.name} 発動`;
+}
+
+/**
+ * 状態型レシピ。プレイフェイズ完了後・攻撃フェイズ開始前に、弟側・敵側それぞれのターンで1回走る。
+ *
+ * - 場に2枚が並んでいれば即発動する。タイミングを計るAIは作らない（覚えたてを即撃ちするのが人格）
+ * - 発動するのは1ターンに1レシピまで。counter の待機は発動に数えない
+ * - 未習得の状態型は何もしない。並んでいる事実だけをログに残す（不発の観測用）
+ * - 敵は習得の概念を持たないので、デッキにペアが積まれていれば常に発動する
+ */
+function applyStateRecipePhase(
+  state: BattleState,
+  side: BattleSide,
+  cards: readonly Card[],
+  context: RecipeContext,
+): BattleState {
+  let next = state;
+
+  if (side === "brother") {
+    for (const recipe of stateRecipes(context.recipes)) {
+      if (isRecipeLearned(recipe, context.memory, side)) continue;
+      if (!recipeBoardIndexes(recipe, state[side].board)) continue;
+      next = event(next, { type: "recipe", side, text: `[RECIPE-STANDBY] ${recipe.name} のペアが場に並んでいるが未習得` });
+    }
+  }
+
+  for (const recipe of stateRecipes(context.recipes)) {
+    if (!isRecipeLearned(recipe, context.memory, side)) continue;
+    const active = next[side];
+    const indexes = recipeBoardIndexes(recipe, active.board);
+    if (!indexes) continue;
+    const resultCard = recipe.resultCardId ? cardById(cards, recipe.resultCardId) : null;
+
+    if (recipe.kind === "fusion") {
+      if (!resultCard) continue;
+      const materials = [active.board[indexes.first], active.board[indexes.second]];
+      // 空いた枠のうち若い方に置く。素材を抜いた後の配列でも、若い側の添字はそのまま使える。
+      const slot = Math.min(indexes.first, indexes.second);
+      const remaining = active.board.filter((_, index) => index !== indexes.first && index !== indexes.second);
+      const result = makeResultInstance(next, side, resultCard);
+      next = updatePlayers(next, {
+        ...active,
+        board: [...remaining.slice(0, slot), result, ...remaining.slice(slot)],
+        graveyard: [...active.graveyard, ...materials],
+      }, next[other(side)]);
+      next = event(next, {
+        type: "recipe",
+        side,
+        text: `${recipeFireText(side, recipe)}：${cardById(cards, materials[0].cardId).name}と${cardById(cards, materials[1].cardId).name}が${resultCard.name}になった`,
+        cardId: resultCard.id,
+        instanceId: result.instanceId,
+        // 素材は破壊されたのではなく合体で場を離れる。表示側はこの印だけで退場を知る。
+        destroyed: true,
+        targetInstanceIds: materials.map((item) => item.instanceId),
+        effective: true,
+      });
+      return next;
+    }
+
+    if (recipe.kind === "transform") {
+      if (!resultCard) continue;
+      const base = active.board[indexes.second];
+      const result: BattleCardInstance = {
+        ...makeResultInstance(next, side, resultCard),
+        // 盤面位置・攻撃済み状態・札の素性を引き継ぐ。instanceId も同じなので表示は同じ札が変化する。
+        instanceId: base.instanceId,
+        intervention: base.intervention,
+        interventionSupported: base.interventionSupported,
+        source: base.source,
+        attacked: base.attacked,
+      };
+      next = updatePlayers(next, {
+        ...active,
+        board: active.board.map((item, index) => index === indexes.second ? result : item),
+      }, next[other(side)]);
+      next = event(next, {
+        type: "recipe",
+        side,
+        text: `${recipeFireText(side, recipe)}：${cardById(cards, base.cardId).name}が${resultCard.name}に変化した`,
+        cardId: resultCard.id,
+        instanceId: result.instanceId,
+        targetInstanceIds: [result.instanceId],
+        effective: true,
+      });
+      return next;
+    }
+
+    const minAtk = recipe.counterCondition?.minAtk;
+    if (minAtk === undefined || recipe.counterEffect?.mode !== "neutralize") continue;
+    const enemy = next[other(side)];
+    const candidates = enemy.board.map((card, index) => ({ card, index })).filter(({ card }) => card.atk >= minAtk && !card.cannotAttack);
+    if (!candidates.length) {
+      // 条件が来るまで待つ。発動は消費されないので、次のターンも同じ判定を続ける。
+      next = event(next, { type: "recipe", side, text: `[RECIPE-WAIT] ${recipe.name} 発動待機中（敵側条件未成立）` });
+      continue;
+    }
+    const picked = candidates.sort((a, b) => b.card.atk - a.card.atk || a.card.hp - b.card.hp)[0];
+    const sealed: BattleCardInstance = { ...picked.card, atk: 1, cannotAttack: true };
+    next = updatePlayers(next, next[side], {
+      ...enemy,
+      board: enemy.board.map((item, index) => index === picked.index ? sealed : item),
+    });
+    next = event(next, {
+      type: "recipe",
+      side,
+      text: `${recipeFireText(side, recipe)}：${cardById(cards, sealed.cardId).name}を無力化した`,
+      cardId: sealed.cardId,
+      instanceId: sealed.instanceId,
+      targetInstanceIds: [sealed.instanceId],
+      effective: true,
+    });
+    return next;
   }
   return next;
 }
@@ -910,13 +1037,16 @@ export function advanceBattle(
     if (next.brother.life <= 0 || next.opponent.life <= 0) break;
   }
 
+  if (recipeContext) next = applyStateRecipePhase(next, side, cards, recipeContext);
+
   const faceBias = side === "brother" ? child.battle.faceBias : opponent.faceBias;
   const attackStyle = side === "brother" ? child.battle.attackStyle ?? "balanced" : opponent.attackStyle ?? "balanced";
   let attackerCursor = 0;
   while (attackerCursor < next[side].board.length) {
     const attacker = next[side].board[attackerCursor];
     const rush = instanceHasKeyword(attacker, cards, "rush");
-    if (!attacker.attacked && (attacker.summonedTurn < turn || rush)) next = resolveAttack(next, side, attackerCursor, faceBias, attackStyle, cards, child);
+    // cannotAttack は妨害レシピで封じられた印。攻撃宣言だけを止める（攻撃対象にはなる）。
+    if (!attacker.attacked && !attacker.cannotAttack && (attacker.summonedTurn < turn || rush)) next = resolveAttack(next, side, attackerCursor, faceBias, attackStyle, cards, child);
     if (next.brother.life <= 0 || next.opponent.life <= 0) break;
     const stillAtCursor = next[side].board[attackerCursor]?.instanceId === attacker.instanceId;
     attackerCursor += stillAtCursor ? 1 : 0;
