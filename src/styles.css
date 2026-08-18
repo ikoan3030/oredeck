@@ -723,12 +723,17 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
 .battle-status-panel .life { width: 100%; }
 .battle-actor-brother .battle-actor-side-data { justify-content: flex-start; }
 .battle-actor-opponent .battle-actor-side-data { justify-content: flex-end; }
-.deck-case-meter { --deck-case-width: 91px; --deck-case-height: 115px; --deck-case-window-x: 49.8%; --deck-case-window-y: 51%; --deck-case-window-width: 25.9%; --deck-case-window-height: 21.3%; --deck-case-number-size: 22px; position: relative; z-index: 1; flex: 0 0 var(--deck-case-width); width: var(--deck-case-width); height: var(--deck-case-height); }
-.deck-case-meter img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.deck-case-meter strong { position: absolute; top: var(--deck-case-window-y); left: var(--deck-case-window-x); width: var(--deck-case-window-width); height: var(--deck-case-window-height); display: grid; place-items: center; box-sizing: border-box; padding: 0; color: white; background: transparent; border: 0; box-shadow: none; font: 1000 var(--deck-case-number-size)/1 Arial, sans-serif; letter-spacing: -.08em; text-align: center; text-shadow: -1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111, 1px 1px 0 #111, 0 2px 4px #000; transform: translate(-50%, -50%); }
 
-/* 立ち絵はトリミングせず、縦横比を保ったまま枠いっぱいに出す。 */
+/* 立ち絵はトリミングせず、縦横比を保ったまま枠いっぱいに出す。
+   デッキケースは顔グラ枠の左下に重ねるので、倍率もここに置いて枠寸法の隣で調整できるようにする。
+     --deck-case-scale  : 顔グラ枠の高さに対するケースの高さ
+     --deck-case-inset  : 顔グラ枠の高さに対する左端・下端からのインセット
+     --deck-case-aspect : ケース画像の縦横比 405/512。維持する値なので調整対象ではない。
+   枠寸法は --actor-portrait-size だけが持つため、枠が動けばケースもそのまま追従する。 */
 .battle-actor-portrait {
+  --deck-case-scale: .37;
+  --deck-case-inset: .04;
+  --deck-case-aspect: .791;
   position: relative;
   flex: 0 0 auto;
   width: var(--actor-portrait-size, 280px);
@@ -743,6 +748,9 @@ button.battle-hand-rail:hover .battle-hand-card:not(:first-child), button.battle
   box-shadow: 5px 5px 0 #0009;
 }
 .battle-actor-portrait-image { display: block; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; }
+/* デッキケースは立ち絵より前面。立ち絵の一部が隠れるのは仕様。中央の窓に山札残数は出さない。 */
+.deck-case-meter { position: absolute; z-index: 2; left: calc(var(--actor-portrait-size) * var(--deck-case-inset)); bottom: calc(var(--actor-portrait-size) * var(--deck-case-inset)); width: auto; height: calc(var(--actor-portrait-size) * var(--deck-case-scale)); aspect-ratio: var(--deck-case-aspect); }
+.deck-case-meter img { display: block; width: 100%; height: 100%; object-fit: contain; }
 /* 立ち絵が未用意の相手はプレースホルダのまま出す。 */
 .battle-actor-opponent .battle-actor-portrait { background: repeating-linear-gradient(135deg, #7c8490 0 10px, #68717f 10px 20px); border: 5px solid var(--ink); box-shadow: 5px 5px 0 #0009; }
 .battle-actor-portrait > span { display: grid; place-items: center; width: 96px; height: 96px; color: var(--ink); background: #d5d9df; border: 5px solid var(--ink); border-radius: 50%; font-size: 54px; line-height: 1; }

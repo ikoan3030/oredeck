@@ -77,8 +77,33 @@ test("deck depletion is announced once per player, and never during skip", () =>
   assert.ok(/DECK_OUT_BANNER_MS[^;]*skip: 0/.test(app), "skip playback must omit the announcement");
   // 切り札カットインより明確に小さい細帯であること。
   assert.ok(styles.includes(".deck-out-banner"), "the banner needs its own thin-band style");
-  assert.ok(app.includes("function DeckCaseMeter("), "the deck case meter must expose the current deck count");
-  assert.ok(app.includes("deckCountBrother") && app.includes('side === "brother" && <DeckCaseMeter'), "only the brother side displays the playback-synchronized deck count");
+  assert.ok(app.includes("function DeckCaseMeter("), "the sync stage still reads off the deck case");
+  assert.ok(app.includes('side === "brother" && <DeckCaseMeter'), "only the brother side carries a deck case");
+  // 残数はこの告知とログで伝わるので、ケース中央の窓に数字は出さない。
+  assert.equal(/<DeckCaseMeter[^>]*deckCount/.test(app), false, "the deck case must not be fed a deck count to draw");
+  assert.equal(styles.includes(".deck-case-meter strong"), false, "the number inside the case window must be gone");
+});
+
+test("the deck case hangs off the brother portrait frame, not the status panel", () => {
+  // 顔グラ枠の中に置くことで、枠が動けばケースもそのまま追従する。
+  assert.ok(/battle-actor-portrait"[^]*?side === "brother" && <DeckCaseMeter[^]*?<div className="battle-actor-side-data"/.test(app), "the deck case belongs to the portrait frame, ahead of the side data column");
+  const frame = rulesFor("battle-actor-portrait")[0] ?? "";
+  // 倍率はこの1箇所だけ。あとから触るのはここ。
+  assert.ok(/--deck-case-scale:\s*\.37/.test(frame), "the size multiplier lives on the portrait frame");
+  assert.ok(/--deck-case-inset:\s*\.04/.test(frame), "the inset multiplier lives on the portrait frame");
+  assert.ok(/--deck-case-aspect:\s*\.791/.test(frame), "the case keeps the 405/512 aspect of its artwork");
+  assert.equal((styles.match(/--deck-case-scale:/g) ?? []).length, 1, "the size multiplier must be declared exactly once");
+  assert.equal((styles.match(/--deck-case-inset:/g) ?? []).length, 1, "the inset multiplier must be declared exactly once");
+  const meter = rulesFor("deck-case-meter")[0] ?? "";
+  assert.ok(/position:\s*absolute/.test(meter), "the case is positioned against the portrait frame");
+  assert.ok(/left:\s*calc\(var\(--actor-portrait-size\) \* var\(--deck-case-inset\)\)/.test(meter), "the left inset is measured off the frame height");
+  assert.ok(/bottom:\s*calc\(var\(--actor-portrait-size\) \* var\(--deck-case-inset\)\)/.test(meter), "the bottom inset is measured off the frame height");
+  assert.ok(/height:\s*calc\(var\(--actor-portrait-size\) \* var\(--deck-case-scale\)\)/.test(meter), "the case height is measured off the frame height");
+  assert.ok(/aspect-ratio:\s*var\(--deck-case-aspect\)/.test(meter), "the width follows from the aspect ratio");
+  // 顔グラより前面。顔グラの一部が隠れるのは仕様。
+  assert.ok(/z-index:\s*2/.test(meter), "the case sits in front of the portrait");
+  // 撤去後もステータスパネルは動かさない（右の空きはそのまま）。
+  assert.ok(styles.includes(".battle-actor-brother .battle-actor-side-data { flex-basis: 215px; }"), "the status panel column keeps its width, leaving the vacated space empty");
 });
 
 test("the turn number is a field watermark that never covers a card", () => {

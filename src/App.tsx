@@ -469,11 +469,15 @@ function PpMeter({ current, maximum }: { current: number; maximum: number }) {
 
 const DECK_CASE_IMAGES = [deckCase0, deckCase1, deckCase2, deckCase3, deckCase4, deckCase5];
 
-function DeckCaseMeter({ stage, deckCount }: { stage: number; deckCount: number }) {
+/**
+ * シンクロ段階を4方向のランプで示すデッキケース。顔グラ枠の左下に重ねる（位置と大きさは styles.css 側の
+ * --deck-case-scale / --deck-case-inset が持つ）。中央の窓に山札残数は出さない。デッキ切れは
+ * DeckOutBanner とバトルログで伝わるので、常時表示の数字は不要。
+ */
+function DeckCaseMeter({ stage }: { stage: number }) {
   const safeStage = Math.max(0, Math.min(5, Math.round(stage)));
-  return <div className="deck-case-meter" aria-label={`シンクロ段階${safeStage}、山札残り${deckCount}枚`}>
+  return <div className="deck-case-meter" aria-label={`シンクロ段階${safeStage}`}>
     <img src={DECK_CASE_IMAGES[safeStage]} alt={`シンクロ段階${safeStage}のデッキケース`} />
-    <strong>{deckCount}</strong>
   </div>;
 }
 
@@ -482,14 +486,13 @@ function DeckCaseMeter({ stage, deckCount }: { stage: number; deckCount: number 
  * LIFE/PP は立ち絵の横に一体型ステータスパネルとして置く。台詞が無い間も枠は残り、台詞欄だけが空になる。
  * 立ち絵は縦横比を保ったまま（トリミングせず）枠いっぱいに出す。
  */
-function BattleActor({ side, name, title, marker, text, leader, deckCount, syncStageValue, hit, portraitSrc }: {
+function BattleActor({ side, name, title, marker, text, leader, syncStageValue, hit, portraitSrc }: {
   side: "brother" | "opponent";
   name: string;
   title?: string;
   marker: string;
   text?: string;
   leader: { life: number; pp: number; maxPp: number };
-  deckCount?: number;
   syncStageValue: number;
   hit: boolean;
   portraitSrc?: string;
@@ -502,13 +505,13 @@ function BattleActor({ side, name, title, marker, text, leader, deckCount, syncS
     <div className="battle-actor-row">
       <div className="battle-actor-portrait" role="img" aria-label={`${name}の立ち絵${portraitSrc ? "" : "（プレースホルダ）"}`}>
         {portraitSrc ? <img className="battle-actor-portrait-image" src={portraitSrc} alt="" /> : <><span aria-hidden="true">{marker}</span><small>PORTRAIT</small></>}
+        {side === "brother" && <DeckCaseMeter stage={syncStageValue} />}
       </div>
       <div className="battle-actor-side-data">
         <div className={`battle-status-panel ${side}-status-panel ` + (hit ? "life-target" : "")}>
           <div className="life"><span>LIFE</span><b>{leader.life}</b></div>
           <PpMeter current={leader.pp} maximum={leader.maxPp} />
         </div>
-        {side === "brother" && <DeckCaseMeter stage={syncStageValue} deckCount={deckCount ?? 0} />}
       </div>
     </div>
   </div>;
@@ -1249,7 +1252,6 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
   const lifeSnapshot = playbackEvent?.snapshot;
   const lifeOpponent = lifeSnapshot?.opponent ?? battle.opponent;
   const lifeBrother = lifeSnapshot?.brother ?? battle.brother;
-  const deckCountBrother = lifeSnapshot?.brother.deckCount ?? battle.brother.deck.length;
   const battleSyncStage = syncStage(battle.syncRate, child);
   const leaderHitSide = activeEvent && isDamageEvent(activeEvent) && activeEvent.targetLeader ? activeEvent.side === "brother" ? "opponent" : "brother" : null;
   const activeTiming = activeEvent ? EVENT_PLAYBACK_TIMING[activeEvent.type] : null;
@@ -1307,7 +1309,7 @@ function BattleScreen({ battle, cards, child, opponent, onNext, onAutoToggle, au
       <BattleHandRail side="brother" hand={brotherHand} cards={cards} activeEvent={activeEvent} onOpen={() => setHandOpen(true)} />
       <BattleEffectLayer activeEvent={activeEvent} cards={cards} guardPreludeDone={guardPreludeDone} attackAfterglow={attackAfterglow} slotOf={slotOf} />
     </section>
-    <BattleActor side="brother" name="ユウタ" marker="ユ" text={!battle.winner ? brotherDialogueEvent?.dialogue : undefined} leader={lifeBrother} deckCount={deckCountBrother} syncStageValue={battleSyncStage} hit={leaderHitSide === "brother"} portraitSrc={tanjunBustSmile} />
+    <BattleActor side="brother" name="ユウタ" marker="ユ" text={!battle.winner ? brotherDialogueEvent?.dialogue : undefined} leader={lifeBrother} syncStageValue={battleSyncStage} hit={leaderHitSide === "brother"} portraitSrc={tanjunBustSmile} />
     {!battle.winner && <div className="battle-controls"><BattleSpeedControls speed={speed} onChange={onSpeedChange} /><button className="battle-pause-toggle" type="button" onClick={onAutoToggle} aria-pressed={!auto}>{auto ? "一時停止" : "再開"}</button></div>}
     <BattleHandModal open={handOpen} hand={brotherHand} cards={cards} aceInstanceId={aceInstanceId ?? null} onClose={() => setHandOpen(false)} />
     <BattleLogPanel open={logOpen} recent={recent} cards={cards} opponentName={opponent.name} onToggle={() => setLogOpen((value) => !value)} />
