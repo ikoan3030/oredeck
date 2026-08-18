@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>デッキケース移設レイアウト検討モック</title>
+  <style>
+    :root {
+      --ink: #17151a;
+      --yellow: #ffd928;
+      --cyan: #2bd9dc;
+      --red: #ee3342;
+      --white: #f7f7f4;
+      --stage-w: 1280px;
+      --stage-h: 720px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #05070c; }
+    body {
+      display: grid;
+      min-width: 320px;
+      min-height: 100vh;
+      place-items: center;
+      overflow: auto;
+      color: var(--white);
+      font-family: Arial, "Noto Sans JP", sans-serif;
+    }
+
+    /* The mock keeps the game's 1280x720 design surface and scales it for review. */
+    .stage-wrap {
+      width: min(100vw, calc(100vh * 16 / 9));
+      aspect-ratio: 16 / 9;
+    }
+
+    .stage {
+      position: relative;
+      width: var(--stage-w);
+      height: var(--stage-h);
+      overflow: hidden;
+      transform-origin: top left;
+      transform: scale(min(calc(100vw / 1280), calc(100vh / 720)));
+      color: var(--white);
+      background-image:
+        radial-gradient(#ffffff16 1px, transparent 1px),
+        radial-gradient(circle at 50% 45%, #34485f 0, #1d2939 45%, #111722 100%);
+      background-size: 10px 10px, auto;
+    }
+
+    /* ---- 以下は src/styles.css の該当ルールをそのまま持ち込んだもの ---- */
+
+    .life { display: flex; align-items: baseline; justify-content: flex-start; gap: 6px; padding: 0 0 6px; color: white; border: 0; border-bottom: 3px solid var(--yellow); white-space: nowrap; }
+    .life span { font: 900 11px Arial, sans-serif; color: var(--yellow); }
+    .life b { font: 1000 40px/0.9 Arial, sans-serif; letter-spacing: -.06em; }
+    .pp-meter { display: grid; margin-top: 8px; }
+    .pp-meter-track { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(2, 15px); gap: 3px; width: 100%; }
+    .pp-pip { min-width: 0; border: 2px solid #090e18; background: #16243a; box-shadow: inset 0 0 0 1px #4d6688; }
+    .pp-pip.available { background: var(--cyan); box-shadow: 0 0 8px #2bd9dc, inset 0 0 0 1px white; }
+    .pp-pip.spent { background: #33435a; border-color: var(--yellow); box-shadow: inset 0 0 0 1px #77631d; }
+    .pp-pip.locked { opacity: .55; }
+
+    .battle-actor { position: absolute; z-index: 8; width: var(--actor-caption-width, 520px); display: flex; flex-direction: column; gap: 0; pointer-events: none; }
+    .battle-actor-brother { left: 8px; bottom: 12px; align-items: flex-start; flex-direction: column-reverse; --actor-portrait-size: 260px; --actor-caption-width: 500px; --actor-caption-height: 104px; }
+    .battle-actor-row { display: flex; align-items: center; gap: 5px; width: 100%; }
+    .battle-actor-side-data { display: flex; min-width: 0; flex: 0 0 178px; flex-direction: row; align-items: center; gap: 4px; }
+    .battle-actor-brother .battle-actor-side-data { flex-basis: 215px; align-self: flex-end; margin-bottom: 4px; justify-content: flex-start; }
+    .battle-status-panel { width: 116px; box-sizing: border-box; padding: 10px 10px 9px; color: white; background: linear-gradient(155deg, #263955, #0b1322 72%); border: 4px solid var(--ink); box-shadow: 5px 5px 0 #0009, inset 0 0 0 2px var(--yellow); }
+    .battle-status-panel .life { width: 100%; }
+    .battle-status-panel.brother-status-panel { text-align: left; }
+
+    .battle-actor-portrait {
+      position: relative;
+      flex: 0 0 auto;
+      width: var(--actor-portrait-size, 280px);
+      height: var(--actor-portrait-size, 280px);
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 4px;
+      overflow: hidden;
+      background: #667182;
+      border: 5px solid var(--ink);
+      box-shadow: 5px 5px 0 #0009;
+    }
+    .battle-actor-portrait-image { display: block; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; }
+
+    .battle-actor-caption {
+      flex: 0 0 auto;
+      width: 100%;
+      height: var(--actor-caption-height, 78px);
+      min-height: 0;
+      display: grid;
+      align-content: center;
+      gap: 4px;
+      padding: 8px 16px;
+      color: var(--ink);
+      background: white;
+      border: 5px solid var(--ink);
+      box-shadow: 5px 5px 0 #0009;
+      font-family: "Yu Gothic", sans-serif;
+    }
+    .battle-actor-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .battle-actor-name { padding: 3px 10px; color: var(--ink); background: var(--cyan); font: 900 14px/1 "Yu Gothic", sans-serif; letter-spacing: .04em; }
+    .battle-actor-line { display: -webkit-box; margin: 0; min-height: 52px; overflow: hidden; font-weight: 900; font-size: 21px; line-height: 26px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+
+    /* ---- ここからが今回の検討対象 ---- */
+
+    /* デッキケースは顔グラ枠の左下に置く。倍率はこの2つだけを触れば調整できる。
+       --deck-case-scale : 顔グラ枠の高さに対するケースの高さ
+       --deck-case-inset : 顔グラ枠の高さに対する左端・下端からのインセット
+       --deck-case-aspect: ケース画像の縦横比 405/512。維持するので触らない。 */
+    .battle-actor-portrait { --deck-case-scale: .37; --deck-case-inset: .04; --deck-case-aspect: .791; }
+
+    .deck-case-meter {
+      position: absolute;
+      z-index: 2;
+      left: calc(var(--actor-portrait-size) * var(--deck-case-inset));
+      bottom: calc(var(--actor-portrait-size) * var(--deck-case-inset));
+      height: calc(var(--actor-portrait-size) * var(--deck-case-scale));
+      width: auto;
+      aspect-ratio: var(--deck-case-aspect);
+    }
+    .deck-case-meter img { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+    /* 参考: 顔グラ枠 166px のときの実寸を並べて確認する。 */
+    .ratio-probe { position: absolute; left: 8px; top: 8px; z-index: 9; display: flex; align-items: flex-end; gap: 10px; padding: 8px 10px; background: #05070ccc; border: 2px solid #3b4759; }
+    .ratio-probe .battle-actor-portrait { --actor-portrait-size: 166px; }
+    .ratio-probe figcaption { margin: 0; font: 11px/1.4 monospace; color: #b4bdcc; }
+    .stage-figures { position: absolute; right: 10px; top: 10px; z-index: 9; padding: 8px 10px; background: #05070ccc; border: 2px solid #3b4759; font: 11px/1.6 monospace; color: #cfd7e4; }
+    .stage-figures b { color: var(--yellow); }
+    .stage-strip { position: absolute; right: 10px; bottom: 10px; z-index: 9; display: flex; align-items: flex-end; gap: 8px; padding: 8px 10px; background: #05070ccc; border: 2px solid #3b4759; }
+    .stage-strip figure { margin: 0; display: grid; justify-items: center; gap: 4px; }
+    .stage-strip img { display: block; height: 96px; width: auto; }
+    .stage-strip figcaption { font: 11px/1 monospace; color: #b4bdcc; }
+
+    .mock-note { position: fixed; right: 12px; bottom: 8px; z-index: 20; padding: 4px 8px; color: #b4bdcc; background: #05070ccc; font: 11px/1.2 monospace; }
+  </style>
+</head>
+<body>
+  <div class="stage-wrap">
+    <main class="stage" aria-label="デッキケース移設の静止モック">
+
+      <div class="ratio-probe">
+        <div class="battle-actor-portrait" role="img" aria-label="顔グラ枠166px時の比率確認">
+          <img class="battle-actor-portrait-image" src="../src/assets/characters/tanjun-bust-smile.png" alt="" />
+          <div class="deck-case-meter" aria-label="シンクロ段階3">
+            <img src="../src/assets/deck-case-3.png" alt="シンクロ段階3のデッキケース" />
+          </div>
+        </div>
+        <figcaption>枠 166px<br>期待値 49 × 61 / inset 7</figcaption>
+      </div>
+
+      <div class="stage-figures" id="figures">計測待ち</div>
+
+      <div class="battle-actor battle-actor-brother">
+        <div class="battle-actor-caption">
+          <div class="battle-actor-heading"><span class="battle-actor-name">ユウタ</span></div>
+          <p class="battle-actor-line">いける、いける！ このデッキ、ぜったい強いって！</p>
+        </div>
+        <div class="battle-actor-row">
+          <div class="battle-actor-portrait" role="img" aria-label="ユウタの立ち絵">
+            <img class="battle-actor-portrait-image" src="../src/assets/characters/tanjun-bust-smile.png" alt="" />
+            <!-- 顔グラより前面。顔グラの一部が隠れるのは仕様。中央の窓に数字は出さない。 -->
+            <div class="deck-case-meter" aria-label="シンクロ段階3">
+              <img src="../src/assets/deck-case-3.png" alt="シンクロ段階3のデッキケース" />
+            </div>
+          </div>
+          <div class="battle-actor-side-data">
+            <!-- デッキケース撤去後もパネルは動かさない。右の空きはそのまま残す。 -->
+            <div class="battle-status-panel brother-status-panel">
+              <div class="life"><span>LIFE</span><b>20</b></div>
+              <div class="pp-meter">
+                <div class="pp-meter-track">
+                  <i class="pp-pip available"></i><i class="pp-pip available"></i><i class="pp-pip spent"></i><i class="pp-pip locked"></i><i class="pp-pip locked"></i>
+                  <i class="pp-pip locked"></i><i class="pp-pip locked"></i><i class="pp-pip locked"></i><i class="pp-pip locked"></i><i class="pp-pip locked"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage-strip" aria-label="シンクロ段階0〜5のランプ確認">
+        <figure><img src="../src/assets/deck-case-0.png" alt="段階0"><figcaption>0</figcaption></figure>
+        <figure><img src="../src/assets/deck-case-1.png" alt="段階1"><figcaption>1</figcaption></figure>
+        <figure><img src="../src/assets/deck-case-2.png" alt="段階2"><figcaption>2</figcaption></figure>
+        <figure><img src="../src/assets/deck-case-3.png" alt="段階3"><figcaption>3</figcaption></figure>
+        <figure><img src="../src/assets/deck-case-4.png" alt="段階4"><figcaption>4</figcaption></figure>
+        <figure><img src="../src/assets/deck-case-5.png" alt="段階5"><figcaption>5</figcaption></figure>
+      </div>
+
+    </main>
+  </div>
+  <div class="mock-note">layout mock v4 / 1280 × 720 / deck case = portrait bottom-left</div>
+  <script>
+    // 実測値を画面に出しておく（倍率が仕様どおりに効いているかの機械的な確認）。
+    // .deck-case-meter の offsetParent は .battle-actor-portrait なので、
+    // offsetLeft / offsetTop はそのまま枠内側基準の値になる（stage の scale の影響を受けない）。
+    addEventListener("load", () => {
+      const rows = [];
+      for (const frame of document.querySelectorAll(".battle-actor-portrait")) {
+        const kase = frame.querySelector(".deck-case-meter");
+        const inner = frame.clientHeight;
+        rows.push(
+          `枠 <b>${frame.offsetHeight}px</b>（内寸 ${inner}） → ケース <b>${kase.offsetWidth} × ${kase.offsetHeight}</b>`
+          + ` / inset 左 <b>${kase.offsetLeft}</b> 下 <b>${inner - kase.offsetTop - kase.offsetHeight}</b>`
+          + ` / 比 ${(kase.offsetWidth / kase.offsetHeight).toFixed(3)}`
+        );
+      }
+      document.getElementById("figures").innerHTML = rows.join("<br>");
+    });
+  </script>
+</body>
+</html>
